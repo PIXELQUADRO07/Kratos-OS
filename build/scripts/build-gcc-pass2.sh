@@ -120,6 +120,8 @@ echo "[+] Configuring GCC pass 2..."
 # CC_FOR_TARGET: use our own cross-gcc so pass2 knows where the sysroot is.
 # --with-build-sysroot: where GCC looks for target headers during the BUILD
 # (as opposed to --with-sysroot which is baked into the installed compiler).
+CXX="g++ -std=c++17" \
+CXXFLAGS_FOR_BUILD="-std=c++17" \
 CC_FOR_TARGET="$KRATOS_TOOLS/bin/$TARGET-gcc" \
 CXX_FOR_TARGET="$KRATOS_TOOLS/bin/$TARGET-g++" \
 AR_FOR_TARGET="$KRATOS_TOOLS/bin/$TARGET-ar" \
@@ -140,7 +142,6 @@ RANLIB_FOR_TARGET="$KRATOS_TOOLS/bin/$TARGET-ranlib" \
     --disable-libquadmath               \
     --disable-libvtv                    \
     --disable-libgomp                   \
-    --disable-libcody                   \
     --with-system-zlib
 
 echo "[+] Building GCC pass 2 (this may take a while)..."
