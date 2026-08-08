@@ -192,17 +192,17 @@ for lib in \
 done
 
 # libgcc_s
-if ls "$KRATOS_TOOLS/$TARGET/lib/libgcc_s.so"* &>/dev/null; then
+if ls "$KRATOS_TOOLS/$TARGET/lib/libgcc_s.so"* &>/dev/null || ls "$KRATOS_TOOLS/$TARGET/lib64/libgcc_s.so"* &>/dev/null; then
     pass "libgcc_s.so present"
 else
-    fail "libgcc_s.so NOT FOUND in $KRATOS_TOOLS/$TARGET/lib/"
+    fail "libgcc_s.so NOT FOUND in $KRATOS_TOOLS/$TARGET/lib/ or lib64/"
 fi
 
 # libstdc++
-if ls "$KRATOS_TOOLS/$TARGET/lib/libstdc++.so"* &>/dev/null; then
+if ls "$KRATOS_TOOLS/$TARGET/lib/libstdc++.so"* &>/dev/null || ls "$KRATOS_TOOLS/$TARGET/lib64/libstdc++.so"* &>/dev/null; then
     pass "libstdc++.so present"
 else
-    fail "libstdc++.so NOT FOUND in $KRATOS_TOOLS/$TARGET/lib/"
+    fail "libstdc++.so NOT FOUND in $KRATOS_TOOLS/$TARGET/lib/ or lib64/"
 fi
 
 # ---------------------------------------------------------------------------
