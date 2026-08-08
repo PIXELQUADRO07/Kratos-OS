@@ -54,6 +54,8 @@ echo "[+] Configuring GCC pass 1..."
     --target="$TARGET" \
     --prefix="$KRATOS_TOOLS" \
     --with-sysroot="$KRATOS_SYSROOT" \
+    --without-headers \
+    --with-newlib \
     --disable-nls \
     --disable-shared \
     --disable-multilib \
