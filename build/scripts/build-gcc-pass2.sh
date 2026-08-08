@@ -102,7 +102,8 @@ echo "[+] Checking GCC prerequisites (gmp, mpfr, mpc, isl)..."
 cd "$SOURCE_DIR"
 if [ ! -d gmp ] || [ ! -d mpfr ] || [ ! -d mpc ]; then
     echo "[+] Downloading GCC prerequisites via download_prerequisites..."
-    ./contrib/download_prerequisites
+    ./contrib/download_prerequisites --no-isl
+    rm -rf gettext isl
 else
     echo "[=] Prerequisites already present."
 fi
