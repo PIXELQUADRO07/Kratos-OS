@@ -104,13 +104,15 @@ fi
 # Download GCC prerequisites (gmp, mpfr, mpc) into the source tree
 # ---------------------------------------------------------------------------
 
-echo "[+] Downloading GCC prerequisites (gmp, mpfr, mpc, isl)..."
+echo "[+] Checking GCC prerequisites (gmp, mpfr, mpc, isl)..."
 cd "$SOURCE_DIR"
 if [ ! -d gmp ] || [ ! -d mpfr ] || [ ! -d mpc ]; then
+    echo "[+] Downloading GCC prerequisites via download_prerequisites..."
     ./contrib/download_prerequisites
 else
     echo "[=] Prerequisites already present."
 fi
+cd "$BUILD_DIR"
 
 # ---------------------------------------------------------------------------
 # Build
@@ -122,21 +124,29 @@ cd "$BUILD_DIR"
 
 echo "[+] Configuring GCC pass 2..."
 
-"$SOURCE_DIR/configure"         \
-    --target="$TARGET"          \
-    --prefix="$KRATOS_TOOLS"    \
-    --with-sysroot="$KRATOS_SYSROOT" \
-    --enable-languages=c,c++    \
-    --enable-shared             \
-    --enable-threads=posix      \
-    --enable-__cxa_atexit       \
-    --enable-clocale=gnu        \
-    --disable-nls               \
-    --disable-multilib          \
-    --disable-libsanitizer      \
-    --disable-libquadmath       \
-    --disable-libvtv            \
-    --disable-libgomp           \
+# CC_FOR_TARGET: use our own cross-gcc so pass2 knows where the sysroot is.
+# --with-build-sysroot: where GCC looks for target headers during the BUILD
+# (as opposed to --with-sysroot which is baked into the installed compiler).
+CC_FOR_TARGET="$KRATOS_TOOLS/bin/$TARGET-gcc" \
+CXX_FOR_TARGET="$KRATOS_TOOLS/bin/$TARGET-g++" \
+AR_FOR_TARGET="$KRATOS_TOOLS/bin/$TARGET-ar" \
+RANLIB_FOR_TARGET="$KRATOS_TOOLS/bin/$TARGET-ranlib" \
+"$SOURCE_DIR/configure"                 \
+    --target="$TARGET"                  \
+    --prefix="$KRATOS_TOOLS"            \
+    --with-sysroot="$KRATOS_SYSROOT"    \
+    --with-build-sysroot="$KRATOS_SYSROOT" \
+    --enable-languages=c,c++            \
+    --enable-shared                     \
+    --enable-threads=posix              \
+    --enable-__cxa_atexit               \
+    --enable-clocale=gnu                \
+    --disable-nls                       \
+    --disable-multilib                  \
+    --disable-libsanitizer              \
+    --disable-libquadmath               \
+    --disable-libvtv                    \
+    --disable-libgomp                   \
     --with-system-zlib
 
 echo "[+] Building GCC pass 2 (this may take a while)..."

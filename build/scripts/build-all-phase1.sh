@@ -77,17 +77,25 @@ stage_header() {
     echo "────────────────────────────────────────────"
 }
 
-# Time a stage
+# Time a stage — NOTE: must explicitly capture rc before the echo,
+# because set -e is suspended inside `if ! run_stage` and the echo
+# would otherwise become the function's return value (always 0).
 run_stage() {
     local script="$SCRIPT_DIR/$1"
-    local t_start t_end elapsed
+    local t_start t_end elapsed rc
 
     t_start="$(date +%s)"
     bash "$script"
+    rc=$?
     t_end="$(date +%s)"
     elapsed=$((t_end - t_start))
 
-    echo "${GREEN}  ✓ Done in ${elapsed}s${RESET}"
+    if [ "$rc" -eq 0 ]; then
+        echo "${GREEN}  ✓ Done in ${elapsed}s${RESET}"
+    else
+        echo "${RED}  ✗ Failed after ${elapsed}s (exit $rc)${RESET}"
+    fi
+    return "$rc"
 }
 
 # ---------------------------------------------------------------------------
