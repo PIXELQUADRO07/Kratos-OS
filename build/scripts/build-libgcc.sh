@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# build-libgcc.sh — Build target libgcc in a dedicated build directory.
+# build-libgcc.sh — Verify libgcc.a from GCC pass 1.
 #
-# Configures and builds target-libgcc independently without re-triggering
-# host GCC tool compilation.
+# Shared libgcc (libgcc_s.so) requires stdio.h from Glibc, which is not yet
+# installed at this stage. Static libgcc.a was already built in GCC pass 1.
+# Full libgcc_s.so will be built during GCC pass 2 after Glibc is installed.
 
 set -euo pipefail
 
@@ -11,67 +12,25 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../config/build.conf"
 source "$SCRIPT_DIR/../config/versions.conf"
 
-PACKAGE="gcc"
-VERSION="$GCC_VERSION"
-
-SOURCE_DIR="$KRATOS_SOURCES/$PACKAGE-$VERSION"
-BUILD_DIR="$KRATOS_WORK/$PACKAGE-libgcc-build"
-
 echo "========================================"
 echo "        KRATOSOS LIBGCC"
 echo "========================================"
 echo
 echo "  Target:    $TARGET"
-echo "  Version:   $VERSION"
-echo "  Build dir: $BUILD_DIR"
 echo "  Sysroot:   $KRATOS_SYSROOT"
 echo
 
-if [ ! -d "$SOURCE_DIR" ]; then
-    echo "[!] GCC sources not found: $SOURCE_DIR"
+# Verify static libgcc.a from GCC pass 1 exists
+LIBGCC_A="$(find "$KRATOS_TOOLS" -name "libgcc.a" 2>/dev/null | head -1 || true)"
+
+if [ -n "$LIBGCC_A" ] && [ -f "$LIBGCC_A" ]; then
+    echo "  [✓] Static libgcc.a verified: $LIBGCC_A"
+else
+    echo "[!] Static libgcc.a not found in $KRATOS_TOOLS"
     echo "    Run build-gcc-pass1.sh first."
     exit 1
 fi
 
-rm -rf "$BUILD_DIR"
-mkdir -p "$BUILD_DIR"
-cd "$BUILD_DIR"
-
-echo "[+] Configuring libgcc in dedicated build directory..."
-
-"$SOURCE_DIR/configure"         \
-    --target="$TARGET"          \
-    --prefix="$KRATOS_TOOLS"    \
-    --with-sysroot="$KRATOS_SYSROOT" \
-    --enable-languages=c        \
-    --enable-shared             \
-    --disable-nls               \
-    --disable-multilib          \
-    --disable-threads           \
-    --disable-libatomic         \
-    --disable-libgomp           \
-    --disable-libquadmath       \
-    --disable-libssp            \
-    --disable-libvtv            \
-    --disable-libstdcxx         \
-    --disable-libsanitizer      \
-    --disable-libcody
-
-echo "[+] Building target libgcc..."
-make -j"$(nproc)" all-target-libgcc
-
-echo "[+] Installing target libgcc..."
-make install-target-libgcc
-
-LIBGCC_DIR="$KRATOS_TOOLS/$TARGET/lib"
-
-if ls "$LIBGCC_DIR/libgcc_s.so"* &>/dev/null; then
-    echo "  [✓] libgcc_s present in $LIBGCC_DIR"
-    mkdir -p "$KRATOS_SYSROOT/usr/lib"
-    cp -av "$LIBGCC_DIR/libgcc_s.so"* "$KRATOS_SYSROOT/usr/lib/" 2>/dev/null || true
-else
-    echo "  [~] Note: libgcc_s.so not built in this stage (will be built in GCC pass 2)."
-fi
-
 echo
-echo "[✓] libgcc stage complete."
+echo "[✓] libgcc bootstrap stage complete (using static libgcc.a)."
+echo "    Shared libgcc_s.so will be built in GCC pass 2 after Glibc."
