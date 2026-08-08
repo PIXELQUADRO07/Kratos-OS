@@ -60,6 +60,7 @@ echo "[+] Configuring ncurses..."
     --enable-widec \
     --without-manpages \
     --without-tests \
+    --without-cxx-binding \
     CC="${CROSS}-gcc" \
     CXX="${CROSS}-g++" \
     AR="${CROSS}-ar" \
