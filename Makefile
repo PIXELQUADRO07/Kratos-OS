@@ -5,8 +5,10 @@
 #
 # Usage:
 #   make phase1          # full Phase 1 toolchain bootstrap
+#   make phase2          # full Phase 2 userspace base
 #   make toolchain       # alias for phase1
-#   make verify          # run toolchain verification only
+#   make verify          # run Phase 1 toolchain verification
+#   make verify-phase2   # run Phase 2 userspace verification
 #   make download        # download all sources
 #   make clean           # remove work/ tools/ sysroot/ (keep downloads/)
 #   make distclean       # remove everything including downloads/
@@ -18,8 +20,10 @@ MAKEFLAGS     += --no-print-directory
 # Export KRATOS_JOBS so sub-scripts pick it up (default: nproc)
 export KRATOS_JOBS ?= $(shell nproc)
 
-.PHONY: help phase1 toolchain verify download clean distclean \
-        gcc-pass1 gcc-pass2 binutils linux-headers glibc libgcc
+.PHONY: help phase1 phase2 toolchain verify verify-phase2 download clean distclean \
+        gcc-pass1 gcc-pass2 binutils linux-headers glibc libgcc \
+        ncurses readline bash coreutils grep sed gawk findutils \
+        diffutils tar gzip xz bzip2 file-cmd
 
 # ─────────────────────────────────────────────
 # Default: show help
@@ -28,12 +32,14 @@ help:
 	@echo ""
 	@echo "  KratosOS Build System"
 	@echo "  ─────────────────────────────────────────"
-	@echo "  make phase1      Full Phase 1 toolchain bootstrap"
-	@echo "  make toolchain   Alias for phase1"
-	@echo "  make verify      Run verify-toolchain.sh only"
-	@echo "  make download    Download all source tarballs"
+	@echo "  make phase1        Full Phase 1 toolchain bootstrap"
+	@echo "  make phase2        Full Phase 2 userspace base"
+	@echo "  make toolchain     Alias for phase1"
+	@echo "  make verify        Run Phase 1 verification"
+	@echo "  make verify-phase2 Run Phase 2 verification"
+	@echo "  make download      Download all source tarballs"
 	@echo ""
-	@echo "  Individual stages:"
+	@echo "  Phase 1 individual stages:"
 	@echo "  make linux-headers"
 	@echo "  make binutils"
 	@echo "  make gcc-pass1"
@@ -41,6 +47,11 @@ help:
 	@echo "  make libgcc"
 	@echo "  make glibc"
 	@echo "  make gcc-pass2"
+	@echo ""
+	@echo "  Phase 2 individual packages:"
+	@echo "  make ncurses  readline  bash  coreutils"
+	@echo "  make grep  sed  gawk  findutils  diffutils"
+	@echo "  make tar  gzip  xz  bzip2  file-cmd"
 	@echo ""
 	@echo "  make clean       Remove build artifacts (keep downloads)"
 	@echo "  make distclean   Remove everything including downloads"
@@ -84,6 +95,57 @@ glibc:
 
 gcc-pass2:
 	@bash $(SCRIPTS)/build-gcc-pass2.sh
+
+# ─────────────────────────────────────────────
+# Phase 2 — Userspace base
+# ─────────────────────────────────────────────
+phase2:
+	@bash $(SCRIPTS)/build-all-phase2.sh
+
+verify-phase2:
+	@bash $(SCRIPTS)/verify-phase2.sh
+
+ncurses:
+	@bash $(SCRIPTS)/build-ncurses.sh
+
+readline:
+	@bash $(SCRIPTS)/build-readline.sh
+
+bash:
+	@bash $(SCRIPTS)/build-bash.sh
+
+coreutils:
+	@bash $(SCRIPTS)/build-coreutils.sh
+
+grep:
+	@bash $(SCRIPTS)/build-grep.sh
+
+sed:
+	@bash $(SCRIPTS)/build-sed.sh
+
+gawk:
+	@bash $(SCRIPTS)/build-gawk.sh
+
+findutils:
+	@bash $(SCRIPTS)/build-findutils.sh
+
+diffutils:
+	@bash $(SCRIPTS)/build-diffutils.sh
+
+tar:
+	@bash $(SCRIPTS)/build-tar.sh
+
+gzip:
+	@bash $(SCRIPTS)/build-gzip.sh
+
+xz:
+	@bash $(SCRIPTS)/build-xz.sh
+
+bzip2:
+	@bash $(SCRIPTS)/build-bzip2.sh
+
+file-cmd:
+	@bash $(SCRIPTS)/build-file.sh
 
 # ─────────────────────────────────────────────
 # Cleanup
