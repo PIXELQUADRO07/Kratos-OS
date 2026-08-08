@@ -140,6 +140,7 @@ RANLIB_FOR_TARGET="$KRATOS_TOOLS/bin/$TARGET-ranlib" \
     --disable-libquadmath               \
     --disable-libvtv                    \
     --disable-libgomp                   \
+    --disable-libcody                   \
     --with-system-zlib
 
 echo "[+] Building GCC pass 2 (this may take a while)..."
