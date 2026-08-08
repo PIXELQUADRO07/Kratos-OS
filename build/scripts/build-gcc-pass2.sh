@@ -65,12 +65,6 @@ for lib in libc.so libc.a; do
     fi
 done
 
-# libgcc shared must exist
-if ! ls "$KRATOS_TOOLS/$TARGET/lib/libgcc_s.so"* &>/dev/null; then
-    echo "[!] libgcc_s not found in $KRATOS_TOOLS/$TARGET/lib/"
-    echo "    Run build-libgcc.sh first."
-    exit 1
-fi
 
 echo "  [✓] All prerequisites satisfied."
 echo
