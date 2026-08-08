@@ -63,7 +63,6 @@ echo "[+] Configuring bash..."
     --prefix=/usr \
     --bindir=/bin \
     --without-bash-malloc \
-    --with-installed-readline \
     --enable-readline \
     --disable-nls \
     CC="${CROSS}-gcc" \
