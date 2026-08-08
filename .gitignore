@@ -1,18 +1,38 @@
-build/downloads
-build/sources
-build/work
-build/tools
-build/sysroot
+# KratosOS — .gitignore
 
+# ─── Build artifacts (generated, never committed) ───────────────────────────
+build/downloads/
+build/sources/
+build/work/
+build/tools/
+build/sysroot/
 
+# Partial downloads
+build/downloads/*.part
+
+# ─── ISO / image output ─────────────────────────────────────────────────────
 iso/*.iso
 iso/*.img
+iso/*.squashfs
 
-*.log
+# ─── Object files / libraries (cross-compiled, not tracked) ─────────────────
 *.o
 *.a
 *.so
+*.so.*
 
+# ─── Logs ───────────────────────────────────────────────────────────────────
+*.log
+build/logs/
 
-*.swp�
+# ─── Editor temporaries ─────────────────────────────────────────────────────
+*.swp
+*.swo
 *~
+.DS_Store
+.vscode/
+.idea/
+
+# ─── Python / misc ──────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
