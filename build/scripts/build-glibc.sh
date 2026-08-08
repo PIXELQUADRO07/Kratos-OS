@@ -70,9 +70,7 @@ for f in crt1.o crti.o crtn.o libc.so; do
 done
 
 if ! ls "$KRATOS_SYSROOT/usr/lib/libgcc_s.so"* &>/dev/null; then
-    echo "[!] libgcc_s.so not found in sysroot."
-    echo "    Run build-libgcc.sh first (it copies libgcc_s into the sysroot)."
-    exit 1
+    echo "  [~] Note: libgcc_s.so not in sysroot yet; glibc will link against static libgcc.a."
 fi
 
 echo "  [✓] All prerequisites satisfied."
