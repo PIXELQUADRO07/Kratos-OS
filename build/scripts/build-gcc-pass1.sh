@@ -69,11 +69,11 @@ echo "[+] Configuring GCC pass 1..."
     --enable-languages=c
 echo "[+] Building GCC pass 1..."
 
-make all-gcc -j"$(nproc)"
+make -j"$(nproc)" all-gcc all-target-libgcc
 
-echo "[+] Installing GCC pass 1..."
+echo "[+] Installing GCC pass 1 (compiler + static libgcc.a)..."
 
-make install-gcc
+make install-gcc install-target-libgcc
 
 echo
 echo "[+] GCC pass 1 installed successfully."
