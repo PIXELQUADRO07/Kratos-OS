@@ -13,7 +13,7 @@ VERSION="$LINUX_VERSION"
 ARCHIVE="$KRATOS_DOWNLOADS/linux-$VERSION.tar.xz"
 SOURCE_DIR="$KRATOS_SOURCES/linux-$VERSION"
 
-URL="https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$VERSION.tar.xz"
+URL="https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-$VERSION.tar.xz"
 
 echo "================================"
 echo "     KRATOSOS LINUX HEADERS"
