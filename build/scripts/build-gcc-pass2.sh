@@ -106,7 +106,6 @@ if [ ! -d gmp ] || [ ! -d mpfr ] || [ ! -d mpc ]; then
 else
     echo "[=] Prerequisites already present."
 fi
-cd "$BUILD_DIR"
 
 # ---------------------------------------------------------------------------
 # Build
