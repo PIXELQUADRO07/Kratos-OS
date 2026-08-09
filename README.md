@@ -1,6 +1,7 @@
 <div align="center">
 
-<img src="assets/KRATOS_OS.png" width="260">
+<img width="500" height="500" alt="KRATOS_OS-removebg-preview" src="https://github.com/user-attachments/assets/955f5d47-345d-4f06-b463-4e11f301607b" />
+
 
 # KratosOS
 
