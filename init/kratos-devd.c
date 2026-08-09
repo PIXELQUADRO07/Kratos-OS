@@ -27,6 +27,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <sys/sysmacros.h>
 #include <linux/netlink.h>
 
 #define UEVENT_BUFFER_SIZE 8192
@@ -95,8 +96,6 @@ static void apply_device_rules(const uevent_t *ev)
     char node_path[256];
     snprintf(node_path, sizeof(node_path), "/dev/%s", ev->devname);
 
-    if (access(node_path, F_OK) != 0) return;
-
     /* Default: 0600 root:root */
     mode_t mode = 0600;
     uid_t uid = 0;
@@ -129,6 +128,21 @@ static void apply_device_rules(const uevent_t *ev)
     {
         mode = 0660;
         gid = 6; /* disk group */
+    }
+
+    /* Create parent directories in /dev if needed (e.g. /dev/input/event0) */
+    char parent_dir[256];
+    snprintf(parent_dir, sizeof(parent_dir), "%s", node_path);
+    char *slash = strrchr(parent_dir, '/');
+    if (slash && slash != parent_dir) {
+        *slash = '\0';
+        mkdir(parent_dir, 0755);
+    }
+
+    /* If devtmpfs didn't create the node yet, create it via mknod */
+    if (access(node_path, F_OK) != 0 && ev->major > 0) {
+        mode_t dev_type = (strcmp(ev->subsystem, "block") == 0) ? S_IFBLK : S_IFCHR;
+        mknod(node_path, mode | dev_type, makedev(ev->major, ev->minor));
     }
 
     chmod(node_path, mode);
@@ -226,8 +240,9 @@ static void coldplug_dir(const char *dirpath)
             }
         }
 
+        /* Use lstat to avoid following sysfs symlinks (which can cause infinite recursion) */
         struct stat st;
-        if (stat(subpath, &st) == 0 && S_ISDIR(st.st_mode)) {
+        if (lstat(subpath, &st) == 0 && S_ISDIR(st.st_mode)) {
             coldplug_dir(subpath);
         }
     }
