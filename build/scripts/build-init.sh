@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# build-init.sh — Build KratosOS init system & shutdown tools
+# build-init.sh — Build KratosOS init system, shutdown tools, and kratos-devd
 
 set -euo pipefail
 
@@ -13,12 +13,14 @@ CC="$TOOLS/bin/$TARGET-gcc"
 
 INIT_SRC="$KRATOS_ROOT/init/init.c"
 SHUTDOWN_SRC="$KRATOS_ROOT/init/shutdown.c"
+DEVD_SRC="$KRATOS_ROOT/init/kratos-devd.c"
 
 INIT_OUT="$SYSROOT/sbin/init"
 SHUTDOWN_OUT="$SYSROOT/sbin/shutdown"
+DEVD_OUT="$SYSROOT/sbin/kratos-devd"
 
 echo "========================================"
-echo "       KRATOSOS INIT BUILD"
+echo "       KRATOSOS SYSTEM BUILD"
 echo "========================================"
 echo "  Target:  $TARGET"
 echo "  Sysroot: $SYSROOT"
@@ -56,6 +58,18 @@ echo "[+] Compiling /sbin/shutdown..."
 
 echo "[✓] shutdown compiled."
 
+echo "[+] Compiling /sbin/kratos-devd..."
+"$CC" \
+    --sysroot="$SYSROOT" \
+    -O2 \
+    -Wall \
+    -Wextra \
+    -std=gnu11 \
+    -o "$DEVD_OUT" \
+    "$DEVD_SRC"
+
+echo "[✓] kratos-devd compiled."
+
 echo "[+] Creating symlinks for reboot, poweroff, halt..."
 ln -sf shutdown "$SYSROOT/sbin/reboot"
 ln -sf shutdown "$SYSROOT/sbin/poweroff"
@@ -64,8 +78,8 @@ ln -sf shutdown "$SYSROOT/sbin/halt"
 echo "[✓] Symlinks created."
 echo
 echo "Installed binaries:"
-ls -lh "$SYSROOT/sbin/init" "$SYSROOT/sbin/shutdown"
+ls -lh "$SYSROOT/sbin/init" "$SYSROOT/sbin/shutdown" "$SYSROOT/sbin/kratos-devd"
 ls -la "$SYSROOT/sbin/reboot" "$SYSROOT/sbin/poweroff" "$SYSROOT/sbin/halt"
 
 echo
-echo "[✓] KratosOS init system built successfully."
+echo "[✓] KratosOS init & devd built successfully."

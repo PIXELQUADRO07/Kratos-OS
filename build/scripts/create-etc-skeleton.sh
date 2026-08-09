@@ -25,6 +25,7 @@ echo "[+] Creating /etc/group..."
 cat > "$ETC/group" <<'EOF'
 root:x:0:
 tty:x:5:
+disk:x:6:
 EOF
 
 echo "[+] Creating /etc/shadow..."
@@ -112,6 +113,18 @@ fi
 echo "[rc.sysinit] System initialization complete."
 EOF
 chmod +x "$ETC/rc.sysinit"
+
+echo "[+] Creating /etc/rc.d/00-devd..."
+cat > "$ETC/rc.d/00-devd" <<'EOF'
+#!/bin/bin/bash
+# /etc/rc.d/00-devd — Launch KratosOS Device Daemon
+
+if [ -x /sbin/kratos-devd ]; then
+    echo "[rc.d] Starting kratos-devd..."
+    /sbin/kratos-devd --daemon
+fi
+EOF
+chmod +x "$ETC/rc.d/00-devd"
 
 echo
 echo "[+] /etc skeleton created successfully."
