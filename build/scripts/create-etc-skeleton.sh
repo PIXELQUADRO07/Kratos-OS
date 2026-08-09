@@ -30,10 +30,27 @@ disk:x:6:
 EOF
 
 echo "[+] Creating /etc/shadow..."
+# NOTE: login.c treats a "*" or "!" hash as a LOCKED account and skips the
+# password prompt entirely — which in this custom login flow actually means
+# "let anyone in without a password" (the opposite of "*"'s usual meaning on
+# other systems). We use the standard empty-password field instead: it hits
+# the same "skip prompt" branch in login.c (hash length 0) but is the
+# conventional way to say "no password set", so it won't confuse anyone
+# relying on normal shadow(5) semantics later.
 cat > "$ETC/shadow" <<'EOF'
-root:*:19700:0:99999:7:::
+root::19700:0:99999:7:::
 EOF
 chmod 600 "$ETC/shadow"
+
+echo "[+] Creating /etc/nsswitch.conf..."
+cat > "$ETC/nsswitch.conf" <<'EOF'
+# KratosOS NSS configuration
+passwd:    files
+group:     files
+shadow:    files
+hosts:     files dns
+networks:  files
+EOF
 
 echo "[+] Creating /etc/shells..."
 cat > "$ETC/shells" <<'EOF'
@@ -110,6 +127,9 @@ auto eth0
 iface eth0 inet dhcp
 EOF
 
+echo "[+] Pre-creating /etc/mtab symlink..."
+ln -sf /proc/self/mounts "$ETC/mtab"
+
 echo "[+] Creating /etc/rc.sysinit..."
 cat > "$ETC/rc.sysinit" <<'EOF'
 #!/bin/bash
@@ -128,7 +148,7 @@ chmod +x "$ETC/rc.sysinit"
 
 echo "[+] Creating /etc/rc.d/00-devd..."
 cat > "$ETC/rc.d/00-devd" <<'EOF'
-#!/bin/bin/bash
+#!/bin/bash
 # /etc/rc.d/00-devd — Launch KratosOS Device Daemon
 
 if [ -x /sbin/kratos-devd ]; then
@@ -140,7 +160,7 @@ chmod +x "$ETC/rc.d/00-devd"
 
 echo "[+] Creating /etc/rc.d/10-network..."
 cat > "$ETC/rc.d/10-network" <<'EOF'
-#!/bin/bin/bash
+#!/bin/bash
 # /etc/rc.d/10-network — Launch KratosOS Network Manager
 
 if [ -x /sbin/kratos-net ]; then

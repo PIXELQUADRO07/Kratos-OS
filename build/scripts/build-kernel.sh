@@ -85,7 +85,25 @@ if [ ! -f "$KBUILD_DIR/.config" ]; then
         --enable  CONFIG_TTY              \
         --enable  CONFIG_SERIAL_8250      \
         --enable  CONFIG_SERIAL_8250_CONSOLE \
+        --enable  CONFIG_VIRTIO           \
+        --enable  CONFIG_VIRTIO_PCI       \
+        --enable  CONFIG_VIRTIO_PCI_LEGACY \
+        --enable  CONFIG_VIRTIO_BLK       \
+        --enable  CONFIG_VIRTIO_MENU      \
         2>/dev/null || true  # scripts/config may not exist in older trees
+
+    # x86_64 defconfig builds VIRTIO_BLK/VIRTIO_PCI as modules (=m) by
+    # default. There is no initramfs in this boot chain and init.c never
+    # loads kernel modules, so if these stay as modules the kernel simply
+    # cannot see /dev/vda when QEMU is run with -drive if=virtio, and it
+    # panics with "VFS: Unable to mount root fs". They must be built-in.
+    # scripts/config --enable only sets bool/tristate options to 'y' when
+    # possible; force it explicitly in case a tristate default resists:
+    sed -i \
+        -e 's/^CONFIG_VIRTIO_PCI=m/CONFIG_VIRTIO_PCI=y/' \
+        -e 's/^CONFIG_VIRTIO_BLK=m/CONFIG_VIRTIO_BLK=y/' \
+        -e 's/^CONFIG_VIRTIO=m/CONFIG_VIRTIO=y/' \
+        "$KBUILD_DIR/.config" 2>/dev/null || true
 
     # Resolve any new symbols introduced by our changes
     "${KMAKE[@]}" olddefconfig
