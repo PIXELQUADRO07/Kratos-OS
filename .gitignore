@@ -15,6 +15,7 @@ build/downloads/*.part
 iso/*.iso
 iso/*.img
 iso/*.squashfs
+build/images/
 
 # ─── Object files / libraries (cross-compiled, not tracked) ─────────────────
 *.o
