@@ -426,8 +426,8 @@ echo "[✓] Root UUID: $ROOT_UUID"
 #   root=UUID=...      The kernel needs this to know which device
 #                      to mount as /.
 #   rw                 Mount root read-write.
-#   console=ttyS0      Serial console output (for QEMU -nographic).
 #   console=tty0       VGA console (standard screen).
+#   console=ttyS0      Serial console output (Primary for QEMU -nographic).
 # ------------------------------------------------------------
 
 echo
@@ -456,7 +456,7 @@ menuentry "KratosOS 0.1.0 (UUID)" {
 
     search --no-floppy --fs-uuid --set=root ${ROOT_UUID}
 
-    linux /boot/vmlinuz root=UUID=${ROOT_UUID} rw init=/sbin/init console=ttyS0 console=tty0 kratos.build=${BUILD_ID}
+    linux /boot/vmlinuz root=UUID=${ROOT_UUID} rw init=/sbin/init console=tty0 console=ttyS0 kratos.build=${BUILD_ID}
 }
 
 menuentry "KratosOS 0.1.0 (VirtIO /dev/vda2)" {
@@ -466,7 +466,7 @@ menuentry "KratosOS 0.1.0 (VirtIO /dev/vda2)" {
 
     search --no-floppy --fs-uuid --set=root ${ROOT_UUID}
 
-    linux /boot/vmlinuz root=/dev/vda2 rw init=/sbin/init console=ttyS0 console=tty0 kratos.build=${BUILD_ID}
+    linux /boot/vmlinuz root=/dev/vda2 rw init=/sbin/init console=tty0 console=ttyS0 kratos.build=${BUILD_ID}
 }
 GRUB_EOF
 
