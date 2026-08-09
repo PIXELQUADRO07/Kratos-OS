@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# build-init.sh — Build KratosOS init system, shutdown tools, kratos-devd, and kratos-net
+# build-init.sh — Build KratosOS init system, shutdown tools, kratos-devd, kratos-net, login, and passwd
 
 set -euo pipefail
 
@@ -15,11 +15,15 @@ INIT_SRC="$KRATOS_ROOT/init/init.c"
 SHUTDOWN_SRC="$KRATOS_ROOT/init/shutdown.c"
 DEVD_SRC="$KRATOS_ROOT/init/kratos-devd.c"
 NET_SRC="$KRATOS_ROOT/init/kratos-net.c"
+LOGIN_SRC="$KRATOS_ROOT/init/login.c"
+PASSWD_SRC="$KRATOS_ROOT/init/passwd.c"
 
 INIT_OUT="$SYSROOT/sbin/init"
 SHUTDOWN_OUT="$SYSROOT/sbin/shutdown"
 DEVD_OUT="$SYSROOT/sbin/kratos-devd"
 NET_OUT="$SYSROOT/sbin/kratos-net"
+LOGIN_OUT="$SYSROOT/bin/login"
+PASSWD_OUT="$SYSROOT/usr/bin/passwd"
 
 echo "========================================"
 echo "       KRATOSOS SYSTEM BUILD"
@@ -34,7 +38,9 @@ if [ ! -f "$CC" ]; then
     exit 1
 fi
 
+mkdir -p "$SYSROOT/bin"
 mkdir -p "$SYSROOT/sbin"
+mkdir -p "$SYSROOT/usr/bin"
 
 echo "[+] Compiling /sbin/init..."
 "$CC" \
@@ -80,6 +86,30 @@ echo "[+] Compiling /sbin/kratos-net..."
     "$NET_SRC"
 echo "[✓] kratos-net compiled."
 
+echo "[+] Compiling /bin/login..."
+"$CC" \
+    --sysroot="$SYSROOT" \
+    -O2 \
+    -Wall \
+    -Wextra \
+    -std=gnu11 \
+    -o "$LOGIN_OUT" \
+    "$LOGIN_SRC" \
+    "$KRATOS_ROOT/init/kratos-crypt.c"
+echo "[✓] login compiled."
+
+echo "[+] Compiling /usr/bin/passwd..."
+"$CC" \
+    --sysroot="$SYSROOT" \
+    -O2 \
+    -Wall \
+    -Wextra \
+    -std=gnu11 \
+    -o "$PASSWD_OUT" \
+    "$PASSWD_SRC" \
+    "$KRATOS_ROOT/init/kratos-crypt.c"
+echo "[✓] passwd compiled."
+
 echo "[+] Creating symlinks for reboot, poweroff, halt..."
 ln -sf shutdown "$SYSROOT/sbin/reboot"
 ln -sf shutdown "$SYSROOT/sbin/poweroff"
@@ -88,8 +118,8 @@ ln -sf shutdown "$SYSROOT/sbin/halt"
 echo "[✓] Symlinks created."
 echo
 echo "Installed binaries:"
-ls -lh "$SYSROOT/sbin/init" "$SYSROOT/sbin/shutdown" "$SYSROOT/sbin/kratos-devd" "$SYSROOT/sbin/kratos-net"
+ls -lh "$INIT_OUT" "$SHUTDOWN_OUT" "$DEVD_OUT" "$NET_OUT" "$LOGIN_OUT" "$PASSWD_OUT"
 ls -la "$SYSROOT/sbin/reboot" "$SYSROOT/sbin/poweroff" "$SYSROOT/sbin/halt"
 
 echo
-echo "[✓] KratosOS system tools built successfully."
+echo "[✓] KratosOS system tools & authentication built successfully."

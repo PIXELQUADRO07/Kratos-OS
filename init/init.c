@@ -311,6 +311,10 @@ static pid_t spawn_tty_shell(const char *tty_dev)
         setenv("PATH",  "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1);
         setenv("SHELL", "/bin/bash", 1);
 
+        if (access("/bin/login", X_OK) == 0) {
+            execl("/bin/login", "login", (char *)NULL);
+        }
+
         execl("/bin/bash", "bash", "--login", (char *)NULL);
         perror("[init] execl bash");
         _exit(127);
