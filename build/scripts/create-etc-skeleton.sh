@@ -15,6 +15,7 @@ echo
 
 mkdir -p "$ETC"
 mkdir -p "$ETC/rc.d"
+mkdir -p "$ETC/network"
 
 echo "[+] Creating /etc/passwd..."
 cat > "$ETC/passwd" <<'EOF'
@@ -91,19 +92,30 @@ export TERM=linux
 export PS1='\[\033[1;32m\]kratOS\[\033[0m\]:\[\033[1;34m\]\w\[\033[0m\]# '
 EOF
 
+echo "[+] Creating /etc/resolv.conf..."
+cat > "$ETC/resolv.conf" <<'EOF'
+# KratosOS DNS Resolv Configuration
+nameserver 1.1.1.1
+nameserver 8.8.8.8
+EOF
+
+echo "[+] Creating /etc/network/interfaces..."
+cat > "$ETC/network/interfaces" <<'EOF'
+# KratosOS network configuration
+
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet dhcp
+EOF
+
 echo "[+] Creating /etc/rc.sysinit..."
 cat > "$ETC/rc.sysinit" <<'EOF'
 #!/bin/bash
 # /etc/rc.sysinit — KratosOS Early System Initialization
 
 echo "[rc.sysinit] Starting KratosOS initialization..."
-
-# Set up loopback network interface
-if command -v ip >/dev/null 2>&1; then
-    ip link set dev lo up 2>/dev/null || true
-elif command -v ifconfig >/dev/null 2>&1; then
-    ifconfig lo 127.0.0.1 up 2>/dev/null || true
-fi
 
 # Ensure /etc/mtab points to /proc/self/mounts
 if [ ! -L /etc/mtab ]; then
@@ -125,6 +137,18 @@ if [ -x /sbin/kratos-devd ]; then
 fi
 EOF
 chmod +x "$ETC/rc.d/00-devd"
+
+echo "[+] Creating /etc/rc.d/10-network..."
+cat > "$ETC/rc.d/10-network" <<'EOF'
+#!/bin/bin/bash
+# /etc/rc.d/10-network — Launch KratosOS Network Manager
+
+if [ -x /sbin/kratos-net ]; then
+    echo "[rc.d] Initializing network via kratos-net..."
+    /sbin/kratos-net --auto
+fi
+EOF
+chmod +x "$ETC/rc.d/10-network"
 
 echo
 echo "[+] /etc skeleton created successfully."

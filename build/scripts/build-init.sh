@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# build-init.sh — Build KratosOS init system, shutdown tools, and kratos-devd
+# build-init.sh — Build KratosOS init system, shutdown tools, kratos-devd, and kratos-net
 
 set -euo pipefail
 
@@ -14,10 +14,12 @@ CC="$TOOLS/bin/$TARGET-gcc"
 INIT_SRC="$KRATOS_ROOT/init/init.c"
 SHUTDOWN_SRC="$KRATOS_ROOT/init/shutdown.c"
 DEVD_SRC="$KRATOS_ROOT/init/kratos-devd.c"
+NET_SRC="$KRATOS_ROOT/init/kratos-net.c"
 
 INIT_OUT="$SYSROOT/sbin/init"
 SHUTDOWN_OUT="$SYSROOT/sbin/shutdown"
 DEVD_OUT="$SYSROOT/sbin/kratos-devd"
+NET_OUT="$SYSROOT/sbin/kratos-net"
 
 echo "========================================"
 echo "       KRATOSOS SYSTEM BUILD"
@@ -43,7 +45,6 @@ echo "[+] Compiling /sbin/init..."
     -std=gnu11 \
     -o "$INIT_OUT" \
     "$INIT_SRC"
-
 echo "[✓] init compiled."
 
 echo "[+] Compiling /sbin/shutdown..."
@@ -55,7 +56,6 @@ echo "[+] Compiling /sbin/shutdown..."
     -std=gnu11 \
     -o "$SHUTDOWN_OUT" \
     "$SHUTDOWN_SRC"
-
 echo "[✓] shutdown compiled."
 
 echo "[+] Compiling /sbin/kratos-devd..."
@@ -67,8 +67,18 @@ echo "[+] Compiling /sbin/kratos-devd..."
     -std=gnu11 \
     -o "$DEVD_OUT" \
     "$DEVD_SRC"
-
 echo "[✓] kratos-devd compiled."
+
+echo "[+] Compiling /sbin/kratos-net..."
+"$CC" \
+    --sysroot="$SYSROOT" \
+    -O2 \
+    -Wall \
+    -Wextra \
+    -std=gnu11 \
+    -o "$NET_OUT" \
+    "$NET_SRC"
+echo "[✓] kratos-net compiled."
 
 echo "[+] Creating symlinks for reboot, poweroff, halt..."
 ln -sf shutdown "$SYSROOT/sbin/reboot"
@@ -78,8 +88,8 @@ ln -sf shutdown "$SYSROOT/sbin/halt"
 echo "[✓] Symlinks created."
 echo
 echo "Installed binaries:"
-ls -lh "$SYSROOT/sbin/init" "$SYSROOT/sbin/shutdown" "$SYSROOT/sbin/kratos-devd"
+ls -lh "$SYSROOT/sbin/init" "$SYSROOT/sbin/shutdown" "$SYSROOT/sbin/kratos-devd" "$SYSROOT/sbin/kratos-net"
 ls -la "$SYSROOT/sbin/reboot" "$SYSROOT/sbin/poweroff" "$SYSROOT/sbin/halt"
 
 echo
-echo "[✓] KratosOS init & devd built successfully."
+echo "[✓] KratosOS system tools built successfully."
