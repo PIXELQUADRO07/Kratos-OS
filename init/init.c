@@ -8,7 +8,13 @@
  *   5. Avvia gli eventuali servizi in /etc/rc.d/
  *   6. Gestisce la mietitura dei processi figli zombie (SIGCHLD handler)
  *   7. Gestisce i segnali di spegnimento e riavvio (SIGINT = reboot, SIGUSR1 = poweroff, SIGUSR2 = halt)
- *   8. Gestisce le console virtuali (TTY1, TTY2, TTYS0) e riavvia automaticamente le shell uscite.
+ *   8. Gestisce le console virtuali (TTY1, TTY2, ttyS0) e riavvia automaticamente le shell uscite.
+ *
+ * TTY layout:
+ *   tty[0] = /dev/console  — kernel early console (always present)
+ *   tty[1] = /dev/tty1     — VGA virtual terminal 1
+ *   tty[2] = /dev/tty2     — VGA virtual terminal 2
+ *   tty[3] = /dev/ttyS0    — First serial port (QEMU -nographic / real HW)
  *
  * Compilazione:
  *   x86_64-kratos-linux-gnu-gcc --sysroot=$KRATOS_SYSROOT -O2 -Wall -std=gnu11 -o /sbin/init init.c
@@ -32,7 +38,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define MAX_TTYS 3
+#define MAX_TTYS 4
 
 typedef struct {
     const char *dev;
@@ -40,10 +46,15 @@ typedef struct {
     int enabled;
 } tty_tab_t;
 
+/* ttyS0 is enabled: QEMU -nographic only attaches a serial console, not a
+ * VGA one. Without ttyS0 in the supervised table the system would boot
+ * silently with no login prompt when running headless. On real hardware
+ * ttyS0 simply produces no output if nothing is connected — harmless. */
 static tty_tab_t ttys[MAX_TTYS] = {
     { "/dev/console", 0, 1 },
     { "/dev/tty1",    0, 1 },
-    { "/dev/tty2",    0, 1 }
+    { "/dev/tty2",    0, 1 },
+    { "/dev/ttyS0",   0, 1 }
 };
 
 static volatile sig_atomic_t caught_sig = 0;
@@ -342,12 +353,20 @@ int main(void)
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = sig_handler;
+    sa.sa_flags   = SA_RESTART;   /* evita EINTR su syscall lente */
     sigemptyset(&sa.sa_mask);
 
     sigaction(SIGINT,  &sa, NULL); /* Reboot */
     sigaction(SIGUSR1, &sa, NULL); /* Poweroff */
     sigaction(SIGUSR2, &sa, NULL); /* Halt */
     sigaction(SIGPWR,  &sa, NULL); /* Poweroff */
+
+    /* SIGCHLD: svegliarsi quando un figlio muore per raccoglierlo subito
+     * e marcarne il TTY slot come libero, evitando ritardi di 1 secondo
+     * prima che il prompt di login venga rilanciato. */
+    sa.sa_handler = sig_handler;
+    sa.sa_flags   = SA_RESTART | SA_NOCLDSTOP;
+    sigaction(SIGCHLD, &sa, NULL);
 
     /* Monta i VFS essenziali */
     mount_vfs();
