@@ -6,6 +6,7 @@
 #include "init.h"
 
 void set_hostname(void);
+void start_devd(void);
 void run_sysinit(void);
 void run_services(void);
 

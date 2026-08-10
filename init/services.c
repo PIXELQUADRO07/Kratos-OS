@@ -34,6 +34,50 @@ void set_hostname(void)
     }
 }
 
+void start_devd(void)
+{
+    fprintf(stderr, "[init] Starting device daemon (kratos-devd)...\n");
+
+    int pipefd[2];
+    if (pipe(pipefd) < 0) {
+        perror("[init] pipe for devd failed");
+        return;
+    }
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("[init] fork devd failed");
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return;
+    }
+
+    if (pid == 0) {
+        close(pipefd[0]);
+        char fd_str[16];
+        snprintf(fd_str, sizeof(fd_str), "%d", pipefd[1]);
+
+        execl("/sbin/kratos-devd", "kratos-devd", "--daemon", "--ready-fd", fd_str, (char *)NULL);
+        execl("/bin/kratos-devd",  "kratos-devd", "--daemon", "--ready-fd", fd_str, (char *)NULL);
+        _exit(127);
+    }
+
+    /* Parent init process */
+    close(pipefd[1]);
+
+    char buf[16] = {0};
+    /* Wait for kratos-devd to finish coldplug scan and signal readiness */
+    ssize_t n = read(pipefd[0], buf, sizeof(buf) - 1);
+    (void)n;
+    close(pipefd[0]);
+
+    /* Reap the intermediate child process (since devd forks into daemon) */
+    int status;
+    waitpid(pid, &status, 0);
+
+    fprintf(stderr, "[init] kratos-devd coldplug complete.\n");
+}
+
 void run_sysinit(void)
 {
     if (access("/etc/rc.sysinit", X_OK) == 0) {

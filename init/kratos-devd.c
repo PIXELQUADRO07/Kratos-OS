@@ -401,12 +401,17 @@ int main(int argc, char *argv[])
 {
     int daemonize = 0;
     int coldplug  = 1;
+    int ready_fd  = -1;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--daemon") == 0 || strcmp(argv[i], "-d") == 0) {
             daemonize = 1;
         } else if (strcmp(argv[i], "--no-coldplug") == 0) {
             coldplug = 0;
+        } else if (strncmp(argv[i], "--ready-fd=", 11) == 0) {
+            ready_fd = atoi(argv[i] + 11);
+        } else if (strcmp(argv[i], "--ready-fd") == 0 && i + 1 < argc) {
+            ready_fd = atoi(argv[++i]);
         }
     }
 
@@ -447,6 +452,12 @@ int main(int argc, char *argv[])
 
     if (coldplug) {
         trigger_coldplug();
+    }
+
+    if (ready_fd >= 0) {
+        if (write(ready_fd, "READY\n", 6) < 0) {}
+        close(ready_fd);
+        ready_fd = -1;
     }
 
     printf("[kratos-devd] Listening for kernel uevents...\n");

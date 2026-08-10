@@ -66,13 +66,16 @@ int main(void)
     /* Configura gestori di segnali */
     setup_signal_handlers();
 
-    /* Monta i VFS essenziali */
+    /* Monta i VFS essenziali (/proc, /sys, /dev) */
     mount_vfs();
+
+    /* Avvia kratos-devd ed attende il completamento del coldplug */
+    start_devd();
 
     /* Imposta hostname */
     set_hostname();
 
-    /* Monta i filesystem da /etc/fstab */
+    /* Monta i filesystem da /etc/fstab (ora /dev/disk/by-uuid e by-label sono popolati) */
     mount_fstab();
 
     /* Esegui script di avvio sistema */
@@ -99,11 +102,19 @@ int main(void)
             }
         }
 
+        /* Maschera SIGCHLD durante la mietitura e il respawn delle TTY per evitare race condition */
+        sigset_t chld_mask, old_mask;
+        sigemptyset(&chld_mask);
+        sigaddset(&chld_mask, SIGCHLD);
+        sigprocmask(SIG_BLOCK, &chld_mask, &old_mask);
+
         /* Mietitura zombie */
         reap_zombies();
 
         /* Riavvio TTY uscite */
         check_and_respawn_ttys();
+
+        sigprocmask(SIG_SETMASK, &old_mask, NULL);
 
         /* Attesa evento / segnale senza polling continuo CPU */
         sleep(1);
