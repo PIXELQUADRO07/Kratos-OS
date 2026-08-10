@@ -7,6 +7,7 @@ build/sources/
 build/work/
 build/tools/
 build/sysroot/
+build/.stamps/
 
 # Partial downloads
 build/downloads/*.part
