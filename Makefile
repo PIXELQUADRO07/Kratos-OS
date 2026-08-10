@@ -3,15 +3,26 @@
 # Convenience wrapper around the build scripts.
 # Run `make help` to see all available targets.
 #
-# Usage:
-#   make phase1          # full Phase 1 toolchain bootstrap
-#   make phase2          # full Phase 2 userspace base
-#   make toolchain       # alias for phase1
-#   make verify          # run Phase 1 toolchain verification
-#   make verify-phase2   # run Phase 2 userspace verification
-#   make download        # download all sources
-#   make clean           # remove work/ tools/ sysroot/ (keep downloads/)
-#   make distclean       # remove everything including downloads/
+# Quick start:
+#   make all            # full build (all phases, skips already-built stages)
+#   make all CLEAN=1    # wipe stamps and rebuild everything
+#
+# Individual phases:
+#   make phase1         # Phase 1: toolchain bootstrap
+#   make phase2         # Phase 2: userspace base
+#   make phase3         # Phase 3: kernel + GRUB + init + disk image
+#
+# Individual targets:
+#   make kernel         # build Linux kernel
+#   make grub           # build GRUB EFI
+#   make etc            # create /etc skeleton
+#   make init           # build init, shutdown, devd, login, passwd
+#   make pkg            # build kpm package manager
+#   make disk           # create bootable disk image (requires sudo)
+#
+# Cleanup:
+#   make clean          # remove work/ tools/ sysroot/ (keep downloads + stamps)
+#   make distclean      # remove everything including downloads and stamps
 
 SHELL         := /bin/bash
 SCRIPTS       := build/scripts
@@ -20,10 +31,14 @@ MAKEFLAGS     += --no-print-directory
 # Export KRATOS_JOBS so sub-scripts pick it up (default: nproc)
 export KRATOS_JOBS ?= $(shell nproc)
 
-.PHONY: help phase1 phase2 toolchain verify verify-phase2 download clean distclean \
-        gcc-pass1 gcc-pass2 binutils linux-headers glibc libgcc \
+.PHONY: help all \
+        phase1 phase2 phase3 \
+        toolchain verify verify-phase2 download \
+        linux-headers binutils gcc-pass1 glibc-bootstrap libgcc glibc gcc-pass2 \
         ncurses readline bash coreutils grep sed gawk findutils \
-        diffutils tar gzip xz bzip2 file-cmd
+        diffutils tar gzip xz bzip2 file-cmd \
+        kernel grub etc init pkg disk image \
+        clean distclean stamps-clean
 
 # ─────────────────────────────────────────────
 # Default: show help
@@ -32,33 +47,53 @@ help:
 	@echo ""
 	@echo "  KratosOS Build System"
 	@echo "  ─────────────────────────────────────────"
-	@echo "  make phase1        Full Phase 1 toolchain bootstrap"
-	@echo "  make phase2        Full Phase 2 userspace base"
-	@echo "  make toolchain     Alias for phase1"
-	@echo "  make verify        Run Phase 1 verification"
-	@echo "  make verify-phase2 Run Phase 2 verification"
-	@echo "  make download      Download all source tarballs"
+	@echo "  make all            Full build — all phases (incremental)"
+	@echo "  make all CLEAN=1    Full rebuild — wipe stamps first"
+	@echo ""
+	@echo "  Phase targets:"
+	@echo "  make phase1         Phase 1: toolchain bootstrap"
+	@echo "  make phase2         Phase 2: userspace base"
+	@echo "  make phase3         Phase 3: kernel + GRUB + init + disk"
 	@echo ""
 	@echo "  Phase 1 individual stages:"
-	@echo "  make linux-headers"
-	@echo "  make binutils"
-	@echo "  make gcc-pass1"
-	@echo "  make glibc-bootstrap"
-	@echo "  make libgcc"
-	@echo "  make glibc"
+	@echo "  make linux-headers  make binutils     make gcc-pass1"
+	@echo "  make glibc-bootstrap make libgcc      make glibc"
 	@echo "  make gcc-pass2"
 	@echo ""
 	@echo "  Phase 2 individual packages:"
-	@echo "  make ncurses  readline  bash  coreutils"
-	@echo "  make grep  sed  gawk  findutils  diffutils"
-	@echo "  make tar  gzip  xz  bzip2  file-cmd"
+	@echo "  make ncurses   make readline   make bash   make coreutils"
+	@echo "  make grep      make sed        make gawk   make findutils"
+	@echo "  make diffutils make tar        make gzip   make xz"
+	@echo "  make bzip2     make file-cmd"
 	@echo ""
-	@echo "  make clean       Remove build artifacts (keep downloads)"
-	@echo "  make distclean   Remove everything including downloads"
+	@echo "  Phase 3 individual targets:"
+	@echo "  make kernel    make grub    make etc   make init"
+	@echo "  make pkg       make disk"
+	@echo ""
+	@echo "  Utilities:"
+	@echo "  make verify         Run Phase 1 toolchain verification"
+	@echo "  make verify-phase2  Run Phase 2 userspace verification"
+	@echo "  make download       Download all source tarballs"
+	@echo "  make stamps-clean   Clear all incremental build stamps"
+	@echo ""
+	@echo "  Cleanup:"
+	@echo "  make clean          Remove build artifacts (keep downloads + stamps)"
+	@echo "  make distclean      Remove everything including downloads and stamps"
 	@echo ""
 	@echo "  Options:"
-	@echo "  KRATOS_JOBS=N    Parallel make jobs (default: nproc=$(shell nproc))"
+	@echo "  KRATOS_JOBS=N       Parallel make jobs (default: nproc=$(shell nproc))"
+	@echo "  CLEAN=1             Wipe all stamps before building (with make all)"
 	@echo ""
+
+# ─────────────────────────────────────────────
+# Full build — all phases in order (incremental)
+# ─────────────────────────────────────────────
+all:
+ifeq ($(CLEAN),1)
+	@bash build.sh --clean
+else
+	@bash build.sh
+endif
 
 # ─────────────────────────────────────────────
 # Phase 1 — Full toolchain bootstrap
@@ -72,9 +107,7 @@ verify:
 download:
 	@bash $(SCRIPTS)/download.sh
 
-# ─────────────────────────────────────────────
-# Individual stages (useful for re-running one step)
-# ─────────────────────────────────────────────
+# Phase 1 individual stages
 linux-headers:
 	@bash $(SCRIPTS)/install-linux-headers.sh
 
@@ -148,14 +181,51 @@ file-cmd:
 	@bash $(SCRIPTS)/build-file.sh
 
 # ─────────────────────────────────────────────
+# Phase 3 — Kernel, bootloader, init, disk image
+# ─────────────────────────────────────────────
+phase3: kernel grub etc init pkg disk
+
+kernel:
+	@bash $(SCRIPTS)/build-kernel.sh
+
+grub:
+	@bash $(SCRIPTS)/build-grub.sh
+
+etc:
+	@bash $(SCRIPTS)/create-etc-skeleton.sh
+
+init:
+	@bash $(SCRIPTS)/build-init.sh
+
+pkg:
+	@bash $(SCRIPTS)/build-pkg.sh
+
+# disk requires root — invoke via sudo automatically
+disk image:
+	@if [ "$$(id -u)" -ne 0 ]; then \
+	    echo "[+] disk target requires root — invoking sudo..."; \
+	    sudo bash $(SCRIPTS)/build-disk.sh; \
+	else \
+	    bash $(SCRIPTS)/build-disk.sh; \
+	fi
+
+# ─────────────────────────────────────────────
+# Incremental stamps
+# ─────────────────────────────────────────────
+stamps-clean:
+	@echo "[+] Removing build/.stamps/ ..."
+	@rm -rf build/.stamps
+	@echo "[✓] Stamps cleared."
+
+# ─────────────────────────────────────────────
 # Cleanup
 # ─────────────────────────────────────────────
 clean:
-	@echo "[+] Removing build/work/, build/tools/, build/sysroot/ ..."
+	@echo "[+] Removing build/work/, build/tools/, build/sysroot/, build/sources/ ..."
 	@rm -rf build/work build/tools build/sysroot build/sources
-	@echo "[✓] Clean done. Downloads preserved."
+	@echo "[✓] Clean done. Downloads and stamps preserved."
 
-distclean: clean
+distclean: clean stamps-clean
 	@echo "[+] Removing build/downloads/ ..."
 	@rm -rf build/downloads
 	@echo "[✓] Distclean done."
