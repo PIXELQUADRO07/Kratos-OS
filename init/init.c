@@ -38,7 +38,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define MAX_TTYS 4
+#define MAX_TTYS 3
 
 typedef struct {
     const char *dev;
@@ -46,12 +46,13 @@ typedef struct {
     int enabled;
 } tty_tab_t;
 
-/* ttyS0 is enabled: QEMU -nographic only attaches a serial console, not a
- * VGA one. Without ttyS0 in the supervised table the system would boot
- * silently with no login prompt when running headless. On real hardware
- * ttyS0 simply produces no output if nothing is connected — harmless. */
+/* TTYs supervised for login.
+ * Note: /dev/console is intentionally excluded here because in Linux,
+ * /dev/console redirects to the active console (which is /dev/ttyS0 when
+ * booting with console=ttyS0). Spawning login on both /dev/console and
+ * /dev/ttyS0 causes two login processes to read from the same serial port
+ * simultaneously, resulting in keypresses being stolen/interleaved. */
 static tty_tab_t ttys[MAX_TTYS] = {
-    { "/dev/console", 0, 1 },
     { "/dev/tty1",    0, 1 },
     { "/dev/tty2",    0, 1 },
     { "/dev/ttyS0",   0, 1 }

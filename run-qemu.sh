@@ -29,7 +29,8 @@ IMAGE_DEFAULT="$SCRIPT_DIR/build/images/kratosos.img"
 # ---------------------------------------------------------------------------
 
 GRAPHIC=false
-KVM=false
+KVM=true
+NO_KVM=false
 MEM="512M"
 IMAGE="$IMAGE_DEFAULT"
 DRY_RUN=false
@@ -42,6 +43,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --graphic)        GRAPHIC=true        ;;
         --kvm)            KVM=true            ;;
+        --no-kvm)         NO_KVM=true; KVM=false ;;
         --mem)            MEM="$2"; shift     ;;
         --image)          IMAGE="$2"; shift   ;;
         --dry-run)        DRY_RUN=true        ;;
