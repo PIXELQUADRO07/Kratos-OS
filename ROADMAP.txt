@@ -1,0 +1,743 @@
+✅ FASE 0 — COMPLETATA (2026-08-10)
+
+✅ 0.1 Build completa: ./build.sh esegue tutte e 28 le fasi in ordine.
+✅ 0.2 Build incrementale: ogni stage viene saltato se già completato (build/.stamps/).
+
+Commit: build.sh master + Makefile aggiornato + build-all-phase3.sh
+✅ FASE 1 — COMPLETATA E VERIFICATA IN QEMU (2026-08-10)
+
+Catena verificata:
+  UEFI → EFI/BOOT/BOOTX64.EFI → GRUB → grub.cfg → vmlinuz → /sbin/init → login
+
+Fix & Ottimizzazioni applicati:
+  - init: rimosso /dev/console dal loop di login per evitare duplicati su ttyS0
+  - init: ttyS0 supervisionato + SIGCHLD handler + SA_RESTART
+  - login: argv[0] con dash prefix ("-bash"), retry loop, timestamp dinamico
+  - run-qemu.sh: abilitata accelerazione KVM automatica + percorsi OVMF Arch Linux
+  - build-kernel.sh: pulizia automatica mrproper per sorgenti sporchi
+
+
+UEFI
+ ↓
+EFI/BOOT/BOOTX64.EFI
+ ↓
+GRUB
+ ↓
+grub.cfg
+ ↓
+Linux kernel
+ ↓
+/sbin/init
+ ↓
+userspace
+
+Il problema che abbiamo appena incontrato era proprio qui: l'immagine veniva creata, ma ESP e /boot/grub non risultavano popolati correttamente.
+
+Quindi sistemerei definitivamente build-disk.sh.
+
+Il risultato deve essere verificabile con:
+
+find /tmp/kratos-check/boot/efi -type f
+
+e dovresti vedere almeno qualcosa come:
+
+EFI/
+└── BOOT/
+    └── BOOTX64.EFI
+
+e nel root:
+
+boot/
+├── grub/
+│   └── grub.cfg
+├── vmlinuz
+├── System.map
+└── config-7.1.5
+✅ FASE 2 — COMPLETATA
+
+L'immagine disco `kratosos.img` prodotta da build-disk.sh è una struttura GPT standard con ESP (FAT32) e root (ext4). È pronta sia per il test QEMU che per la scrittura su USB reale:
+  sudo dd if=build/images/kratosos.img of=/dev/sdX bs=4M status=progress conv=fsync
+
+✅ FASE 3 — COMPLETATA (2026-08-10)
+
+L'architettura di /sbin/init è stata completamente rifattorizzata in una struttura modulare pulita:
+  init/
+  ├── init.c       (PID 1 main entry point & supervisor loop)
+  ├── init.h       (common declarations & shared data structures)
+  ├── mount.c/h    (VFS & fstab mounting with LABEL=/UUID= resolution)
+  ├── services.c/h (hostname, rc.sysinit, and rc.d service runner)
+  ├── signals.c/h  (signal handlers & zombie child reaping)
+  ├── tty.c/h      (TTY supervision & login spawning)
+  └── shutdown.c   (system shutdown & reboot syscall engine)
+
+Commit: refactor(init): modularize PID 1 init architecture
+
+✅ FASE 3.5 — BUG FIX & STABILIZZAZIONE CORE USERSPACE (2026-08-10)
+
+Tutti i bug critici e le fragilità individuate nel documento 'Errori_da_correggere.txt' sono stati risolti con commit separati:
+  - fix(devd): scansione ricorsiva coldplug su /sys/devices/ invece di /sys/block (risolve omissione partizioni sda1/nvme)
+  - fix(devd): parser C nativo superblock per UUID ext4 e UUID/LABEL FAT32 (rimossa dipendenza da blkid)
+  - fix(devd): gestione rimozione symlink orfani in /dev/disk/by-uuid e by-label su eventi 'remove'
+  - fix(devd): hardening socket Netlink (validazione nl_pid == 0 kernel ed incremento SO_RCVBUF a 1MB)
+  - fix(init): sincronizzazione avvio kratos-devd e attesa fine coldplug prima del montaggio /etc/fstab
+  - fix(init): mascheramento SIGCHLD durante la supervisione TTY per eliminare race condition nel PID 1
+  - fix(pkg): sanitizzazione percorsi e protezione Zip-Slip (path traversal ../) nell'unpacking pacchetti .kpkg
+  - feat(boot): template personalizzato /boot/grub/grub.cfg e integrazione logo /Branding nel tema GRUB 2
+
+FASE 4 — kratos-devd
+
+Questa secondo me è una ottima idea.
+
+E la metterei abbastanza presto.
+
+Architettura:
+
+                Kernel
+                   │
+                   │ uevent
+                   ▼
+          NETLINK_KOBJECT_UEVENT
+                   │
+                   ▼
+              kratos-devd
+             /     |      \
+            /      |       \
+        device   perms    symlinks
+
+Deve occuparsi di:
+
+Coldplug
+
+All'avvio:
+
+/sys/class
+/sys/block
+/sys/devices
+
+vengono scansionati.
+
+Hotplug
+
+Poi ascolta:
+
+NETLINK_KOBJECT_UEVENT
+
+per eventi come:
+
+add
+remove
+change
+bind
+unbind
+/dev
+
+Per esempio:
+
+/dev/null
+/dev/zero
+/dev/random
+/dev/urandom
+/dev/tty
+/dev/console
+
+e dispositivi block:
+
+/dev/sda
+/dev/sda1
+/dev/nvme0n1
+/dev/nvme0n1p1
+Symlink
+/dev/disk/by-uuid/
+                  └── ...
+
+/dev/disk/by-label/
+                   └── ...
+
+Questo ti permette di evitare una dipendenza da udev.
+
+È un componente molto importante per l'identità di KratosOS.
+
+FASE 5 — Filesystem e mount system
+
+Qui migliorerei parecchio quello che hai ora.
+
+Il tuo:
+
+/etc/fstab
+
+deve diventare realmente utilizzabile.
+
+Per esempio:
+
+UUID=xxxx   /       ext4    defaults   0 1
+UUID=yyyy   /boot   vfat    defaults   0 2
+proc        /proc   proc    defaults   0 0
+sysfs       /sys    sysfs   defaults   0 0
+
+E init deve riuscire a:
+
+/dev
+/proc
+/sys
+/run
+/tmp
+/dev/pts
+/dev/shm
+
+senza dipendere da mount fatti manualmente dall'ambiente host.
+
+FASE 6 — Account e login
+
+Ora hai già:
+
+root:x:0:0:root:/root:/bin/bash
+
+Il passo successivo è creare un vero sistema di autenticazione.
+
+Per esempio:
+
+/etc/passwd
+/etc/group
+/etc/shadow
+
+e:
+
+/sbin/login
+
+Quindi:
+
+KratosOS tty1
+
+login: ghost
+Password:
+
+e non semplicemente un Bash lanciato da init.
+
+Questa è una differenza importante.
+
+FASE 7 — Package manager
+
+Qui inizierei a costruire uno dei componenti più caratteristici di KratosOS.
+
+Non farei subito qualcosa di enorme.
+
+Creerei:
+
+kratos-pkg
+
+oppure:
+
+kpm
+Prima versione
+
+Dovrebbe poter fare:
+
+kpm install package
+kpm remove package
+kpm update
+kpm search package
+kpm info package
+kpm list
+Database
+
+Per esempio:
+
+/var/lib/kratos/pkg/
+
+con:
+
+installed/
+available/
+database/
+
+Ogni pacchetto potrebbe contenere:
+
+package/
+├── metadata
+├── files/
+├── scripts/
+└── manifest
+
+Metadata:
+
+name=bash
+version=5.x
+arch=x86_64
+depends=glibc
+Ma soprattutto
+
+Devi decidere che formato di pacchetto vuoi.
+
+Io eviterei di copiare semplicemente .deb o .rpm.
+
+Potresti avere qualcosa come:
+
+bash-5.x-x86_64.kpkg
+
+e un archivio interno:
+
+metadata
+manifest
+payload.tar.zst
+
+Questo renderebbe KratosOS realmente indipendente dal packaging di Debian/Arch.
+
+FASE 8 — Repository
+
+Dopo il package manager:
+
+KratosOS
+   │
+   └── kpm
+        │
+        ▼
+   repository
+        │
+        ├── packages/
+        ├── metadata/
+        └── signatures/
+
+A quel punto:
+
+kpm update
+kpm install gcc
+
+può funzionare davvero.
+
+Firma dei pacchetti
+
+Questa parte la metterei fin dall'inizio dell'architettura, anche se inizialmente il repository è locale.
+
+package
+   ↓
+hash
+   ↓
+signature
+   ↓
+repository
+   ↓
+kpm
+   ↓
+verify
+   ↓
+install
+FASE 9 — Toolchain completa
+
+Ora hai una toolchain abbastanza avanzata, ma devi arrivare a un sistema nel quale KratosOS possa compilare software per KratosOS.
+
+Quindi:
+
+gcc
+binutils
+glibc
+make
+pkg-config
+
+poi:
+
+m4
+autoconf
+automake
+libtool
+
+e infine una toolchain utilizzabile normalmente:
+
+gcc hello.c -o hello
+./hello
+
+senza dover specificare manualmente:
+
+--sysroot
+-L...
+-I...
+FASE 10 — Core utilities
+
+A questo punto Bash da solo non basta.
+
+Servono le utility fondamentali:
+
+coreutils
+
+quindi:
+
+ls
+cp
+mv
+rm
+mkdir
+cat
+chmod
+chown
+ln
+mount
+umount
+ps
+kill
+sleep
+echo
+printf
+grep
+
+e possibilmente:
+
+sed
+awk
+tar
+gzip
+xz
+
+Non necessariamente devi scriverle tu.
+
+Puoi inizialmente portare software GNU esistente, mantenendo però KratosOS come sistema di integrazione.
+
+FASE 11 — Networking
+
+Poi:
+
+kernel networking
+       ↓
+ip
+       ↓
+loopback
+       ↓
+Ethernet
+       ↓
+DHCP
+       ↓
+DNS
+
+Quindi:
+
+ip link
+ip addr
+ip route
+
+e successivamente:
+
+dhcp
+resolv.conf
+hostname
+
+Alla fine:
+
+ping ...
+
+funzionante.
+
+FASE 12 — Servizi
+
+Il tuo:
+
+/etc/rc.d/
+
+può diventare il sistema di servizi di KratosOS.
+
+Per esempio:
+
+/etc/rc.d/
+├── devd
+├── networking
+├── syslog
+├── sshd
+└── cron
+
+Potresti definire un formato estremamente semplice:
+
+start()
+stop()
+restart()
+status()
+
+e far gestire tutto a init.
+
+Quindi:
+
+service networking start
+service networking status
+
+oppure un tuo comando:
+
+kratosctl service networking start
+FASE 13 — kratosctl
+
+A questo punto inizierei a creare un comando centrale:
+
+kratosctl
+
+che gestisce:
+
+kratosctl service
+kratosctl system
+kratosctl reboot
+kratosctl poweroff
+kratosctl hostname
+kratosctl users
+kratosctl package
+
+Non deve diventare un "systemd clone".
+
+Deve essere semplicemente l'interfaccia amministrativa di KratosOS.
+
+FASE 14 — Logging
+
+Ti servirà un sistema di log.
+
+Inizialmente può essere banalissimo:
+
+/var/log/
+├── boot.log
+├── kernel.log
+├── auth.log
+└── services.log
+
+Poi puoi creare:
+
+kratos-logd
+
+che riceve messaggi dai servizi.
+
+FASE 15 — Security baseline
+
+Prima di pensare alla GUI, farei questa fase.
+
+Controllare:
+
+ASLR
+NX
+PIE
+RELRO
+stack protector
+permissions
+capabilities
+
+e soprattutto:
+
+root
+ ↓
+servizi
+ ↓
+privilege dropping
+
+Un servizio di rete non dovrebbe girare come root se non necessario.
+
+FASE 16 — Installer
+
+Quando il sistema è sufficientemente stabile:
+
+KratosOS Installer
+
+che permetta:
+
+[1] Install KratosOS
+[2] Partition disk
+[3] Select filesystem
+[4] Create user
+[5] Set hostname
+[6] Install bootloader
+[7] Configure system
+
+Questo è il momento in cui KratosOS smette definitivamente di essere "un'immagine che hai costruito".
+
+Diventa una distro installabile.
+
+FASE 17 — Desktop
+
+Solo molto dopo.
+
+Prima:
+
+Kernel
+ ↓
+init
+ ↓
+devd
+ ↓
+services
+ ↓
+network
+ ↓
+package manager
+ ↓
+installer
+
+Poi:
+
+Wayland
+ ↓
+compositor
+ ↓
+desktop
+
+Non partirei da GNOME/KDE.
+
+Potresti inizialmente avere:
+
+KratosOS
+   ↓
+Wayland
+   ↓
+tuo compositor minimale
+   ↓
+terminal
+
+e successivamente costruire un ambiente desktop.
+
+FASE 18 — Architettura finale
+
+A lungo termine potresti arrivare a qualcosa del genere:
+
+                    ┌───────────────────┐
+                    │      UEFI         │
+                    └─────────┬─────────┘
+                              ↓
+                         ┌─────────┐
+                         │  GRUB   │
+                         └────┬────┘
+                              ↓
+                         ┌─────────┐
+                         │ Kernel  │
+                         └────┬────┘
+                              ↓
+                     ┌────────────────┐
+                     │  /sbin/init   │
+                     │    PID 1       │
+                     └───────┬────────┘
+                             │
+          ┌──────────────────┼──────────────────┐
+          ↓                  ↓                  ↓
+    kratos-devd         service mgr        mount mgr
+          │                  │                  │
+          ↓                  ↓                  ↓
+        /dev              rc.d               VFS
+          │                  │                  │
+          └──────────────────┼──────────────────┘
+                             ↓
+                       userspace
+                             │
+             ┌───────────────┼───────────────┐
+             ↓               ↓               ↓
+           login           shell            kpm
+                                             │
+                                             ↓
+                                        repository
+La priorità adesso
+
+Non farei tutto contemporaneamente.
+
+Per il tuo repository, io farei esattamente questa sequenza:
+
+🔴 Adesso
+
+1. Sistemare definitivamente build-disk.sh
+
+Deve produrre:
+
+kratosos.img
+├── ESP
+│   └── EFI/BOOT/BOOTX64.EFI
+│
+└── root
+    ├── boot/
+    │   ├── grub/grub.cfg
+    │   └── vmlinuz
+    ├── sbin/init
+    ├── bin/bash
+    └── ...
+🟠 Subito dopo
+
+2. Boot QEMU senza workaround
+
+UEFI → GRUB → kernel → init → login
+
+Non considerare conclusa la fase finché non è riproducibile.
+
+🟡 Poi
+
+3. Primo boot reale
+
+USB → PC → UEFI → KratosOS.
+
+🟢 Poi
+
+4. kratos-devd
+
+Questo è probabilmente il prossimo grande componente nativo.
+
+🟢 Poi
+
+5. init definitivo
+
+Integrare:
+
+devd
+fstab
+rc.sysinit
+rc.d
+TTY
+shutdown
+🟢 Poi
+
+6. Login vero + utenti
+
+/etc/passwd
+/etc/shadow
+login
+🔵 Poi
+
+7. Package manager
+
+kpm
+🔵 Poi
+
+8. Repository + firme
+
+🔵 Poi
+
+9. Coreutils + toolchain completa
+
+🟣 Poi
+
+10. Networking
+
+🟣 Poi
+
+11. Servizi
+
+🟣 Poi
+
+12. Installer
+
+⚫ Infine
+
+13. Desktop / GUI
+
+Un'importante distinzione
+
+A questo punto eviterei di aggiungere funzionalità semplicemente perché "sarebbe bello averle".
+
+Per ogni componente chiediti:
+
+È necessario per trasformare il prototipo attuale in un sistema utilizzabile?
+
+Se sì → roadmap.
+
+Se no → backlog.
+
+Per esempio:
+
+Componente	Priorità
+Boot EFI	🔴 Critica
+init/PID 1	🔴 Critica
+devd	🔴 Critica
+mount/VFS	🔴 Critica
+login	🔴 Critica
+package manager	🟠 Alta
+repository	🟠 Alta
+networking	🟠 Alta
+coreutils	🟠 Alta
+service manager	🟡 Media
+installer	🟡 Media
+GUI	🟢 Dopo
+desktop proprietario	🟢 Molto dopo
+
+Il prossimo obiettivo concreto, quindi, non è il package manager: è chiudere definitivamente la catena disk image → EFI → GRUB → kernel → init → login, provarla in QEMU in modo pulito e poi fare il primo boot su hardware reale. Dopo quello, kratos-devd è probabilmente il componente migliore da affrontare.
