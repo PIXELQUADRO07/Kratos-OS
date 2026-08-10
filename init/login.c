@@ -45,6 +45,17 @@ static void restore_echo(const struct termios *old_t)
     tcsetattr(STDIN_FILENO, TCSANOW, old_t);
 }
 
+static void restore_sane_termios(void)
+{
+    struct termios t;
+    if (tcgetattr(STDIN_FILENO, &t) == 0) {
+        t.c_iflag |= (ICRNL | IXON);
+        t.c_oflag |= (OPOST | ONLCR);
+        t.c_lflag |= (ECHO | ECHOE | ECHOK | ICANON | ISIG);
+        tcsetattr(STDIN_FILENO, TCSANOW, &t);
+    }
+}
+
 static void print_issue(void)
 {
     FILE *f = fopen("/etc/issue", "r");
@@ -186,6 +197,7 @@ int main(int argc, char *argv[])
     strncpy(argv0 + 1, base, sizeof(argv0) - 2);
     argv0[sizeof(argv0) - 1] = '\0';
 
+    restore_sane_termios();
     execl(shell, argv0, (char *)NULL);
 
     perror("[login] exec shell failed");

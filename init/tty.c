@@ -8,6 +8,17 @@ tty_tab_t ttys[MAX_TTYS] = {
     { "/dev/ttyS0",   0, 1 }
 };
 
+static void set_sane_termios(int fd)
+{
+    struct termios t;
+    if (tcgetattr(fd, &t) == 0) {
+        t.c_iflag |= (ICRNL | IXON);
+        t.c_oflag |= (OPOST | ONLCR);
+        t.c_lflag |= (ECHO | ECHOE | ECHOK | ICANON | ISIG);
+        tcsetattr(fd, TCSANOW, &t);
+    }
+}
+
 static int setup_tty(const char *tty_dev)
 {
     if (setsid() < 0 && errno != EPERM) {
@@ -20,6 +31,8 @@ static int setup_tty(const char *tty_dev)
     }
 
     ioctl(fd, TIOCSCTTY, 1);
+
+    set_sane_termios(fd);
 
     dup2(fd, STDIN_FILENO);
     dup2(fd, STDOUT_FILENO);
