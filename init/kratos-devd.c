@@ -440,6 +440,11 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    /* Increase receive buffer to 1 MB to handle uevent bursts during
+     * mass device discovery (e.g. USB hub enumeration) */
+    int rcvbuf = 1024 * 1024;
+    setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf));
+
     if (coldplug) {
         trigger_coldplug();
     }
@@ -448,12 +453,27 @@ int main(int argc, char *argv[])
 
     char buf[UEVENT_BUFFER_SIZE];
     while (running) {
-        ssize_t len = recv(sock, buf, sizeof(buf) - 1, 0);
+        /* Use recvmsg() to verify the sender is the kernel (pid == 0).
+         * This prevents userspace processes from injecting fake uevents
+         * through the netlink socket. */
+        struct sockaddr_nl nladdr;
+        struct iovec iov = { .iov_base = buf, .iov_len = sizeof(buf) - 1 };
+        struct msghdr msg = {
+            .msg_name    = &nladdr,
+            .msg_namelen = sizeof(nladdr),
+            .msg_iov     = &iov,
+            .msg_iovlen  = 1,
+        };
+
+        ssize_t len = recvmsg(sock, &msg, 0);
         if (len < 0) {
             if (errno == EINTR) continue;
-            perror("[kratos-devd] recv failed");
+            perror("[kratos-devd] recvmsg failed");
             break;
         }
+
+        /* Reject messages not from the kernel (nl_pid != 0) */
+        if (nladdr.nl_pid != 0) continue;
 
         buf[len] = '\0';
 
