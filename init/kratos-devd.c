@@ -150,8 +150,132 @@ static void apply_device_rules(const uevent_t *ev)
 }
 
 /* ------------------------------------------------------------------ */
+/* Native Superblock Probing (replaces popen("blkid"))                */
+/* ------------------------------------------------------------------ */
+
+/* Read ext4 UUID directly from the superblock.
+ * ext4 superblock starts at byte offset 0x400 (1024).
+ * UUID is a 128-bit field at offset 0x68 within the superblock.
+ * Magic number 0xEF53 is at offset 0x38 within the superblock. */
+static int read_ext4_uuid(const char *dev_path, char *uuid_out, size_t out_size)
+{
+    int fd = open(dev_path, O_RDONLY);
+    if (fd < 0) return -1;
+
+    unsigned char sb[256];
+    if (pread(fd, sb, sizeof(sb), 1024) != sizeof(sb)) {
+        close(fd);
+        return -1;
+    }
+    close(fd);
+
+    /* Check ext4 magic: 0xEF53 at offset 0x38 (little-endian) */
+    if (sb[0x38] != 0x53 || sb[0x39] != 0xEF) return -1;
+
+    /* UUID is at offset 0x68 within superblock, 16 bytes */
+    const unsigned char *u = sb + 0x68;
+    snprintf(uuid_out, out_size,
+             "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+             u[0],u[1],u[2],u[3], u[4],u[5], u[6],u[7],
+             u[8],u[9], u[10],u[11],u[12],u[13],u[14],u[15]);
+
+    /* Check UUID is not all zeros */
+    for (int i = 0; i < 16; i++) {
+        if (u[i] != 0) return 0;
+    }
+    return -1;
+}
+
+/* Read VFAT/FAT32 Volume Serial Number (UUID) and Volume Label.
+ * FAT32 boot sector: serial at offset 0x43 (4 bytes), label at 0x47 (11 bytes).
+ * FAT16/FAT12 boot sector: serial at offset 0x27 (4 bytes), label at 0x2B (11 bytes).
+ * We detect FAT32 vs FAT16 by checking for the FAT32 extended marker at offset 0x42. */
+static int read_vfat_info(const char *dev_path, char *uuid_out, size_t uuid_size,
+                          char *label_out, size_t label_size)
+{
+    int fd = open(dev_path, O_RDONLY);
+    if (fd < 0) return -1;
+
+    unsigned char bs[512];
+    if (pread(fd, bs, sizeof(bs), 0) != sizeof(bs)) {
+        close(fd);
+        return -1;
+    }
+    close(fd);
+
+    /* Basic sanity: check boot sector signature 0x55AA at offset 510 */
+    if (bs[510] != 0x55 || bs[511] != 0xAA) return -1;
+
+    int serial_off, label_off;
+
+    /* FAT32 extended boot signature at offset 0x42 == 0x29 */
+    if (bs[0x42] == 0x29) {
+        serial_off = 0x43;
+        label_off  = 0x47;
+    }
+    /* FAT16/12 extended boot signature at offset 0x26 == 0x29 */
+    else if (bs[0x26] == 0x29) {
+        serial_off = 0x27;
+        label_off  = 0x2B;
+    } else {
+        return -1;
+    }
+
+    /* Volume Serial Number → UUID format: XXXX-XXXX */
+    if (uuid_out && uuid_size > 0) {
+        unsigned int serial = (unsigned int)bs[serial_off]
+                            | ((unsigned int)bs[serial_off+1] << 8)
+                            | ((unsigned int)bs[serial_off+2] << 16)
+                            | ((unsigned int)bs[serial_off+3] << 24);
+        snprintf(uuid_out, uuid_size, "%04X-%04X",
+                 (serial >> 16) & 0xFFFF, serial & 0xFFFF);
+    }
+
+    /* Volume Label (11 bytes, space-padded) */
+    if (label_out && label_size > 0) {
+        size_t copy_len = (label_size - 1 < 11) ? label_size - 1 : 11;
+        memcpy(label_out, bs + label_off, copy_len);
+        label_out[copy_len] = '\0';
+        /* Trim trailing spaces */
+        for (int i = (int)copy_len - 1; i >= 0; i--) {
+            if (label_out[i] == ' ') label_out[i] = '\0';
+            else break;
+        }
+        /* "NO NAME" is the default empty label */
+        if (strcmp(label_out, "NO NAME") == 0) label_out[0] = '\0';
+    }
+
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
 /* Disk Symlinks (/dev/disk/by-uuid/, /dev/disk/by-label/)            */
 /* ------------------------------------------------------------------ */
+
+/* Remove all symlinks in dir_path whose target matches node_path */
+static void remove_symlinks_for_device(const char *dir_path, const char *node_path)
+{
+    DIR *d = opendir(dir_path);
+    if (!d) return;
+
+    struct dirent *entry;
+    while ((entry = readdir(d)) != NULL) {
+        if (entry->d_name[0] == '.') continue;
+
+        char link_path[512];
+        snprintf(link_path, sizeof(link_path), "%s/%s", dir_path, entry->d_name);
+
+        char target[256];
+        ssize_t len = readlink(link_path, target, sizeof(target) - 1);
+        if (len > 0) {
+            target[len] = '\0';
+            if (strcmp(target, node_path) == 0) {
+                unlink(link_path);
+            }
+        }
+    }
+    closedir(d);
+}
 
 static void update_disk_symlinks(const uevent_t *ev)
 {
@@ -160,26 +284,26 @@ static void update_disk_symlinks(const uevent_t *ev)
     char node_path[256];
     snprintf(node_path, sizeof(node_path), "/dev/%s", ev->devname);
 
+    /* On device removal, clean up orphan symlinks */
     if (strcmp(ev->action, "remove") == 0) {
+        remove_symlinks_for_device("/dev/disk/by-uuid", node_path);
+        remove_symlinks_for_device("/dev/disk/by-label", node_path);
         return;
     }
 
-    /* Probe for UUID using blkid */
-    char cmd[512];
-    snprintf(cmd, sizeof(cmd), "blkid -s UUID -o value %s 2>/dev/null", node_path);
-
-    FILE *f = popen(cmd, "r");
-    if (!f) return;
-
+    /* Probe filesystem UUID and LABEL natively (no blkid dependency) */
     char uuid[128] = {0};
-    if (fgets(uuid, sizeof(uuid), f)) {
-        size_t l = strlen(uuid);
-        while (l > 0 && (uuid[l-1] == '\n' || uuid[l-1] == '\r')) {
-            uuid[--l] = '\0';
-        }
-    }
-    pclose(f);
+    char label[128] = {0};
 
+    if (read_ext4_uuid(node_path, uuid, sizeof(uuid)) == 0) {
+        /* ext4 detected — label could be read too but ext4 label probing
+         * is less critical; skip for now. */
+    } else if (read_vfat_info(node_path, uuid, sizeof(uuid),
+                              label, sizeof(label)) == 0) {
+        /* VFAT/FAT32 detected */
+    }
+
+    /* Create UUID symlink */
     if (uuid[0] != '\0') {
         mkdir("/dev/disk", 0755);
         mkdir("/dev/disk/by-uuid", 0755);
@@ -191,28 +315,16 @@ static void update_disk_symlinks(const uevent_t *ev)
         symlink(node_path, link_path);
     }
 
-    /* Probe for LABEL using blkid */
-    snprintf(cmd, sizeof(cmd), "blkid -s LABEL -o value %s 2>/dev/null", node_path);
-    f = popen(cmd, "r");
-    if (f) {
-        char label[128] = {0};
-        if (fgets(label, sizeof(label), f)) {
-            size_t l = strlen(label);
-            while (l > 0 && (label[l-1] == '\n' || label[l-1] == '\r')) {
-                label[--l] = '\0';
-            }
-            if (label[0] != '\0') {
-                mkdir("/dev/disk", 0755);
-                mkdir("/dev/disk/by-label", 0755);
+    /* Create LABEL symlink */
+    if (label[0] != '\0') {
+        mkdir("/dev/disk", 0755);
+        mkdir("/dev/disk/by-label", 0755);
 
-                char link_path[512];
-                snprintf(link_path, sizeof(link_path), "/dev/disk/by-label/%s", label);
+        char link_path[512];
+        snprintf(link_path, sizeof(link_path), "/dev/disk/by-label/%s", label);
 
-                unlink(link_path);
-                symlink(node_path, link_path);
-            }
-        }
-        pclose(f);
+        unlink(link_path);
+        symlink(node_path, link_path);
     }
 }
 
