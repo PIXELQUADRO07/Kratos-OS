@@ -132,7 +132,41 @@ static int read_metadata(const char *filepath, pkg_meta_t *meta)
 
 /* ------------------------------------------------------------------ */
 /* Package Installation                                                */
-/* ------------------------------------------------------------------ */
+static int is_safe_path(const char *rel_path, const char *target_root)
+{
+    if (!rel_path || rel_path[0] == '\0') return 0;
+
+    /* Check for direct path traversal components */
+    if (strstr(rel_path, "../") != NULL || strstr(rel_path, "/..") != NULL || strcmp(rel_path, "..") == 0) {
+        return 0;
+    }
+
+    char full_path[PATH_MAX];
+    snprintf(full_path, sizeof(full_path), "%s/%s",
+             target_root[0] ? target_root : "/",
+             (rel_path[0] == '/') ? rel_path + 1 : rel_path);
+
+    char resolved_root[PATH_MAX];
+    if (target_root[0] != '\0') {
+        if (realpath(target_root, resolved_root) == NULL) {
+            strncpy(resolved_root, target_root, sizeof(resolved_root) - 1);
+            resolved_root[sizeof(resolved_root) - 1] = '\0';
+        }
+    } else {
+        strcpy(resolved_root, "/");
+    }
+
+    size_t root_len = strlen(resolved_root);
+    if (root_len > 1 && resolved_root[root_len - 1] == '/') {
+        resolved_root[--root_len] = '\0';
+    }
+
+    if (strncmp(full_path, resolved_root, root_len) != 0) {
+        return 0;
+    }
+
+    return 1;
+}
 
 static int install_kpkg(const char *kpkg_path, const char *target_root)
 {
@@ -163,6 +197,9 @@ static int install_kpkg(const char *kpkg_path, const char *target_root)
     pkg_meta_t meta;
     if (read_metadata(meta_path, &meta) < 0) {
         fprintf(stderr, "[kratos-pkg] Error: Invalid package metadata in %s\n", kpkg_path);
+        char rm_cmd[PATH_MAX + 16];
+        snprintf(rm_cmd, sizeof(rm_cmd), "rm -rf \"%s\"", stage_dir);
+        run_cmd(rm_cmd);
         return -1;
     }
 
@@ -170,10 +207,33 @@ static int install_kpkg(const char *kpkg_path, const char *target_root)
     printf("  Arch:        %s\n", meta.arch);
     printf("  Description: %s\n", meta.description);
 
-    /* 4. Run pre-install hook */
+    /* 4. Validate manifest against Zip-Slip path traversal */
+    char manifest_path[PATH_MAX];
+    snprintf(manifest_path, sizeof(manifest_path), "%s/manifest", stage_dir);
+    FILE *mf = fopen(manifest_path, "r");
+    if (mf) {
+        char line[PATH_MAX];
+        while (fgets(line, sizeof(line), mf)) {
+            size_t l = strlen(line);
+            while (l > 0 && (line[l-1] == '\n' || line[l-1] == '\r')) line[--l] = '\0';
+            if (line[0] == '\0') continue;
+
+            if (!is_safe_path(line, target_root)) {
+                fprintf(stderr, "[kratos-pkg] Security Error: Path traversal detected in manifest entry '%s'\n", line);
+                fclose(mf);
+                char rm_cmd[PATH_MAX + 16];
+                snprintf(rm_cmd, sizeof(rm_cmd), "rm -rf \"%s\"", stage_dir);
+                run_cmd(rm_cmd);
+                return -1;
+            }
+        }
+        fclose(mf);
+    }
+
+    /* 5. Run pre-install hook */
     run_hook(stage_dir, "pre-install", target_root);
 
-    /* 5. Extract payload into target root */
+    /* 6. Extract payload into target root */
     char payload_path[PATH_MAX];
     snprintf(payload_path, sizeof(payload_path), "%s/payload.tar.gz", stage_dir);
 
@@ -182,6 +242,9 @@ static int install_kpkg(const char *kpkg_path, const char *target_root)
         snprintf(extract_cmd, sizeof(extract_cmd), "tar -xzf \"%s\" -C \"%s/\"", payload_path, target_root);
         if (run_cmd(extract_cmd) != 0) {
             fprintf(stderr, "[kratos-pkg] Error: Failed to extract payload for %s\n", meta.name);
+            char rm_cmd[PATH_MAX + 16];
+            snprintf(rm_cmd, sizeof(rm_cmd), "rm -rf \"%s\"", stage_dir);
+            run_cmd(rm_cmd);
             return -1;
         }
     }
@@ -197,8 +260,6 @@ static int install_kpkg(const char *kpkg_path, const char *target_root)
     run_cmd(copy_meta_cmd);
 
     /* 8. Save file manifest to DB */
-    char manifest_path[PATH_MAX];
-    snprintf(manifest_path, sizeof(manifest_path), "%s/manifest", stage_dir);
     char db_manifest_path[PATH_MAX];
     snprintf(db_manifest_path, sizeof(db_manifest_path), "%s%s/%s", target_root, DB_FILES, meta.name);
     char copy_manifest_cmd[PATH_MAX * 2 + 32];
