@@ -12,11 +12,13 @@
 
 #include "kratos-crypt.h"
 #include <errno.h>
+#include <fcntl.h>
 #include <pwd.h>
 #include <shadow.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
@@ -102,14 +104,28 @@ int main(int argc, char *argv[])
     const char *shadow_tmp  = "/etc/shadow.tmp";
 
     FILE *fin = fopen(shadow_file, "r");
-    FILE *fout = fopen(shadow_tmp, "w");
+
+    /* Create shadow.tmp with 0600 permissions from the very first instant it
+     * exists (open() with an explicit mode, not fopen()+chmod() afterwards,
+     * which would leave a window where the file has the default/umask-derived
+     * mode — often 0644, i.e. world-readable password hashes). */
+    unlink(shadow_tmp); /* avoid inheriting a stale file's old permissions */
+    int fout_fd = open(shadow_tmp, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    FILE *fout = (fout_fd >= 0) ? fdopen(fout_fd, "w") : NULL;
 
     if (!fin || !fout) {
         perror("[passwd] Cannot open /etc/shadow");
         if (fin) fclose(fin);
         if (fout) fclose(fout);
+        else if (fout_fd >= 0) close(fout_fd);
         return 1;
     }
+
+    /* Belt-and-braces: enforce mode + ownership even if the file already
+     * existed with different permissions (e.g. leftover from a previous
+     * failed run) and force root:root ownership. */
+    fchmod(fout_fd, S_IRUSR | S_IWUSR);
+    fchown(fout_fd, 0, 0);
 
     char line[512];
     int updated = 0;
