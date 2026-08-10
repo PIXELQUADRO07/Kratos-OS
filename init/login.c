@@ -6,6 +6,10 @@
  *   3. Imposta i gruppi supplementari, GID e UID dell'utente (drop dei privilegi root)
  *   4. Prepara l'ambiente (HOME, USER, LOGNAME, SHELL, PATH) e lancia la login shell.
  *
+ * Retry behaviour:
+ *   Up to 3 attempts are allowed. After each failure a 1-second delay is
+ *   inserted to slow brute-force attacks on the physical console.
+ *
  * Compilazione:
  *   x86_64-kratos-linux-gnu-gcc --sysroot=$KRATOS_SYSROOT -O2 -Wall -std=gnu11 -o /bin/login login.c kratos-crypt.c
  */
@@ -15,13 +19,17 @@
 #include "kratos-crypt.h"
 #include <errno.h>
 #include <grp.h>
+#include <libgen.h>
 #include <pwd.h>
 #include <shadow.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <termios.h>
 #include <unistd.h>
+
+#define MAX_RETRIES 3
 
 static void disable_echo(struct termios *old_t)
 {
@@ -57,6 +65,8 @@ int main(int argc, char *argv[])
     print_issue();
     fflush(stdout);
 
+    for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
+
     char username[128] = {0};
     char password[128] = {0};
 
@@ -86,7 +96,8 @@ int main(int argc, char *argv[])
         if (fgets(password, sizeof(password), stdin)) {}
         restore_echo(&old_t);
         printf("\nLogin incorrect\n\n");
-        return 1;
+        sleep(1);
+        continue;
     }
 
     /* Read shadow entry */
@@ -116,13 +127,26 @@ int main(int argc, char *argv[])
         char *encrypted = kratos_crypt(password, hash);
         if (!encrypted || strcmp(encrypted, hash) != 0) {
             printf("Login incorrect\n\n");
-            return 1;
+            sleep(1);
+            continue;
         }
     } else {
         printf("\n");
     }
 
-    printf("Last login: Sun Aug  9 18:38:00 2026 on %s\n", ttyname(STDIN_FILENO) ? ttyname(STDIN_FILENO) : "tty1");
+    /* ----------------------------------------------------------------
+     * Authentication successful
+     * ---------------------------------------------------------------- */
+
+    /* Dynamic last-login timestamp */
+    {
+        time_t now = time(NULL);
+        char tbuf[64];
+        struct tm *tm_info = localtime(&now);
+        strftime(tbuf, sizeof(tbuf), "%a %b %e %H:%M:%S %Y", tm_info);
+        const char *tty = ttyname(STDIN_FILENO);
+        printf("Last login: %s on %s\n", tbuf, tty ? tty : "tty");
+    }
 
     /* Drop privileges & setup user environment */
     if (initgroups(pw->pw_name, pw->pw_gid) < 0) {
@@ -147,8 +171,28 @@ int main(int argc, char *argv[])
     setenv("TERM",    "linux", 1);
 
     const char *shell = pw->pw_shell[0] ? pw->pw_shell : "/bin/bash";
-    execl(shell, "bash", "--login", (char *)NULL);
+
+    /* argv[0] must be "-basename" (dash prefix) to signal a login shell.
+     * Using a hardcoded "bash" would break if the user's shell is not bash,
+     * and would also lose the dash prefix that many shells use to detect
+     * login-shell mode and source /etc/profile. */
+    char shell_copy[256];
+    strncpy(shell_copy, shell, sizeof(shell_copy) - 1);
+    shell_copy[sizeof(shell_copy) - 1] = '\0';
+    char *base = basename(shell_copy);
+
+    char argv0[258];
+    argv0[0] = '-';
+    strncpy(argv0 + 1, base, sizeof(argv0) - 2);
+    argv0[sizeof(argv0) - 1] = '\0';
+
+    execl(shell, argv0, (char *)NULL);
 
     perror("[login] exec shell failed");
+    return 1;
+
+    } /* end retry loop */
+
+    fprintf(stderr, "[login] Maximum login attempts reached. Disconnecting.\n");
     return 1;
 }
