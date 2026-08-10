@@ -7,10 +7,13 @@
  */
 
 #include "kratos-crypt.h"
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <sys/random.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -144,14 +147,56 @@ static void b64_from_24bit(uint8_t b2, uint8_t b1, uint8_t b0, int n, char **out
 
 /* ── Public API ───────────────────────────────────────────────────────────── */
 
+/* Fill buf[0..n) with cryptographically strong random bytes.
+ * Tries getrandom() first (no fd, no /dev dependency at boot before /dev
+ * is populated); falls back to /dev/urandom if the syscall is unavailable
+ * (e.g. seccomp-filtered environment). Returns 0 on success, -1 on failure. */
+static int kratos_get_random_bytes(uint8_t *buf, size_t n)
+{
+    size_t got = 0;
+    while (got < n) {
+        ssize_t r = getrandom(buf + got, n - got, 0);
+        if (r > 0) {
+            got += (size_t)r;
+            continue;
+        }
+        if (r < 0 && errno == EINTR) continue;
+        break; /* getrandom() unsupported or hard-failed: fall back below */
+    }
+    if (got == n) return 0;
+
+    int fd = open("/dev/urandom", O_RDONLY);
+    if (fd < 0) return -1;
+    got = 0;
+    while (got < n) {
+        ssize_t r = read(fd, buf + got, n - got);
+        if (r > 0) { got += (size_t)r; continue; }
+        if (r < 0 && errno == EINTR) continue;
+        break;
+    }
+    close(fd);
+    return (got == n) ? 0 : -1;
+}
+
 void kratos_gensalt(char *out, size_t size)
 {
     static const char chars[] =
         "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    uint8_t rnd[16];
     char r[17];
-    srand((unsigned)(time(NULL) ^ getpid()));
-    for (int i = 0; i < 16; i++)
-        r[i] = chars[rand() % (sizeof(chars) - 1)];
+
+    if (kratos_get_random_bytes(rnd, sizeof(rnd)) == 0) {
+        for (int i = 0; i < 16; i++)
+            r[i] = chars[rnd[i] % (sizeof(chars) - 1)];
+    } else {
+        /* Should not happen on a real kernel; last-resort degraded fallback
+         * so the system doesn't crash, still better than nothing. */
+        unsigned seed = (unsigned)(time(NULL) ^ getpid());
+        for (int i = 0; i < 16; i++) {
+            seed = seed * 1103515245u + 12345u;
+            r[i] = chars[(seed >> 16) % (sizeof(chars) - 1)];
+        }
+    }
     r[16] = '\0';
     snprintf(out, size, "$6$%s$", r);
 }
