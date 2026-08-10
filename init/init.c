@@ -1,4 +1,4 @@
-/* init.c — KratosOS PID 1 System Init
+/* init.c — KratosOS PID 1 System Init Entry Point
  *
  * Responsabilità:
  *   1. Monta i filesystem virtuali VFS (/proc, /sys, /dev, /dev/pts, /dev/shm, /run, /tmp)
@@ -9,240 +9,15 @@
  *   6. Gestisce la mietitura dei processi figli zombie (SIGCHLD handler)
  *   7. Gestisce i segnali di spegnimento e riavvio (SIGINT = reboot, SIGUSR1 = poweroff, SIGUSR2 = halt)
  *   8. Gestisce le console virtuali (TTY1, TTY2, ttyS0) e riavvia automaticamente le shell uscite.
- *
- * TTY layout:
- *   tty[0] = /dev/console  — kernel early console (always present)
- *   tty[1] = /dev/tty1     — VGA virtual terminal 1
- *   tty[2] = /dev/tty2     — VGA virtual terminal 2
- *   tty[3] = /dev/ttyS0    — First serial port (QEMU -nographic / real HW)
- *
- * Compilazione:
- *   x86_64-kratos-linux-gnu-gcc --sysroot=$KRATOS_SYSROOT -O2 -Wall -std=gnu11 -o /sbin/init init.c
  */
 
-#define _GNU_SOURCE
+#include "init.h"
+#include "mount.h"
+#include "services.h"
+#include "signals.h"
+#include "tty.h"
 
-#include <dirent.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <mntent.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/ioctl.h>
-#include <sys/mount.h>
-#include <sys/reboot.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
-
-#define MAX_TTYS 3
-
-typedef struct {
-    const char *dev;
-    pid_t pid;
-    int enabled;
-} tty_tab_t;
-
-/* TTYs supervised for login.
- * Note: /dev/console is intentionally excluded here because in Linux,
- * /dev/console redirects to the active console (which is /dev/ttyS0 when
- * booting with console=ttyS0). Spawning login on both /dev/console and
- * /dev/ttyS0 causes two login processes to read from the same serial port
- * simultaneously, resulting in keypresses being stolen/interleaved. */
-static tty_tab_t ttys[MAX_TTYS] = {
-    { "/dev/tty1",    0, 1 },
-    { "/dev/tty2",    0, 1 },
-    { "/dev/ttyS0",   0, 1 }
-};
-
-static volatile sig_atomic_t caught_sig = 0;
-
-/* ------------------------------------------------------------------ */
-/* Helpers                                                             */
-/* ------------------------------------------------------------------ */
-
-static void try_mount(const char *src, const char *tgt,
-                      const char *type, unsigned long flags,
-                      const char *data)
-{
-    if (mount(src, tgt, type, flags, data) < 0 && errno != EBUSY) {
-        fprintf(stderr, "[init] WARNING: mount %s on %s failed: %s\n",
-                src, tgt, strerror(errno));
-    }
-}
-
-static void trim_newline(char *str)
-{
-    size_t len = strlen(str);
-    while (len > 0 && (str[len - 1] == '\n' || str[len - 1] == '\r' || str[len - 1] == ' ')) {
-        str[--len] = '\0';
-    }
-}
-
-/* ------------------------------------------------------------------ */
-/* Signal Handlers                                                     */
-/* ------------------------------------------------------------------ */
-
-static void sig_handler(int sig)
-{
-    caught_sig = sig;
-}
-
-static void reap_zombies(void)
-{
-    int status;
-    pid_t pid;
-
-    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
-        for (int i = 0; i < MAX_TTYS; i++) {
-            if (ttys[i].pid == pid) {
-                ttys[i].pid = 0;
-            }
-        }
-    }
-}
-
-/* ------------------------------------------------------------------ */
-/* VFS & System Initialization                                         */
-/* ------------------------------------------------------------------ */
-
-static void mount_vfs(void)
-{
-    fprintf(stderr, "[init] Mounting virtual filesystems...\n");
-
-    try_mount("proc",     "/proc",     "proc",     MS_NOSUID | MS_NODEV | MS_NOEXEC, NULL);
-    try_mount("sysfs",    "/sys",      "sysfs",    MS_NOSUID | MS_NODEV | MS_NOEXEC, NULL);
-    try_mount("devtmpfs", "/dev",      "devtmpfs", MS_NOSUID,                        "mode=0755,size=10m");
-
-    mkdir("/dev/pts", 0755);
-    try_mount("devpts",   "/dev/pts",  "devpts",   MS_NOSUID | MS_NOEXEC,            "mode=0620,gid=5");
-
-    mkdir("/dev/shm", 1777);
-    try_mount("tmpfs",    "/dev/shm",  "tmpfs",    MS_NOSUID | MS_NODEV,             "mode=1777");
-
-    mkdir("/run", 0755);
-    try_mount("tmpfs",    "/run",      "tmpfs",    MS_NOSUID | MS_NODEV,             "mode=0755,size=64m");
-
-    mkdir("/tmp", 1777);
-    try_mount("tmpfs",    "/tmp",      "tmpfs",    MS_NOSUID | MS_NODEV,             "mode=1777,size=128m");
-
-    fprintf(stderr, "[init] Virtual filesystems mounted.\n");
-}
-
-static void set_hostname(void)
-{
-    FILE *f = fopen("/etc/hostname", "r");
-    if (f) {
-        char host[128];
-        if (fgets(host, sizeof(host), f)) {
-            trim_newline(host);
-            if (sethostname(host, strlen(host)) == 0) {
-                fprintf(stderr, "[init] Hostname set to '%s'\n", host);
-            } else {
-                perror("[init] sethostname failed");
-            }
-        }
-        fclose(f);
-    } else {
-        sethostname("kratos", 6);
-    }
-}
-
-static const char *resolve_dev_spec(const char *spec, char *buf, size_t buflen)
-{
-    if (strncmp(spec, "LABEL=", 6) == 0) {
-        snprintf(buf, buflen, "/dev/disk/by-label/%s", spec + 6);
-        return buf;
-    }
-    if (strncmp(spec, "UUID=", 5) == 0) {
-        snprintf(buf, buflen, "/dev/disk/by-uuid/%s", spec + 5);
-        return buf;
-    }
-    return spec;
-}
-
-static void mount_fstab(void)
-{
-    FILE *f = setmntent("/etc/fstab", "r");
-    if (!f) {
-        return;
-    }
-
-    struct mntent mnt;
-    char buf[1024];
-
-    fprintf(stderr, "[init] Mounting filesystems from /etc/fstab...\n");
-
-    while (getmntent_r(f, &mnt, buf, sizeof(buf))) {
-        if (strcmp(mnt.mnt_type, "proc") == 0 ||
-            strcmp(mnt.mnt_type, "sysfs") == 0 ||
-            strcmp(mnt.mnt_type, "devtmpfs") == 0 ||
-            strcmp(mnt.mnt_type, "devpts") == 0 ||
-            strcmp(mnt.mnt_type, "tmpfs") == 0)
-        {
-            continue; /* Già montati in mount_vfs() */
-        }
-
-        char resolved[512];
-        const char *target_dev = resolve_dev_spec(mnt.mnt_fsname, resolved, sizeof(resolved));
-
-        mkdir(mnt.mnt_dir, 0755);
-        if (mount(target_dev, mnt.mnt_dir, mnt.mnt_type, 0, mnt.mnt_opts) == 0) {
-            fprintf(stderr, "[init] Mounted %s on %s (%s)\n",
-                    target_dev, mnt.mnt_dir, mnt.mnt_type);
-        }
-    }
-
-    endmntent(f);
-}
-
-static void run_sysinit(void)
-{
-    if (access("/etc/rc.sysinit", X_OK) == 0) {
-        fprintf(stderr, "[init] Running /etc/rc.sysinit...\n");
-        pid_t pid = fork();
-        if (pid == 0) {
-            execl("/etc/rc.sysinit", "/etc/rc.sysinit", (char *)NULL);
-            _exit(127);
-        } else if (pid > 0) {
-            int status;
-            waitpid(pid, &status, 0);
-        }
-    }
-}
-
-static void run_services(void)
-{
-    DIR *d = opendir("/etc/rc.d");
-    if (!d) return;
-
-    struct dirent *entry;
-    while ((entry = readdir(d)) != NULL) {
-        if (entry->d_name[0] == '.') continue;
-
-        char path[384];
-        snprintf(path, sizeof(path), "/etc/rc.d/%s", entry->d_name);
-
-        if (access(path, X_OK) == 0) {
-            fprintf(stderr, "[init] Starting service: %s\n", entry->d_name);
-            pid_t pid = fork();
-            if (pid == 0) {
-                execl(path, path, (char *)NULL);
-                _exit(127);
-            }
-        }
-    }
-    closedir(d);
-}
-
-/* ------------------------------------------------------------------ */
-/* Shutdown / Reboot Logic                                             */
-/* ------------------------------------------------------------------ */
-
-static void shutdown_system(int cmd)
+void shutdown_system(int cmd)
 {
     const char *action_str = (cmd == RB_POWER_OFF) ? "Powering off" :
                              (cmd == (int)RB_HALT_SYSTEM) ? "Halting" : "Rebooting";
@@ -277,84 +52,6 @@ static void shutdown_system(int cmd)
     for (;;) pause();
 }
 
-/* ------------------------------------------------------------------ */
-/* TTY Setup & Shell Spawning                                          */
-/* ------------------------------------------------------------------ */
-
-static int setup_tty(const char *tty_dev)
-{
-    if (setsid() < 0 && errno != EPERM) {
-        /* Ignora EPERM se siamo già leader di sessione */
-    }
-
-    int fd = open(tty_dev, O_RDWR | O_NOCTTY);
-    if (fd < 0) {
-        return -1;
-    }
-
-    ioctl(fd, TIOCSCTTY, 1);
-
-    dup2(fd, STDIN_FILENO);
-    dup2(fd, STDOUT_FILENO);
-    dup2(fd, STDERR_FILENO);
-
-    if (fd > STDERR_FILENO) {
-        close(fd);
-    }
-
-    return 0;
-}
-
-static void print_issue(void)
-{
-    FILE *f = fopen("/etc/issue", "r");
-    if (f) {
-        char buf[256];
-        while (fgets(buf, sizeof(buf), f)) {
-            fputs(buf, stdout);
-        }
-        fclose(f);
-    }
-}
-
-static pid_t spawn_tty_shell(const char *tty_dev)
-{
-    pid_t pid = fork();
-
-    if (pid < 0) {
-        perror("[init] fork TTY shell");
-        return -1;
-    }
-
-    if (pid == 0) {
-        if (setup_tty(tty_dev) < 0) {
-            _exit(1);
-        }
-
-        print_issue();
-        fflush(stdout);
-
-        setenv("TERM",  "linux", 1);
-        setenv("HOME",  "/root", 1);
-        setenv("PATH",  "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1);
-        setenv("SHELL", "/bin/bash", 1);
-
-        if (access("/bin/login", X_OK) == 0) {
-            execl("/bin/login", "login", (char *)NULL);
-        }
-
-        execl("/bin/bash", "bash", "--login", (char *)NULL);
-        perror("[init] execl bash");
-        _exit(127);
-    }
-
-    return pid;
-}
-
-/* ------------------------------------------------------------------ */
-/* Main (PID 1)                                                        */
-/* ------------------------------------------------------------------ */
-
 int main(void)
 {
     fprintf(stderr, "\n");
@@ -367,23 +64,7 @@ int main(void)
     }
 
     /* Configura gestori di segnali */
-    struct sigaction sa;
-    memset(&sa, 0, sizeof(sa));
-    sa.sa_handler = sig_handler;
-    sa.sa_flags   = SA_RESTART;   /* evita EINTR su syscall lente */
-    sigemptyset(&sa.sa_mask);
-
-    sigaction(SIGINT,  &sa, NULL); /* Reboot */
-    sigaction(SIGUSR1, &sa, NULL); /* Poweroff */
-    sigaction(SIGUSR2, &sa, NULL); /* Halt */
-    sigaction(SIGPWR,  &sa, NULL); /* Poweroff */
-
-    /* SIGCHLD: svegliarsi quando un figlio muore per raccoglierlo subito
-     * e marcarne il TTY slot come libero, evitando ritardi di 1 secondo
-     * prima che il prompt di login venga rilanciato. */
-    sa.sa_handler = sig_handler;
-    sa.sa_flags   = SA_RESTART | SA_NOCLDSTOP;
-    sigaction(SIGCHLD, &sa, NULL);
+    setup_signal_handlers();
 
     /* Monta i VFS essenziali */
     mount_vfs();
@@ -418,17 +99,11 @@ int main(void)
             }
         }
 
-        /* Mietitura zombie e riavvio TTY */
+        /* Mietitura zombie */
         reap_zombies();
 
-        for (int i = 0; i < MAX_TTYS; i++) {
-            if (ttys[i].enabled && ttys[i].pid == 0) {
-                /* Avvia la shell sul TTY se la device esiste */
-                if (access(ttys[i].dev, F_OK) == 0) {
-                    ttys[i].pid = spawn_tty_shell(ttys[i].dev);
-                }
-            }
-        }
+        /* Riavvio TTY uscite */
+        check_and_respawn_ttys();
 
         /* Attesa evento / segnale senza polling continuo CPU */
         sleep(1);

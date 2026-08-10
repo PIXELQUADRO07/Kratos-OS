@@ -42,15 +42,20 @@ mkdir -p "$SYSROOT/bin"
 mkdir -p "$SYSROOT/sbin"
 mkdir -p "$SYSROOT/usr/bin"
 
-echo "[+] Compiling /sbin/init..."
+echo "[+] Compiling /sbin/init (modular PID 1)..."
 "$CC" \
     --sysroot="$SYSROOT" \
     -O2 \
     -Wall \
     -Wextra \
     -std=gnu11 \
+    -I"$KRATOS_ROOT/init" \
     -o "$INIT_OUT" \
-    "$INIT_SRC"
+    "$KRATOS_ROOT/init/init.c" \
+    "$KRATOS_ROOT/init/mount.c" \
+    "$KRATOS_ROOT/init/services.c" \
+    "$KRATOS_ROOT/init/signals.c" \
+    "$KRATOS_ROOT/init/tty.c"
 echo "[✓] init compiled."
 
 echo "[+] Compiling /sbin/shutdown..."
