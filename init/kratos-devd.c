@@ -277,9 +277,7 @@ static void coldplug_dir(const char *dirpath)
 static void trigger_coldplug(void)
 {
     printf("[kratos-devd] Running coldplug scan on /sys...\n");
-    coldplug_dir("/sys/bus");
-    coldplug_dir("/sys/class");
-    coldplug_dir("/sys/block");
+    coldplug_dir("/sys/devices");
     printf("[kratos-devd] Coldplug scan complete.\n");
 }
 
