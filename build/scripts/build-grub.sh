@@ -28,6 +28,18 @@ echo "  Target:  $TARGET"
 echo "  Sysroot: $SYSROOT"
 echo
 
+# ── Incremental guard ─────────────────────────────────────────────────
+# Skip the build entirely if the GRUB EFI modules are already installed
+# in the sysroot. The normal.mod file is the canonical indicator that
+# grub-install will work correctly; if it is present we assume the full
+# GRUB installation is intact.
+GRUB_MARKER="$SYSROOT/usr/lib/grub/x86_64-efi/normal.mod"
+if [ -f "$GRUB_MARKER" ]; then
+    echo "[✓] GRUB $VERSION already installed (found $GRUB_MARKER)."
+    echo "[~] Skipping build. Run with --force or remove the sysroot to rebuild."
+    exit 0
+fi
+
 mkdir -p "$KRATOS_DOWNLOADS"
 mkdir -p "$KRATOS_SOURCES"
 mkdir -p "$KRATOS_WORK"
