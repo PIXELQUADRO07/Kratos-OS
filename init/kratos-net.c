@@ -27,13 +27,31 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/random.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+/* Fills *out with a random 32-bit value via getrandom(). Returns 0 on
+ * success, -1 if the syscall is unavailable/failed. */
+static int kratos_random_xid(uint32_t *out)
+{
+    uint8_t buf[4];
+    ssize_t got = 0;
+    while (got < 4) {
+        ssize_t r = getrandom(buf + got, 4 - got, 0);
+        if (r > 0) { got += r; continue; }
+        if (r < 0 && errno == EINTR) continue;
+        return -1;
+    }
+    memcpy(out, buf, 4);
+    return 0;
+}
 
 #define DHCP_SERVER_PORT 67
 #define DHCP_CLIENT_PORT 68
@@ -246,10 +264,17 @@ static int run_dhcp_client(const char *ifname)
     dhcp_packet_t pkt;
     memset(&pkt, 0, sizeof(pkt));
 
+    /* Random transaction ID: used below to verify that the reply we accept
+     * actually answers *our* request, instead of blindly trusting the first
+     * UDP datagram that lands on port 68 (which any host on the LAN segment
+     * could have forged). */
+    uint32_t xid;
+    if (kratos_random_xid(&xid) != 0) xid = 0x12345678u ^ (uint32_t)getpid();
+
     pkt.op = 1; /* BOOTREQUEST */
     pkt.htype = 1; /* Ethernet */
     pkt.hlen = 6;
-    pkt.xid = htonl(0x12345678);
+    pkt.xid = htonl(xid);
     pkt.flags = htons(0x8000); /* Broadcast flag */
     memcpy(pkt.chaddr, mac, 6);
     pkt.cookie = htonl(0x63825363); /* Magic Cookie */
@@ -274,11 +299,38 @@ static int run_dhcp_client(const char *ifname)
     tv.tv_usec = 0;
     setsockopt(dhcp_sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
+    /* Zero the receive buffer first: recv() only overwrites the bytes it
+     * actually delivers, so on a short/truncated datagram the remainder of
+     * this stack struct would otherwise still hold whatever was left over
+     * from earlier stack usage — and that garbage would then get parsed
+     * below as if it were real IP/gateway/DNS option data. */
     dhcp_packet_t offer_pkt;
-    ssize_t res = recv(dhcp_sock, &offer_pkt, sizeof(offer_pkt), 0);
+    memset(&offer_pkt, 0, sizeof(offer_pkt));
 
-    if (res <= 0) {
+    struct sockaddr_in from_sa;
+    socklen_t from_len = sizeof(from_sa);
+    ssize_t res = recvfrom(dhcp_sock, &offer_pkt, sizeof(offer_pkt), 0,
+                            (struct sockaddr *)&from_sa, &from_len);
+
+    /* Minimum bytes needed to safely read up to (and including) the fixed
+     * header + magic cookie, before we touch offer_pkt.options[] at all. */
+    const size_t header_len = offsetof(dhcp_packet_t, options);
+
+    if (res <= 0 || (size_t)res < header_len) {
         printf("[kratos-net] DHCP timeout on %s. Setting fallback IP 192.168.1.150...\n", ifname);
+        close(dhcp_sock);
+        set_iface_ip(ifname, "192.168.1.150", "255.255.255.0");
+        set_default_gateway(ifname, "192.168.1.1");
+        update_resolv_conf("1.1.1.1", "8.8.8.8");
+        return 0;
+    }
+
+    /* Reject anything that isn't actually answering the request we just
+     * sent: wrong transaction ID means either a stray/unrelated DHCP
+     * packet on the segment or a forged reply, in both cases not something
+     * we should configure the interface from. */
+    if (offer_pkt.xid != pkt.xid) {
+        fprintf(stderr, "[kratos-net] Ignoring DHCP reply with mismatched XID on %s.\n", ifname);
         close(dhcp_sock);
         set_iface_ip(ifname, "192.168.1.150", "255.255.255.0");
         set_default_gateway(ifname, "192.168.1.1");
@@ -293,16 +345,29 @@ static int run_dhcp_client(const char *ifname)
 
     printf("[kratos-net] Received DHCP lease: %s on %s\n", ip_str, ifname);
 
-    /* Parse Subnet Mask and Router from Options */
+    /* Parse Subnet Mask and Router from Options.
+     * `opts_len` is how many bytes of offer_pkt.options[] were *actually*
+     * received (res is capped to sizeof(offer_pkt) by recvfrom, and never
+     * exceeds sizeof(offer_pkt.options)) — every array access below is
+     * bounds-checked against this, not against a hardcoded constant. */
     char mask_str[INET_ADDRSTRLEN] = "255.255.255.0";
     char gw_str[INET_ADDRSTRLEN]   = "";
     char dns_str[INET_ADDRSTRLEN]  = "1.1.1.1";
 
-    int idx = 0;
-    while (idx < 300 && offer_pkt.options[idx] != 255) {
+    size_t opts_len = (size_t)res - header_len;
+    if (opts_len > sizeof(offer_pkt.options)) opts_len = sizeof(offer_pkt.options);
+
+    size_t idx = 0;
+    while (idx < opts_len && offer_pkt.options[idx] != 255) {
         uint8_t opt = offer_pkt.options[idx];
-        if (opt == 0) { idx++; continue; }
+        if (opt == 0) { idx++; continue; } /* PAD */
+
+        /* Need at least the length byte before reading it. */
+        if (idx + 1 >= opts_len) break;
         uint8_t opt_len = offer_pkt.options[idx + 1];
+
+        /* Need the full option value to be within what we received. */
+        if (idx + 2 + (size_t)opt_len > opts_len) break;
 
         if (opt == 1 && opt_len == 4) { /* Subnet Mask */
             struct in_addr m;
