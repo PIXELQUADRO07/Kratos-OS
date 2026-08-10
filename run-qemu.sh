@@ -93,10 +93,13 @@ echo "  QEMU:   $QEMU_VER"
 
 # OVMF firmware
 OVMF_CANDIDATES=(
+    /usr/share/edk2/x64/OVMF.4m.fd
+    /usr/share/edk2/x64/OVMF_CODE.4m.fd
+    /usr/share/edk2/x64/OVMF.fd
     /usr/share/ovmf/OVMF.fd
     /usr/share/OVMF/OVMF.fd
     /usr/share/qemu/OVMF.fd
-    /usr/share/edk2/x64/OVMF.fd
+    /usr/share/edk2-ovmf/x64/OVMF.fd
     /usr/share/edk2-ovmf/OVMF.fd
 )
 

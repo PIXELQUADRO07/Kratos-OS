@@ -52,6 +52,12 @@ else
     echo "[~] Linux $VERSION already extracted."
 fi
 
+# ── Clean source tree if an in-source build was previously done ───────────────
+if [ -f "$SOURCE_DIR/include/config/auto.conf" ] || [ -f "$SOURCE_DIR/.config" ]; then
+    echo "[+] Cleaning in-source artifacts in kernel source tree..."
+    make -C "$SOURCE_DIR" ARCH=x86_64 mrproper 2>/dev/null || true
+fi
+
 # ── Prepare output directory ──────────────────────────────────────────
 mkdir -p "$KBUILD_DIR"
 
