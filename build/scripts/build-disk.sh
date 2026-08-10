@@ -400,7 +400,8 @@ if [ -n "$BLKID_UUID" ] && [ "$BLKID_UUID" != "$ROOT_UUID" ]; then
     exit 1
 fi
 
-echo "[✓] Root UUID: $ROOT_UUID"
+ROOT_PARTUUID="$(blkid -s PARTUUID -o value "$ROOT_DEV" 2>/dev/null || blkid -p -s PART_ENTRY_UUID -o value "$ROOT_DEV" 2>/dev/null || true)"
+echo "[✓] Root PARTUUID: $ROOT_PARTUUID"
 
 # ------------------------------------------------------------
 # Step 11: Install Branding Logo & Custom /boot/grub/grub.cfg
@@ -423,6 +424,7 @@ fi
 GRUB_TEMPLATE="$KRATOS_ROOT/config/grub/grub.cfg.template"
 if [ -f "$GRUB_TEMPLATE" ]; then
     sed -e "s/@ROOT_UUID@/${ROOT_UUID}/g" \
+        -e "s/@ROOT_PARTUUID@/${ROOT_PARTUUID}/g" \
         -e "s/@BUILD_ID@/${BUILD_ID}/g" \
         "$GRUB_TEMPLATE" > "$MNT_ROOT/boot/grub/grub.cfg"
     echo "[✓] Custom grub.cfg generated from config/grub/grub.cfg.template"
@@ -432,12 +434,25 @@ else
 # KratosOS GRUB configuration
 set timeout=5
 set default=0
-menuentry "KratosOS 0.1.0" {
+
+serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1
+terminal_input console serial
+terminal_output console serial
+
+menuentry "KratosOS 0.1.0 (PARTUUID)" {
     insmod part_gpt
     insmod ext2
     insmod linux
     search --no-floppy --fs-uuid --set=root ${ROOT_UUID}
-    linux /boot/vmlinuz root=UUID=${ROOT_UUID} rw init=/sbin/init console=tty0 console=ttyS0 kratos.build=${BUILD_ID}
+    linux /boot/vmlinuz root=PARTUUID=${ROOT_PARTUUID} rw init=/sbin/init console=tty0 console=ttyS0 kratos.build=${BUILD_ID}
+}
+
+menuentry "KratosOS 0.1.0 (VirtIO /dev/vda2)" {
+    insmod part_gpt
+    insmod ext2
+    insmod linux
+    search --no-floppy --fs-uuid --set=root ${ROOT_UUID}
+    linux /boot/vmlinuz root=/dev/vda2 rw init=/sbin/init console=tty0 console=ttyS0 kratos.build=${BUILD_ID}
 }
 GRUB_EOF
 fi
