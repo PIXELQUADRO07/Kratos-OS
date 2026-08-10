@@ -190,6 +190,30 @@ static void update_disk_symlinks(const uevent_t *ev)
         unlink(link_path);
         symlink(node_path, link_path);
     }
+
+    /* Probe for LABEL using blkid */
+    snprintf(cmd, sizeof(cmd), "blkid -s LABEL -o value %s 2>/dev/null", node_path);
+    f = popen(cmd, "r");
+    if (f) {
+        char label[128] = {0};
+        if (fgets(label, sizeof(label), f)) {
+            size_t l = strlen(label);
+            while (l > 0 && (label[l-1] == '\n' || label[l-1] == '\r')) {
+                label[--l] = '\0';
+            }
+            if (label[0] != '\0') {
+                mkdir("/dev/disk", 0755);
+                mkdir("/dev/disk/by-label", 0755);
+
+                char link_path[512];
+                snprintf(link_path, sizeof(link_path), "/dev/disk/by-label/%s", label);
+
+                unlink(link_path);
+                symlink(node_path, link_path);
+            }
+        }
+        pclose(f);
+    }
 }
 
 /* ------------------------------------------------------------------ */

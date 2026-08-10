@@ -151,6 +151,19 @@ static void set_hostname(void)
     }
 }
 
+static const char *resolve_dev_spec(const char *spec, char *buf, size_t buflen)
+{
+    if (strncmp(spec, "LABEL=", 6) == 0) {
+        snprintf(buf, buflen, "/dev/disk/by-label/%s", spec + 6);
+        return buf;
+    }
+    if (strncmp(spec, "UUID=", 5) == 0) {
+        snprintf(buf, buflen, "/dev/disk/by-uuid/%s", spec + 5);
+        return buf;
+    }
+    return spec;
+}
+
 static void mount_fstab(void)
 {
     FILE *f = setmntent("/etc/fstab", "r");
@@ -173,10 +186,13 @@ static void mount_fstab(void)
             continue; /* Già montati in mount_vfs() */
         }
 
+        char resolved[512];
+        const char *target_dev = resolve_dev_spec(mnt.mnt_fsname, resolved, sizeof(resolved));
+
         mkdir(mnt.mnt_dir, 0755);
-        if (mount(mnt.mnt_fsname, mnt.mnt_dir, mnt.mnt_type, 0, mnt.mnt_opts) == 0) {
+        if (mount(target_dev, mnt.mnt_dir, mnt.mnt_type, 0, mnt.mnt_opts) == 0) {
             fprintf(stderr, "[init] Mounted %s on %s (%s)\n",
-                    mnt.mnt_fsname, mnt.mnt_dir, mnt.mnt_type);
+                    target_dev, mnt.mnt_dir, mnt.mnt_type);
         }
     }
 
