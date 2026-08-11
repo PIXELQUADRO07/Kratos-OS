@@ -92,9 +92,26 @@ int main(int argc, char *argv[])
     snprintf(tar_cmd, sizeof(tar_cmd), "tar -czf \"%s\" -C \"%s\" .", payload_path, dir);
     system(tar_cmd);
 
-    /* 4. Pack everything into final .kpkg tarball */
+    /* 5. Check for hooks directory */
+    char hooks_dir[1024];
+    snprintf(hooks_dir, sizeof(hooks_dir), "%s/hooks", dir);
+    
+    /* Copy hooks to temp dir if they exist */
+    struct stat st;
+    int has_hooks = (stat(hooks_dir, &st) == 0 && S_ISDIR(st.st_mode));
+    if (has_hooks) {
+        char cp_hooks[2048];
+        snprintf(cp_hooks, sizeof(cp_hooks), "cp -r \"%s\" \"%s/hooks\"", hooks_dir, temp_dir);
+        system(cp_hooks);
+    }
+    
+    /* 6. Pack everything into final .kpkg tarball */
     char pack_cmd[2048];
-    snprintf(pack_cmd, sizeof(pack_cmd), "tar -cf \"%s\" -C \"%s\" metadata manifest payload.tar.gz", out, temp_dir);
+    if (has_hooks) {
+        snprintf(pack_cmd, sizeof(pack_cmd), "tar -cf \"%s\" -C \"%s\" metadata manifest payload.tar.gz hooks", out, temp_dir);
+    } else {
+        snprintf(pack_cmd, sizeof(pack_cmd), "tar -cf \"%s\" -C \"%s\" metadata manifest payload.tar.gz", out, temp_dir);
+    }
     int res = system(pack_cmd);
 
     /* Cleanup temp directory */

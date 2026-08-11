@@ -38,6 +38,7 @@ export KRATOS_JOBS ?= $(shell nproc)
         ncurses readline bash coreutils grep sed gawk findutils \
         diffutils tar gzip xz bzip2 file-cmd \
         kernel grub etc init pkg disk image \
+        mbedtls ca-certs fetch \
         clean distclean stamps-clean
 
 # ─────────────────────────────────────────────
@@ -183,7 +184,7 @@ file-cmd:
 # ─────────────────────────────────────────────
 # Phase 3 — Kernel, bootloader, init, disk image
 # ─────────────────────────────────────────────
-phase3: kernel grub etc init pkg disk
+phase3: kernel grub mbedtls ca-certs etc init pkg fetch disk
 
 kernel:
 	@bash $(SCRIPTS)/build-kernel.sh
@@ -199,6 +200,15 @@ init:
 
 pkg:
 	@bash $(SCRIPTS)/build-pkg.sh
+
+mbedtls:
+	@bash $(SCRIPTS)/build-mbedtls.sh
+
+ca-certs:
+	@bash $(SCRIPTS)/build-ca-certificates.sh
+
+fetch:
+	@bash $(SCRIPTS)/build-fetch.sh
 
 # disk requires root — invoke via sudo automatically
 disk image:

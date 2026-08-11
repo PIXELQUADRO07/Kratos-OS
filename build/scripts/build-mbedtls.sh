@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+
+# build-mbedtls.sh — Cross-compile mbedTLS for KratosOS sysroot
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../config/build.conf"
+source "$SCRIPT_DIR/../config/versions.conf"
+
+SYSROOT="$KRATOS_SYSROOT"
+TOOLS="$KRATOS_TOOLS"
+CC="$TOOLS/bin/$TARGET-gcc"
+AR="$TOOLS/bin/$TARGET-ar"
+RANLIB="$TOOLS/bin/$TARGET-ranlib"
+
+SRC_DIR="$KRATOS_SOURCES/mbedtls-${MBEDTLS_VERSION}"
+WORK_DIR="$KRATOS_WORK/mbedtls"
+
+echo "========================================"
+echo "       KRATOSOS mbedTLS BUILD"
+echo "========================================"
+echo "  Version: ${MBEDTLS_VERSION}"
+echo "  Target:  $TARGET"
+echo "  Sysroot: $SYSROOT"
+echo "  CC:      $CC"
+echo
+
+if [ ! -f "$CC" ]; then
+    echo "[!] Cross-compiler not found: $CC"
+    exit 1
+fi
+
+# Download if not present
+MBEDTLS_TAR="$KRATOS_DOWNLOADS/mbedtls-${MBEDTLS_VERSION}.tar.bz2"
+if [ ! -f "$MBEDTLS_TAR" ]; then
+    echo "[+] Downloading mbedTLS ${MBEDTLS_VERSION}..."
+    mkdir -p "$KRATOS_DOWNLOADS"
+    curl -L --progress-bar --retry 3 \
+        -o "${MBEDTLS_TAR}.part" \
+        "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-${MBEDTLS_VERSION}/mbedtls-${MBEDTLS_VERSION}.tar.bz2"
+    mv "${MBEDTLS_TAR}.part" "$MBEDTLS_TAR"
+    echo "[✓] Downloaded."
+fi
+
+# Extract if not present
+if [ ! -d "$SRC_DIR" ]; then
+    echo "[+] Extracting mbedTLS..."
+    mkdir -p "$KRATOS_SOURCES"
+    tar -xjf "$MBEDTLS_TAR" -C "$KRATOS_SOURCES"
+    echo "[✓] Extracted."
+fi
+
+# Clean and create work directory
+rm -rf "$WORK_DIR"
+mkdir -p "$WORK_DIR"
+
+# Build using Makefile (mbedTLS supports plain make without cmake)
+echo "[+] Compiling mbedTLS (static libraries)..."
+cd "$SRC_DIR"
+
+# mbedTLS can be built with just make, specifying CC and AR
+make -j"${KRATOS_JOBS:-$(nproc)}" \
+    CC="$CC --sysroot=$SYSROOT" \
+    AR="$AR" \
+    CFLAGS="-O2 -fstack-protector-strong -D_FORTIFY_SOURCE=2 -DMBEDTLS_THREADING_C -DMBEDTLS_THREADING_PTHREAD" \
+    LDFLAGS="--sysroot=$SYSROOT" \
+    lib
+
+echo "[✓] mbedTLS compiled."
+
+# Install into sysroot
+echo "[+] Installing into sysroot..."
+mkdir -p "$SYSROOT/usr/lib"
+mkdir -p "$SYSROOT/usr/include"
+
+cp library/libmbedtls.a    "$SYSROOT/usr/lib/"
+cp library/libmbedcrypto.a "$SYSROOT/usr/lib/"
+cp library/libmbedx509.a   "$SYSROOT/usr/lib/"
+
+# ranlib the static libs
+"$RANLIB" "$SYSROOT/usr/lib/libmbedtls.a"
+"$RANLIB" "$SYSROOT/usr/lib/libmbedcrypto.a"
+"$RANLIB" "$SYSROOT/usr/lib/libmbedx509.a"
+
+cp -r include/mbedtls "$SYSROOT/usr/include/"
+cp -r include/psa     "$SYSROOT/usr/include/"
+
+echo "[✓] mbedTLS installed into sysroot."
+
+echo
+echo "Installed libraries:"
+ls -lh "$SYSROOT/usr/lib/libmbed"*
+echo
+echo "[✓] mbedTLS build complete."

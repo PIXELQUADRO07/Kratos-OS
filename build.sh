@@ -92,9 +92,12 @@ declare -a STAGES=(
     "xz|build-xz.sh|no|xz"
     "bzip2|build-bzip2.sh|no|bzip2"
     "file|build-file.sh|no|file (magic detection)"
+    "mbedtls|build-mbedtls.sh|no|mbedTLS (TLS library)"
+    "ca-certs|build-ca-certificates.sh|no|Mozilla CA certificate bundle"
     "etc|create-etc-skeleton.sh|no|/etc skeleton (fstab, passwd, ...)"
     "init|build-init.sh|no|init + shutdown + devd + login + passwd"
     "pkg|build-pkg.sh|no|kpm package manager"
+    "fetch|build-fetch.sh|no|kratos-fetch HTTPS client"
     "disk|build-disk.sh|yes|Disk image (requires sudo)"
 )
 

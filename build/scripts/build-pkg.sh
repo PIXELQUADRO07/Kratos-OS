@@ -43,10 +43,14 @@ echo "[+] Compiling /usr/libexec/kratos-pkg (Engine)..."
     --sysroot="$SYSROOT" \
     -O2 \
     -Wall \
+    -fstack-protector-strong \
+    -D_FORTIFY_SOURCE=2 \
     -Wextra \
     -std=gnu11 \
     -o "$PKG_OUT" \
-    "$PKG_SRC"
+    "$PKG_SRC" \
+    -fPIE -pie \
+    -Wl,-z,relro,-z,now
 echo "[✓] kratos-pkg engine compiled."
 
 echo "[+] Compiling /usr/bin/kratos (CLI Frontend)..."
@@ -54,10 +58,14 @@ echo "[+] Compiling /usr/bin/kratos (CLI Frontend)..."
     --sysroot="$SYSROOT" \
     -O2 \
     -Wall \
+    -fstack-protector-strong \
+    -D_FORTIFY_SOURCE=2 \
     -Wextra \
     -std=gnu11 \
     -o "$CLI_OUT" \
-    "$CLI_SRC"
+    "$CLI_SRC" \
+    -fPIE -pie \
+    -Wl,-z,relro,-z,now
 echo "[✓] kratos CLI frontend compiled."
 
 echo "[+] Compiling /usr/bin/kratos-pack (Package Builder)..."
@@ -65,10 +73,14 @@ echo "[+] Compiling /usr/bin/kratos-pack (Package Builder)..."
     --sysroot="$SYSROOT" \
     -O2 \
     -Wall \
+    -fstack-protector-strong \
+    -D_FORTIFY_SOURCE=2 \
     -Wextra \
     -std=gnu11 \
     -o "$PACK_OUT" \
-    "$PACK_SRC"
+    "$PACK_SRC" \
+    -fPIE -pie \
+    -Wl,-z,relro,-z,now
 echo "[✓] kratos-pack tool compiled."
 
 echo

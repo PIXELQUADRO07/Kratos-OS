@@ -266,6 +266,19 @@ static int install_kpkg(const char *kpkg_path, const char *target_root)
     snprintf(copy_manifest_cmd, sizeof(copy_manifest_cmd), "cp \"%s\" \"%s\"", manifest_path, db_manifest_path);
     run_cmd(copy_manifest_cmd);
 
+    /* 9. Save hooks to DB for later removal */
+    char hooks_src[PATH_MAX];
+    snprintf(hooks_src, sizeof(hooks_src), "%s/hooks", stage_dir);
+    char hooks_dst[PATH_MAX];
+    snprintf(hooks_dst, sizeof(hooks_dst), "%s%s/%s.hooks", target_root, DB_PKGS, meta.name);
+    
+    struct stat hooks_st;
+    if (stat(hooks_src, &hooks_st) == 0 && S_ISDIR(hooks_st.st_mode)) {
+        char cp_hooks[PATH_MAX * 2 + 32];
+        snprintf(cp_hooks, sizeof(cp_hooks), "cp -r \"%s\" \"%s\"", hooks_src, hooks_dst);
+        run_cmd(cp_hooks);
+    }
+
     /* Clean up stage directory */
     snprintf(unpack_cmd, sizeof(unpack_cmd), "rm -rf \"%s\"", stage_dir);
     run_cmd(unpack_cmd);
@@ -277,6 +290,19 @@ static int install_kpkg(const char *kpkg_path, const char *target_root)
 /* ------------------------------------------------------------------ */
 /* Package Removal                                                     */
 /* ------------------------------------------------------------------ */
+
+static void run_hook_from_db(const char *hooks_dir, const char *hook_name, const char *target_root)
+{
+    char hook_path[PATH_MAX];
+    snprintf(hook_path, sizeof(hook_path), "%s/%s", hooks_dir, hook_name);
+
+    if (access(hook_path, X_OK) == 0) {
+        printf("[kratos-pkg] Running hook: %s...\n", hook_name);
+        char cmd[PATH_MAX * 2];
+        snprintf(cmd, sizeof(cmd), "ROOT=\"%s\" \"%s\"", target_root, hook_path);
+        run_cmd(cmd);
+    }
+}
 
 static int remove_pkg(const char *pkg_name, const char *target_root)
 {
@@ -292,6 +318,11 @@ static int remove_pkg(const char *pkg_name, const char *target_root)
         fprintf(stderr, "[kratos-pkg] Error: Package '%s' is not installed.\n", pkg_name);
         return -1;
     }
+
+    /* Run pre-remove hook if saved */
+    char hooks_dir[PATH_MAX];
+    snprintf(hooks_dir, sizeof(hooks_dir), "%s%s/%s.hooks", target_root, DB_PKGS, pkg_name);
+    run_hook_from_db(hooks_dir, "pre-remove", target_root);
 
     /* Delete files listed in manifest */
     FILE *f = fopen(db_manifest_path, "r");
@@ -317,6 +348,14 @@ static int remove_pkg(const char *pkg_name, const char *target_root)
     /* Remove DB entries */
     unlink(db_meta_path);
     unlink(db_manifest_path);
+
+    /* Run post-remove hook */
+    run_hook_from_db(hooks_dir, "post-remove", target_root);
+    
+    /* Clean up saved hooks */
+    char rm_hooks[PATH_MAX + 16];
+    snprintf(rm_hooks, sizeof(rm_hooks), "rm -rf \"%s\"", hooks_dir);
+    run_cmd(rm_hooks);
 
     printf("[✓] Package '%s' removed successfully.\n", pkg_name);
     return 0;

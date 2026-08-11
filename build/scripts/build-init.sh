@@ -47,6 +47,8 @@ echo "[+] Compiling /sbin/init (modular PID 1)..."
     --sysroot="$SYSROOT" \
     -O2 \
     -Wall \
+    -fstack-protector-strong \
+    -D_FORTIFY_SOURCE=2 \
     -Wextra \
     -std=gnu11 \
     -I"$KRATOS_ROOT/init" \
@@ -55,7 +57,9 @@ echo "[+] Compiling /sbin/init (modular PID 1)..."
     "$KRATOS_ROOT/init/mount.c" \
     "$KRATOS_ROOT/init/services.c" \
     "$KRATOS_ROOT/init/signals.c" \
-    "$KRATOS_ROOT/init/tty.c"
+    "$KRATOS_ROOT/init/tty.c" \
+    -fPIE -pie \
+    -Wl,-z,relro,-z,now
 echo "[✓] init compiled."
 
 echo "[+] Compiling /sbin/shutdown..."
@@ -63,10 +67,14 @@ echo "[+] Compiling /sbin/shutdown..."
     --sysroot="$SYSROOT" \
     -O2 \
     -Wall \
+    -fstack-protector-strong \
+    -D_FORTIFY_SOURCE=2 \
     -Wextra \
     -std=gnu11 \
     -o "$SHUTDOWN_OUT" \
-    "$SHUTDOWN_SRC"
+    "$SHUTDOWN_SRC" \
+    -fPIE -pie \
+    -Wl,-z,relro,-z,now
 echo "[✓] shutdown compiled."
 
 echo "[+] Compiling /sbin/kratos-devd..."
@@ -74,10 +82,14 @@ echo "[+] Compiling /sbin/kratos-devd..."
     --sysroot="$SYSROOT" \
     -O2 \
     -Wall \
+    -fstack-protector-strong \
+    -D_FORTIFY_SOURCE=2 \
     -Wextra \
     -std=gnu11 \
     -o "$DEVD_OUT" \
-    "$DEVD_SRC"
+    "$DEVD_SRC" \
+    -fPIE -pie \
+    -Wl,-z,relro,-z,now
 echo "[✓] kratos-devd compiled."
 
 echo "[+] Compiling /sbin/kratos-net..."
@@ -85,10 +97,14 @@ echo "[+] Compiling /sbin/kratos-net..."
     --sysroot="$SYSROOT" \
     -O2 \
     -Wall \
+    -fstack-protector-strong \
+    -D_FORTIFY_SOURCE=2 \
     -Wextra \
     -std=gnu11 \
     -o "$NET_OUT" \
-    "$NET_SRC"
+    "$NET_SRC" \
+    -fPIE -pie \
+    -Wl,-z,relro,-z,now
 echo "[✓] kratos-net compiled."
 
 echo "[+] Compiling /bin/login..."
@@ -96,11 +112,15 @@ echo "[+] Compiling /bin/login..."
     --sysroot="$SYSROOT" \
     -O2 \
     -Wall \
+    -fstack-protector-strong \
+    -D_FORTIFY_SOURCE=2 \
     -Wextra \
     -std=gnu11 \
     -o "$LOGIN_OUT" \
     "$LOGIN_SRC" \
-    "$KRATOS_ROOT/init/kratos-crypt.c"
+    "$KRATOS_ROOT/init/kratos-crypt.c" \
+    -fPIE -pie \
+    -Wl,-z,relro,-z,now
 echo "[✓] login compiled."
 
 echo "[+] Compiling /usr/bin/passwd..."
@@ -108,11 +128,15 @@ echo "[+] Compiling /usr/bin/passwd..."
     --sysroot="$SYSROOT" \
     -O2 \
     -Wall \
+    -fstack-protector-strong \
+    -D_FORTIFY_SOURCE=2 \
     -Wextra \
     -std=gnu11 \
     -o "$PASSWD_OUT" \
     "$PASSWD_SRC" \
-    "$KRATOS_ROOT/init/kratos-crypt.c"
+    "$KRATOS_ROOT/init/kratos-crypt.c" \
+    -fPIE -pie \
+    -Wl,-z,relro,-z,now
 echo "[✓] passwd compiled."
 
 # setuid root: passwd.c refuses to run unless getuid()==0, and login.c drops
