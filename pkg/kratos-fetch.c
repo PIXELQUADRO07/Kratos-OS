@@ -5,10 +5,13 @@
  *   2. Segue redirect 301/302 (necessario per GitHub Releases)
  *   3. Scrive il body su file (-o) o stdout
  *   4. Mostra progresso download
+ *   5. Gestisce Transfer-Encoding: chunked oltre a Content-Length
+ *   6. Applica timeout su connessione e lettura per non restare appesi
  *
  * Uso:
  *   kratos-fetch https://example.com/file.tar.gz -o /tmp/file.tar.gz
  *   kratos-fetch https://example.com/index.json
+ *   kratos-fetch https://example.com/file.tar.gz -o /tmp/file.tar.gz -q
  *
  * Compilazione:
  *   x86_64-kratos-linux-gnu-gcc --sysroot=$KRATOS_SYSROOT -O2 -Wall -std=gnu11 \
@@ -21,6 +24,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,11 +37,18 @@
 #include <mbedtls/ssl.h>
 #include <mbedtls/x509_crt.h>
 
-#define CA_BUNDLE_PATH  "/etc/ssl/certs/ca-certificates.crt"
-#define MAX_REDIRECTS   5
-#define READ_BUF_SIZE   8192
-#define MAX_URL_LEN     2048
-#define MAX_HEADER_SIZE 16384
+#define CA_BUNDLE_PATH     "/etc/ssl/certs/ca-certificates.crt"
+#define MAX_REDIRECTS      5
+#define READ_BUF_SIZE      8192
+#define MAX_URL_LEN        2048
+#define MAX_HEADER_SIZE    16384
+#define MAX_CHUNK_LINE     64
+#define CONNECT_TIMEOUT_SEC 15
+#define READ_TIMEOUT_MS     30000
+
+/* Quiet mode: -q suppresses progress/status chatter on stderr.
+ * Error messages are always printed regardless of this flag. */
+static int g_quiet = 0;
 
 /* ------------------------------------------------------------------ */
 /* URL Parser                                                          */
@@ -119,6 +130,43 @@ static void tls_free(tls_ctx_t *ctx)
     mbedtls_entropy_free(&ctx->entropy);
 }
 
+/* Bytes consumed by SIGALRM while mbedtls_net_connect() is blocked in
+ * connect(2). Kernel connect timeouts can otherwise run to several
+ * minutes, which is unacceptable for an unattended `kratos update`. */
+static volatile sig_atomic_t g_connect_alarm_fired = 0;
+
+static void connect_alarm_handler(int sig)
+{
+    (void)sig;
+    g_connect_alarm_fired = 1;
+}
+
+static int net_connect_with_timeout(mbedtls_net_context *net,
+                                     const char *host, const char *port)
+{
+    struct sigaction sa_new, sa_old;
+    memset(&sa_new, 0, sizeof(sa_new));
+    sa_new.sa_handler = connect_alarm_handler;
+    sigemptyset(&sa_new.sa_mask);
+    sa_new.sa_flags = 0; /* deliberately no SA_RESTART: interrupt connect() */
+
+    g_connect_alarm_fired = 0;
+    sigaction(SIGALRM, &sa_new, &sa_old);
+    alarm(CONNECT_TIMEOUT_SEC);
+
+    int ret = mbedtls_net_connect(net, host, port, MBEDTLS_NET_PROTO_TCP);
+
+    alarm(0);
+    sigaction(SIGALRM, &sa_old, NULL);
+
+    if (g_connect_alarm_fired) {
+        fprintf(stderr, "[kratos-fetch] Error: connection to %s:%s timed out after %ds\n",
+                host, port, CONNECT_TIMEOUT_SEC);
+        return -1;
+    }
+    return ret;
+}
+
 static int tls_connect(tls_ctx_t *ctx, const char *host, const char *port)
 {
     int ret;
@@ -141,11 +189,9 @@ static int tls_connect(tls_ctx_t *ctx, const char *host, const char *port)
         return -1;
     }
 
-    /* TCP connect */
-    ret = mbedtls_net_connect(&ctx->net, host, port, MBEDTLS_NET_PROTO_TCP);
-    if (ret != 0) {
-        fprintf(stderr, "[kratos-fetch] Error: TCP connect to %s:%s failed (-0x%04x)\n",
-                host, port, -ret);
+    /* TCP connect (bounded by CONNECT_TIMEOUT_SEC) */
+    if (net_connect_with_timeout(&ctx->net, host, port) != 0) {
+        fprintf(stderr, "[kratos-fetch] Error: TCP connect to %s:%s failed\n", host, port);
         return -1;
     }
 
@@ -163,6 +209,12 @@ static int tls_connect(tls_ctx_t *ctx, const char *host, const char *port)
     mbedtls_ssl_conf_ca_chain(&ctx->conf, &ctx->cacert, NULL);
     mbedtls_ssl_conf_rng(&ctx->conf, mbedtls_ctr_drbg_random, &ctx->ctr_drbg);
 
+    /* Read timeout: applies to every mbedtls_ssl_read() call, including
+     * during the handshake. mbedtls_net_recv_timeout() wraps recv() in a
+     * select() with this timeout, so it works on our plain blocking
+     * socket without needing a full nonblocking + timer-callback setup. */
+    mbedtls_ssl_conf_read_timeout(&ctx->conf, READ_TIMEOUT_MS);
+
     ret = mbedtls_ssl_setup(&ctx->ssl, &ctx->conf);
     if (ret != 0) {
         fprintf(stderr, "[kratos-fetch] Error: SSL setup failed (-0x%04x)\n", -ret);
@@ -176,10 +228,16 @@ static int tls_connect(tls_ctx_t *ctx, const char *host, const char *port)
     }
 
     mbedtls_ssl_set_bio(&ctx->ssl, &ctx->net,
-                         mbedtls_net_send, mbedtls_net_recv, NULL);
+                         mbedtls_net_send, mbedtls_net_recv,
+                         mbedtls_net_recv_timeout);
 
     /* TLS handshake */
     while ((ret = mbedtls_ssl_handshake(&ctx->ssl)) != 0) {
+        if (ret == MBEDTLS_ERR_SSL_TIMEOUT) {
+            fprintf(stderr, "[kratos-fetch] Error: TLS handshake timed out after %dms\n",
+                    READ_TIMEOUT_MS);
+            return -1;
+        }
         if (ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE) {
             fprintf(stderr, "[kratos-fetch] Error: TLS handshake failed (-0x%04x)\n", -ret);
             return -1;
@@ -218,6 +276,100 @@ static int tls_write_all(tls_ctx_t *ctx, const char *buf, size_t len)
     return 0;
 }
 
+/* body_reader_t pulls body bytes first from whatever was already
+ * buffered while reading headers (leftover), then transparently falls
+ * back to the TLS socket. Used uniformly for identity transfers with a
+ * known Content-Length, identity transfers without one, and chunked
+ * transfers (chunk-size lines, chunk data, chunk trailers). */
+typedef struct {
+    tls_ctx_t *ctx;
+    const unsigned char *buf;
+    size_t len;
+    size_t pos;
+} body_reader_t;
+
+/* Returns >0 bytes read, 0 on clean EOF, -1 on error (message already
+ * printed). */
+static long reader_read(body_reader_t *r, unsigned char *out, size_t want)
+{
+    if (r->pos < r->len) {
+        size_t avail = r->len - r->pos;
+        size_t n = avail < want ? avail : want;
+        memcpy(out, r->buf + r->pos, n);
+        r->pos += n;
+        return (long)n;
+    }
+
+    for (;;) {
+        int ret = mbedtls_ssl_read(&r->ctx->ssl, out, want);
+        if (ret > 0) {
+            return ret;
+        } else if (ret == 0 || ret == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY) {
+            return 0;
+        } else if (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE) {
+            continue;
+        } else if (ret == MBEDTLS_ERR_SSL_TIMEOUT) {
+            fprintf(stderr, "\n[kratos-fetch] Error: read timed out after %dms — server unresponsive.\n",
+                    READ_TIMEOUT_MS);
+            return -1;
+        } else {
+            fprintf(stderr, "\n[kratos-fetch] Error: connection read failed (-0x%04x)\n", -ret);
+            return -1;
+        }
+    }
+}
+
+/* Reads exactly n bytes and writes them to `out`, updating progress.
+ * Returns 0 on success, -1 on short read/error (partial data has
+ * already been written — caller is responsible for discarding the
+ * output file). */
+static int read_exact_to_file(body_reader_t *r, FILE *out, size_t n,
+                               size_t *total_written, long content_length,
+                               int show_progress)
+{
+    unsigned char buf[READ_BUF_SIZE];
+    size_t remaining = n;
+    while (remaining > 0) {
+        size_t want = remaining < sizeof(buf) ? remaining : sizeof(buf);
+        long got = reader_read(r, buf, want);
+        if (got <= 0) return -1;
+        fwrite(buf, 1, (size_t)got, out);
+        *total_written += (size_t)got;
+        remaining -= (size_t)got;
+
+        if (show_progress && !g_quiet) {
+            if (content_length > 0) {
+                int pct = (int)(*total_written * 100 / (size_t)content_length);
+                fprintf(stderr, "\r[kratos-fetch] %zu / %ld bytes (%d%%)",
+                        *total_written, content_length, pct);
+            } else {
+                fprintf(stderr, "\r[kratos-fetch] %zu bytes", *total_written);
+            }
+        }
+    }
+    return 0;
+}
+
+/* Reads one CRLF-terminated line (used for chunk-size lines and chunk
+ * trailers). \r is skipped; \n ends the line. Truncates silently if a
+ * line exceeds out_size, which is fine for chunk-size lines. */
+static int read_line(body_reader_t *r, char *out, size_t out_size)
+{
+    size_t i = 0;
+    for (;;) {
+        unsigned char c;
+        long got = reader_read(r, &c, 1);
+        if (got <= 0) return -1;
+        if (c == '\r') continue;
+        if (c == '\n') {
+            if (i < out_size) out[i] = '\0';
+            else out[out_size - 1] = '\0';
+            return 0;
+        }
+        if (i + 1 < out_size) out[i++] = (char)c;
+    }
+}
+
 static int do_https_get(const char *url, const char *output_path, int redirect_count)
 {
     if (redirect_count > MAX_REDIRECTS) {
@@ -228,7 +380,7 @@ static int do_https_get(const char *url, const char *output_path, int redirect_c
     parsed_url_t pu;
     if (parse_url(url, &pu) != 0) return -1;
 
-    fprintf(stderr, "[kratos-fetch] Connecting to %s:%s...\n", pu.host, pu.port);
+    if (!g_quiet) fprintf(stderr, "[kratos-fetch] Connecting to %s:%s...\n", pu.host, pu.port);
 
     tls_ctx_t ctx;
     tls_init(&ctx);
@@ -272,11 +424,30 @@ static int do_https_get(const char *url, const char *output_path, int redirect_c
             }
         } else if (ret == 0 || ret == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY) {
             break;
+        } else if (ret == MBEDTLS_ERR_SSL_TIMEOUT) {
+            fprintf(stderr, "[kratos-fetch] Error: timed out waiting for response headers (%dms).\n",
+                    READ_TIMEOUT_MS);
+            tls_free(&ctx);
+            return -1;
         } else if (ret != MBEDTLS_ERR_SSL_WANT_READ) {
             fprintf(stderr, "[kratos-fetch] Error: read failed (-0x%04x)\n", -ret);
             tls_free(&ctx);
             return -1;
         }
+    }
+
+    if (!header_done) {
+        /* Either the connection closed early, or headers exceeded
+         * MAX_HEADER_SIZE — either way we must not silently fall
+         * through and parse a truncated header block as if valid. */
+        if (header_len >= sizeof(header_buf) - 1) {
+            fprintf(stderr, "[kratos-fetch] Error: response headers exceeded %d bytes without completing.\n",
+                    MAX_HEADER_SIZE);
+        } else {
+            fprintf(stderr, "[kratos-fetch] Error: connection closed before headers completed.\n");
+        }
+        tls_free(&ctx);
+        return -1;
     }
 
     /* Parse status code */
@@ -287,7 +458,7 @@ static int do_https_get(const char *url, const char *output_path, int redirect_c
         return -1;
     }
 
-    fprintf(stderr, "[kratos-fetch] HTTP %d\n", status_code);
+    if (!g_quiet) fprintf(stderr, "[kratos-fetch] HTTP %d\n", status_code);
 
     /* Handle redirects */
     if (status_code == 301 || status_code == 302 || status_code == 307 || status_code == 308) {
@@ -310,7 +481,7 @@ static int do_https_get(const char *url, const char *output_path, int redirect_c
         memcpy(new_url, loc, loc_len);
         new_url[loc_len] = '\0';
 
-        fprintf(stderr, "[kratos-fetch] Redirecting to: %s\n", new_url);
+        if (!g_quiet) fprintf(stderr, "[kratos-fetch] Redirecting to: %s\n", new_url);
         tls_free(&ctx);
         return do_https_get(new_url, output_path, redirect_count + 1);
     }
@@ -326,6 +497,20 @@ static int do_https_get(const char *url, const char *output_path, int redirect_c
     char *cl_header = strcasestr(header_buf, "\r\nContent-Length: ");
     if (cl_header) {
         content_length = atol(cl_header + strlen("\r\nContent-Length: "));
+    }
+
+    /* Parse Transfer-Encoding: chunked. Per HTTP/1.1 (RFC 7230 §3.3.3),
+     * Transfer-Encoding takes precedence over Content-Length when both
+     * are present — a chunked body's real length is only known once
+     * fully decoded. */
+    int is_chunked = 0;
+    char *te_header = strcasestr(header_buf, "\r\nTransfer-Encoding: ");
+    if (te_header) {
+        char *val = te_header + strlen("\r\nTransfer-Encoding: ");
+        if (strncasecmp(val, "chunked", 7) == 0) {
+            is_chunked = 1;
+            content_length = -1;
+        }
     }
 
     /* Find start of body (after \r\n\r\n) */
@@ -350,44 +535,110 @@ static int do_https_get(const char *url, const char *output_path, int redirect_c
         out = stdout;
     }
 
-    /* Write body data already read with headers */
+    body_reader_t reader = {
+        .ctx = &ctx,
+        .buf = (const unsigned char *)body_start,
+        .len = body_offset,
+        .pos = 0,
+    };
+
     size_t total_written = 0;
-    if (body_offset > 0) {
-        fwrite(body_start, 1, body_offset, out);
-        total_written += body_offset;
-    }
+    int transfer_failed = 0;
 
-    /* Read remaining body */
-    unsigned char read_buf[READ_BUF_SIZE];
-    for (;;) {
-        int ret = mbedtls_ssl_read(&ctx.ssl, read_buf, sizeof(read_buf));
-        if (ret > 0) {
-            fwrite(read_buf, 1, (size_t)ret, out);
-            total_written += (size_t)ret;
-
-            /* Progress indicator */
-            if (output_path && content_length > 0) {
-                int pct = (int)(total_written * 100 / (size_t)content_length);
-                fprintf(stderr, "\r[kratos-fetch] %zu / %ld bytes (%d%%)",
-                        total_written, content_length, pct);
-            } else if (output_path) {
-                fprintf(stderr, "\r[kratos-fetch] %zu bytes", total_written);
+    if (is_chunked) {
+        for (;;) {
+            char line[MAX_CHUNK_LINE];
+            if (read_line(&reader, line, sizeof(line)) != 0) {
+                fprintf(stderr, "[kratos-fetch] Error: failed to read chunk size.\n");
+                transfer_failed = 1;
+                break;
             }
-        } else if (ret == 0 || ret == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY) {
-            break;
-        } else if (ret != MBEDTLS_ERR_SSL_WANT_READ) {
-            break;
+
+            char *semi = strchr(line, ';');
+            if (semi) *semi = '\0'; /* strip chunk extensions, we don't use them */
+
+            char *endptr = NULL;
+            unsigned long chunk_size = strtoul(line, &endptr, 16);
+            if (endptr == line) {
+                fprintf(stderr, "[kratos-fetch] Error: malformed chunk size line.\n");
+                transfer_failed = 1;
+                break;
+            }
+
+            if (chunk_size == 0) {
+                /* Final chunk: consume trailer headers until blank line. */
+                for (;;) {
+                    char trailer[512];
+                    if (read_line(&reader, trailer, sizeof(trailer)) != 0) {
+                        fprintf(stderr, "[kratos-fetch] Error: failed to read chunk trailer.\n");
+                        transfer_failed = 1;
+                        break;
+                    }
+                    if (trailer[0] == '\0') break;
+                }
+                break;
+            }
+
+            if (read_exact_to_file(&reader, out, (size_t)chunk_size,
+                                    &total_written, -1, output_path != NULL) != 0) {
+                fprintf(stderr, "[kratos-fetch] Error: chunked transfer interrupted (incomplete download).\n");
+                transfer_failed = 1;
+                break;
+            }
+
+            /* Each chunk's data is followed by a bare CRLF. */
+            char crlf_dummy[8];
+            if (read_line(&reader, crlf_dummy, sizeof(crlf_dummy)) != 0) {
+                fprintf(stderr, "[kratos-fetch] Error: malformed chunk terminator.\n");
+                transfer_failed = 1;
+                break;
+            }
+        }
+    } else if (content_length >= 0) {
+        if (read_exact_to_file(&reader, out, (size_t)content_length,
+                                &total_written, content_length, output_path != NULL) != 0) {
+            fprintf(stderr, "[kratos-fetch] Error: download interrupted (received %zu of %ld bytes).\n",
+                    total_written, content_length);
+            transfer_failed = 1;
+        }
+    } else {
+        /* No Content-Length and not chunked: body is delimited by the
+         * connection closing (HTTP/1.0-style). A clean TLS close_notify
+         * and an abrupt reset are, by design of this fallback, treated
+         * the same way here since there is no length to check against —
+         * this ambiguity is inherent to close-delimited bodies, not
+         * something kratos-fetch can resolve on its own. */
+        unsigned char buf[READ_BUF_SIZE];
+        for (;;) {
+            long got = reader_read(&reader, buf, sizeof(buf));
+            if (got > 0) {
+                fwrite(buf, 1, (size_t)got, out);
+                total_written += (size_t)got;
+                if (!g_quiet && output_path) {
+                    fprintf(stderr, "\r[kratos-fetch] %zu bytes", total_written);
+                }
+            } else {
+                break;
+            }
         }
     }
 
     if (output_path) {
-        fprintf(stderr, "\n");
+        if (!g_quiet) fprintf(stderr, "\n");
         fclose(out);
-        fprintf(stderr, "[kratos-fetch] Saved %zu bytes to %s\n", total_written, output_path);
+        if (transfer_failed) {
+            /* Don't leave a corrupt/truncated file behind masquerading
+             * as a successful download. */
+            unlink(output_path);
+        } else {
+            if (!g_quiet) {
+                fprintf(stderr, "[kratos-fetch] Saved %zu bytes to %s\n", total_written, output_path);
+            }
+        }
     }
 
     tls_free(&ctx);
-    return 0;
+    return transfer_failed ? -1 : 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -396,7 +647,7 @@ static int do_https_get(const char *url, const char *output_path, int redirect_c
 
 static void show_help(void)
 {
-    printf("Usage: kratos-fetch <url> [-o output_file]\n");
+    printf("Usage: kratos-fetch <url> [-o output_file] [-q]\n");
     printf("\n");
     printf("Download a file via HTTPS with certificate verification.\n");
     printf("\n");
@@ -419,6 +670,8 @@ int main(int argc, char *argv[])
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
             output = argv[++i];
+        } else if (strcmp(argv[i], "-q") == 0) {
+            g_quiet = 1;
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             show_help();
             return 0;
