@@ -135,8 +135,23 @@ int main(int argc, char *argv[])
     struct spwd *sp = getspnam(username);
     const char *hash = sp ? sp->sp_pwdp : pw->pw_passwd;
 
-    /* Prompt password (se presente in shadow) */
-    if (hash && strcmp(hash, "*") != 0 && strcmp(hash, "!") != 0 && strlen(hash) > 0) {
+    /* A missing shadow entry, or a hash of "*" / "!", means this account is
+     * LOCKED per standard shadow(5) semantics — daemon/bin/nobody and every
+     * other system account on a normal distro carry one of these markers
+     * specifically to say "no password login, ever". Treat it as a hard
+     * deny, not as "no password required": letting anyone log straight
+     * into a locked account without a password is a full authentication
+     * bypass the moment a locked system account exists. */
+    if (!hash || strcmp(hash, "*") == 0 || strcmp(hash, "!") == 0) {
+        printf("\nLogin incorrect\n\n");
+        sleep(1);
+        continue;
+    }
+
+    /* An explicitly empty hash ("") is the deliberate, documented KratosOS
+     * convention for "no password set" (see create-etc-skeleton.sh) — that
+     * one case, and only that one, skips the password prompt. */
+    if (strlen(hash) > 0) {
         struct termios old_t;
         disable_echo(&old_t);
         printf("Password: ");
