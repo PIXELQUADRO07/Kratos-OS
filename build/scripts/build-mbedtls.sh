@@ -59,11 +59,21 @@ mkdir -p "$WORK_DIR"
 echo "[+] Compiling mbedTLS (static libraries)..."
 cd "$SRC_DIR"
 
-# mbedTLS can be built with just make, specifying CC and AR
+# The build runs directly inside $SRC_DIR (not $WORK_DIR), so re-running
+# this script after changing CFLAGS would otherwise reuse objects from
+# the previous run instead of starting clean. mbedTLS supports distclean;
+# ignore failure on a pristine checkout where there's nothing to clean.
+make distclean >/dev/null 2>&1 || true
+
+# mbedTLS can be built with just make, specifying CC and AR.
+# Threading support (MBEDTLS_THREADING_C/PTHREAD) is intentionally left
+# out: kratos-fetch is a single-threaded CLI tool, so there's no shared
+# RNG/entropy context across threads to protect, and enabling it would
+# require -lpthread that isn't linked in build-fetch.sh / build-pkg.sh.
 make -j"${KRATOS_JOBS:-$(nproc)}" \
     CC="$CC --sysroot=$SYSROOT" \
     AR="$AR" \
-    CFLAGS="-O2 -fstack-protector-strong -D_FORTIFY_SOURCE=2 -DMBEDTLS_THREADING_C -DMBEDTLS_THREADING_PTHREAD" \
+    CFLAGS="-O2 -fstack-protector-strong -D_FORTIFY_SOURCE=2" \
     LDFLAGS="--sysroot=$SYSROOT" \
     lib
 
