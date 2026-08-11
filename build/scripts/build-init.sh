@@ -115,6 +115,25 @@ echo "[+] Compiling /usr/bin/passwd..."
     "$KRATOS_ROOT/init/kratos-crypt.c"
 echo "[✓] passwd compiled."
 
+# setuid root: passwd.c refuses to run unless getuid()==0, and login.c drops
+# privileges to the logging-in user's UID before exec'ing their shell — so
+# without this bit, any non-root user invoking passwd to change their own
+# password would run as their own (non-root) UID and be rejected outright.
+# Harmless to skip today (only root exists in /etc/passwd so far), but
+# required as soon as real user accounts are added.
+#
+# NOTE: this stage intentionally runs unprivileged (STAGE_SUDO=no in
+# build-all-phase3.sh), so we can only set the mode bits here — the file
+# is still owned by the build user at this point. The setuid bit only
+# grants *root* privilege once the file is actually owned by root, which
+# happens later in build-disk.sh (Step 6b, "Normalizing ownership to
+# root:root") when the sysroot is copied into the final image under sudo.
+# Setting the mode here and the ownership there together are both required;
+# neither alone is enough.
+echo "[+] Setting setuid bit on /usr/bin/passwd (ownership finalized to root later, in build-disk.sh)..."
+chmod 4755 "$PASSWD_OUT"
+echo "[✓] passwd mode set to setuid (rwsr-xr-x); will be root:root in the final image."
+
 echo "[+] Creating symlinks for reboot, poweroff, halt..."
 ln -sf shutdown "$SYSROOT/sbin/reboot"
 ln -sf shutdown "$SYSROOT/sbin/poweroff"
