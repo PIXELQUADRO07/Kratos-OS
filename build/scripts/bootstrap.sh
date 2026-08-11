@@ -5,7 +5,7 @@ set -e
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 echo "================================"
-echo "       MYDISTRO BOOTSTRAP"
+echo "      KRATOSOS BOOTSTRAP"
 echo "================================"
 echo
 echo "Project root: $PROJECT_ROOT"
