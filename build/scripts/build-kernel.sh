@@ -78,8 +78,18 @@ if [ ! -f "$KBUILD_DIR/.config" ]; then
 
     # Enable a few extras useful for a real system
     echo "[+] Tweaking config..."
-    # Make sure EFI stub, serial console, devtmpfs and ext4 are on
-    scripts/config --file "$KBUILD_DIR/.config" \
+    # Make sure EFI stub, serial console, devtmpfs and ext4 are on.
+    #
+    # IMPORTANT: this must be the *absolute* path to scripts/config inside
+    # the kernel source tree. The rest of this script never `cd`s into
+    # $SOURCE_DIR (it uses `make -C "$SOURCE_DIR"` throughout instead), so
+    # a bare relative "scripts/config" resolves against whatever directory
+    # the caller invoked this script from — almost never the kernel tree —
+    # and silently fails every time under the `2>/dev/null || true` below.
+    # When that happens this whole --enable block becomes a no-op and you
+    # only find out at boot time, if defconfig's own defaults happen not
+    # to cover you.
+    "$SOURCE_DIR/scripts/config" --file "$KBUILD_DIR/.config" \
         --enable  CONFIG_EFI_STUB         \
         --enable  CONFIG_DEVTMPFS         \
         --enable  CONFIG_DEVTMPFS_MOUNT   \
@@ -96,7 +106,7 @@ if [ ! -f "$KBUILD_DIR/.config" ]; then
         --enable  CONFIG_VIRTIO_PCI_LEGACY \
         --enable  CONFIG_VIRTIO_BLK       \
         --enable  CONFIG_VIRTIO_MENU      \
-        2>/dev/null || true  # scripts/config may not exist in older trees
+        2>/dev/null || true  # tolerate older trees without scripts/config
 
     # x86_64 defconfig builds VIRTIO_BLK/VIRTIO_PCI as modules (=m) by
     # default. There is no initramfs in this boot chain and init.c never
