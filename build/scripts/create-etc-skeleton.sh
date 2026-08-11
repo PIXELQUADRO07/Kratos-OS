@@ -17,6 +17,13 @@ mkdir -p "$ETC"
 mkdir -p "$ETC/rc.d"
 mkdir -p "$ETC/network"
 
+# NOTE: kratos-devd is intentionally NOT launched from /etc/rc.d/. init.c's
+# start_devd() already starts it early in the boot sequence (before
+# mount_fstab(), since UUID/LABEL resolution depends on it) and blocks until
+# its coldplug scan completes. An rc.d entry used to duplicate this, causing
+# a second devd instance to double-process every uevent and re-run the
+# by-uuid/by-label symlink logic concurrently with the first. Don't re-add it.
+
 echo "[+] Creating /etc/passwd..."
 cat > "$ETC/passwd" <<'EOF'
 root:x:0:0:root:/root:/bin/bash
@@ -145,18 +152,6 @@ fi
 echo "[rc.sysinit] System initialization complete."
 EOF
 chmod +x "$ETC/rc.sysinit"
-
-echo "[+] Creating /etc/rc.d/00-devd..."
-cat > "$ETC/rc.d/00-devd" <<'EOF'
-#!/bin/bash
-# /etc/rc.d/00-devd — Launch KratosOS Device Daemon
-
-if [ -x /sbin/kratos-devd ]; then
-    echo "[rc.d] Starting kratos-devd..."
-    /sbin/kratos-devd --daemon
-fi
-EOF
-chmod +x "$ETC/rc.d/00-devd"
 
 echo "[+] Creating /etc/rc.d/10-network..."
 cat > "$ETC/rc.d/10-network" <<'EOF'
