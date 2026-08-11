@@ -293,6 +293,30 @@ fi
 echo "[✓] Sysroot copied."
 
 # ------------------------------------------------------------
+# Step 6b: Normalize ownership to root:root
+#
+# $SYSROOT is built by an unprivileged user (build-init.sh, build-pkg.sh,
+# etc. intentionally do NOT run as root — see STAGE_SUDO in
+# build-all-phase3.sh). rsync -a / cp -a faithfully replicate that
+# non-root ownership onto the image, since this script (running as root)
+# has permission to chown to anything, including the build user's own
+# UID/GID. Left uncorrected, EVERY file in the shipped image — not just
+# passwd — would be owned by the build user, not root.
+#
+# This matters beyond cosmetics: a setuid-root bit (see /usr/bin/passwd
+# in build-init.sh) only grants root privilege if the file's *owner* is
+# actually root — setuid on a file owned by UID 1000 elevates to UID
+# 1000, not to root. So without this step, passwd's setuid bit would be
+# silently meaningless in the shipped image even though it looks correct
+# in `ls -l` output on the sysroot.
+# ------------------------------------------------------------
+
+echo
+echo "[Step 6b] Normalizing ownership to root:root..."
+chown -R root:root "$MNT_ROOT"
+echo "[✓] Ownership normalized."
+
+# ------------------------------------------------------------
 # Step 7: Create required directories in the root partition
 # ------------------------------------------------------------
 
@@ -401,6 +425,12 @@ if [ -n "$BLKID_UUID" ] && [ "$BLKID_UUID" != "$ROOT_UUID" ]; then
 fi
 
 ROOT_PARTUUID="$(blkid -s PARTUUID -o value "$ROOT_DEV" 2>/dev/null || blkid -p -s PART_ENTRY_UUID -o value "$ROOT_DEV" 2>/dev/null || true)"
+
+if [ -z "$ROOT_PARTUUID" ]; then
+    echo "[!] Could not detect PARTUUID of $ROOT_DEV"
+    exit 1
+fi
+
 echo "[✓] Root PARTUUID: $ROOT_PARTUUID"
 
 # ------------------------------------------------------------
