@@ -30,7 +30,7 @@ void set_hostname(void)
         }
         fclose(f);
     } else {
-        sethostname("kratos", 6);
+        sethostname("kratos-os", 9);
     }
 }
 
