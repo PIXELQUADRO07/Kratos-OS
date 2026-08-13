@@ -47,8 +47,12 @@ echo "[+] Compiling /usr/libexec/kratos-pkg (Engine)..."
     -D_FORTIFY_SOURCE=2 \
     -Wextra \
     -std=gnu11 \
+    -I"$KRATOS_ROOT/pkg" \
     -o "$PKG_OUT" \
     "$PKG_SRC" \
+    "$KRATOS_ROOT/pkg/kratos-tar.c" \
+    "$KRATOS_ROOT/pkg/kratos-sha256.c" \
+    "$KRATOS_ROOT/pkg/kratos-deps.c" \
     -fPIE -pie \
     -Wl,-z,relro,-z,now
 echo "[✓] kratos-pkg engine compiled."
@@ -62,6 +66,7 @@ echo "[+] Compiling /usr/bin/kratos (CLI Frontend)..."
     -D_FORTIFY_SOURCE=2 \
     -Wextra \
     -std=gnu11 \
+    -I"$KRATOS_ROOT/pkg" \
     -o "$CLI_OUT" \
     "$CLI_SRC" \
     -fPIE -pie \
@@ -77,8 +82,11 @@ echo "[+] Compiling /usr/bin/kratos-pack (Package Builder)..."
     -D_FORTIFY_SOURCE=2 \
     -Wextra \
     -std=gnu11 \
+    -I"$KRATOS_ROOT/pkg" \
     -o "$PACK_OUT" \
     "$PACK_SRC" \
+    "$KRATOS_ROOT/pkg/kratos-tar.c" \
+    "$KRATOS_ROOT/pkg/kratos-sha256.c" \
     -fPIE -pie \
     -Wl,-z,relro,-z,now
 echo "[✓] kratos-pack tool compiled."

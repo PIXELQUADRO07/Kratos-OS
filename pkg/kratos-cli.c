@@ -29,6 +29,7 @@ static void show_help(void)
     printf("  remove  <name>        Remove an installed package\n");
     printf("  list                  List all installed packages\n");
     printf("  info    <name>        Display detailed package information\n");
+    printf("  verify  <name>        Verify files of an installed package\n");
     printf("  search  <query>       Search available packages\n");
     printf("  update                Update package repository database\n");
     printf("  upgrade               Upgrade installed packages\n");
@@ -45,7 +46,8 @@ int main(int argc, char *argv[])
     const char *cmd = argv[1];
 
     if (strcmp(cmd, "install") == 0 || strcmp(cmd, "remove") == 0 ||
-        strcmp(cmd, "list") == 0 || strcmp(cmd, "info") == 0)
+        strcmp(cmd, "list") == 0 || strcmp(cmd, "info") == 0 ||
+        strcmp(cmd, "verify") == 0)
     {
         /* Resolve backend path considering KRATOS_SYSROOT if set */
         const char *sysroot = getenv("KRATOS_SYSROOT");
