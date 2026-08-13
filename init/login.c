@@ -88,6 +88,19 @@ static void print_issue(void)
     }
 }
 
+/* Build the "<hostname> login: " prompt from the real system hostname
+ * (set via sethostname() in services.c) instead of a hardcoded string, so
+ * the prompt can never drift out of sync with the actual machine name. */
+static void print_login_prompt(void)
+{
+    char host[256];
+    if (gethostname(host, sizeof(host)) != 0 || host[0] == '\0') {
+        strncpy(host, "kratos", sizeof(host) - 1);
+        host[sizeof(host) - 1] = '\0';
+    }
+    printf("%s login: ", host);
+}
+
 int main(int argc, char *argv[])
 {
     (void)argc;
@@ -103,7 +116,7 @@ int main(int argc, char *argv[])
 
     /* Prompt username */
     while (username[0] == '\0') {
-        printf("kratos login: ");
+        print_login_prompt();
         fflush(stdout);
 
         if (!fgets(username, sizeof(username), stdin)) {
