@@ -89,6 +89,15 @@ static void parse_uevent(const char *buf, size_t len, uevent_t *ev)
 /* Device Rules & Permissions                                          */
 /* ------------------------------------------------------------------ */
 
+static gid_t resolve_group(const char *name, gid_t fallback)
+{
+    struct group *gr = getgrnam(name);
+    if (gr) {
+        return gr->gr_gid;
+    }
+    return fallback;
+}
+
 static void apply_device_rules(const uevent_t *ev)
 {
     if (ev->devname[0] == '\0') return;
@@ -117,7 +126,7 @@ static void apply_device_rules(const uevent_t *ev)
              strncmp(ev->devname, "pts/", 4) == 0)
     {
         mode = 0620;
-        gid = 5; /* tty group */
+        gid = resolve_group("tty", 5);
     }
     /* Block devices (disks, partitions) */
     else if (strcmp(ev->subsystem, "block") == 0 ||
@@ -127,7 +136,21 @@ static void apply_device_rules(const uevent_t *ev)
              strncmp(ev->devname, "nvme", 4) == 0)
     {
         mode = 0660;
-        gid = 6; /* disk group */
+        gid = resolve_group("disk", 6);
+    }
+    /* Input devices */
+    else if (strcmp(ev->subsystem, "input") == 0 ||
+             strncmp(ev->devname, "input/", 6) == 0)
+    {
+        mode = 0660;
+        gid = resolve_group("input", 107);
+    }
+    /* Sound / Audio devices */
+    else if (strcmp(ev->subsystem, "sound") == 0 ||
+             strncmp(ev->devname, "snd/", 4) == 0)
+    {
+        mode = 0660;
+        gid = resolve_group("audio", 29);
     }
 
     /* Create parent directories in /dev if needed (e.g. /dev/input/event0) */
@@ -142,11 +165,11 @@ static void apply_device_rules(const uevent_t *ev)
     /* If devtmpfs didn't create the node yet, create it via mknod */
     if (access(node_path, F_OK) != 0 && ev->major > 0) {
         mode_t dev_type = (strcmp(ev->subsystem, "block") == 0) ? S_IFBLK : S_IFCHR;
-        mknod(node_path, mode | dev_type, makedev(ev->major, ev->minor));
+        if (mknod(node_path, mode | dev_type, makedev(ev->major, ev->minor)) < 0) {}
     }
 
-    chmod(node_path, mode);
-    chown(node_path, uid, gid);
+    if (chmod(node_path, mode) < 0) {}
+    if (chown(node_path, uid, gid) < 0) {}
 }
 
 /* ------------------------------------------------------------------ */
@@ -312,7 +335,7 @@ static void update_disk_symlinks(const uevent_t *ev)
         snprintf(link_path, sizeof(link_path), "/dev/disk/by-uuid/%s", uuid);
 
         unlink(link_path);
-        symlink(node_path, link_path);
+        if (symlink(node_path, link_path) < 0) {}
     }
 
     /* Create LABEL symlink */
@@ -324,7 +347,7 @@ static void update_disk_symlinks(const uevent_t *ev)
         snprintf(link_path, sizeof(link_path), "/dev/disk/by-label/%s", label);
 
         unlink(link_path);
-        symlink(node_path, link_path);
+        if (symlink(node_path, link_path) < 0) {}
     }
 }
 
@@ -371,7 +394,7 @@ static void coldplug_dir(const char *dirpath)
         if (access(uevent_file, W_OK) == 0) {
             int fd = open(uevent_file, O_WRONLY);
             if (fd >= 0) {
-                write(fd, "add\n", 4);
+                if (write(fd, "add\n", 4) < 0) {}
                 close(fd);
             }
         }
