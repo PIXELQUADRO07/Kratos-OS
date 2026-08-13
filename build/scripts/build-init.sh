@@ -232,6 +232,82 @@ chmod 4755 "$PASSWD_OUT"
 chmod 4755 "$SU_OUT"
 echo "[✓] setuid modes set on passwd and su."
 
+# ── Phase 1 System Utilities ──
+
+USERMOD_SRC="$KRATOS_ROOT/init/usermod.c"
+GROUPS_SRC="$KRATOS_ROOT/init/groups.c"
+ID_SRC="$KRATOS_ROOT/init/id.c"
+WHOAMI_SRC="$KRATOS_ROOT/init/whoami.c"
+HOSTNAME_SRC="$KRATOS_ROOT/init/hostname.c"
+MOUNT_SRC="$KRATOS_ROOT/init/kratos-mount.c"
+PS_SRC="$KRATOS_ROOT/init/ps.c"
+KILL_SRC="$KRATOS_ROOT/init/kill.c"
+DMESG_SRC="$KRATOS_ROOT/init/dmesg.c"
+FREE_SRC="$KRATOS_ROOT/init/free.c"
+DF_SRC="$KRATOS_ROOT/init/df.c"
+
+USERMOD_OUT="$SYSROOT/usr/sbin/usermod"
+GROUPS_OUT="$SYSROOT/usr/bin/groups"
+ID_OUT="$SYSROOT/usr/bin/id"
+WHOAMI_OUT="$SYSROOT/usr/bin/whoami"
+HOSTNAME_OUT="$SYSROOT/usr/bin/hostname"
+MOUNT_OUT="$SYSROOT/bin/mount"
+UMOUNT_OUT="$SYSROOT/bin/umount"
+PS_OUT="$SYSROOT/bin/ps"
+KILL_OUT="$SYSROOT/bin/kill"
+DMESG_OUT="$SYSROOT/bin/dmesg"
+FREE_OUT="$SYSROOT/usr/bin/free"
+DF_OUT="$SYSROOT/usr/bin/df"
+
+mkdir -p "$SYSROOT/usr/sbin"
+
+HARDEN_FLAGS="-O2 -Wall -fstack-protector-strong -D_FORTIFY_SOURCE=2 -Wextra -std=gnu11 -fPIE -pie -Wl,-z,relro,-z,now"
+
+echo "[+] Compiling /usr/sbin/usermod..."
+"$CC" --sysroot="$SYSROOT" $HARDEN_FLAGS -o "$USERMOD_OUT" "$USERMOD_SRC"
+echo "[✓] usermod compiled."
+
+echo "[+] Compiling /usr/bin/groups..."
+"$CC" --sysroot="$SYSROOT" $HARDEN_FLAGS -o "$GROUPS_OUT" "$GROUPS_SRC"
+echo "[✓] groups compiled."
+
+echo "[+] Compiling /usr/bin/id..."
+"$CC" --sysroot="$SYSROOT" $HARDEN_FLAGS -o "$ID_OUT" "$ID_SRC"
+echo "[✓] id compiled."
+
+echo "[+] Compiling /usr/bin/whoami..."
+"$CC" --sysroot="$SYSROOT" $HARDEN_FLAGS -o "$WHOAMI_OUT" "$WHOAMI_SRC"
+echo "[✓] whoami compiled."
+
+echo "[+] Compiling /usr/bin/hostname..."
+"$CC" --sysroot="$SYSROOT" $HARDEN_FLAGS -o "$HOSTNAME_OUT" "$HOSTNAME_SRC"
+echo "[✓] hostname compiled."
+
+echo "[+] Compiling /bin/mount & /bin/umount..."
+"$CC" --sysroot="$SYSROOT" $HARDEN_FLAGS -o "$MOUNT_OUT" "$MOUNT_SRC"
+ln -sf mount "$SYSROOT/bin/umount"
+echo "[✓] mount/umount compiled."
+
+echo "[+] Compiling /bin/ps..."
+"$CC" --sysroot="$SYSROOT" $HARDEN_FLAGS -o "$PS_OUT" "$PS_SRC"
+echo "[✓] ps compiled."
+
+echo "[+] Compiling /bin/kill..."
+"$CC" --sysroot="$SYSROOT" $HARDEN_FLAGS -o "$KILL_OUT" "$KILL_SRC"
+echo "[✓] kill compiled."
+
+echo "[+] Compiling /bin/dmesg..."
+"$CC" --sysroot="$SYSROOT" $HARDEN_FLAGS -o "$DMESG_OUT" "$DMESG_SRC"
+echo "[✓] dmesg compiled."
+
+echo "[+] Compiling /usr/bin/free..."
+"$CC" --sysroot="$SYSROOT" $HARDEN_FLAGS -o "$FREE_OUT" "$FREE_SRC"
+echo "[✓] free compiled."
+
+echo "[+] Compiling /usr/bin/df..."
+"$CC" --sysroot="$SYSROOT" $HARDEN_FLAGS -o "$DF_OUT" "$DF_SRC"
+echo "[✓] df compiled."
+
 echo "[+] Creating symlinks for reboot, poweroff, halt..."
 ln -sf shutdown "$SYSROOT/sbin/reboot"
 ln -sf shutdown "$SYSROOT/sbin/poweroff"
@@ -241,8 +317,10 @@ echo "[✓] Symlinks created."
 echo
 echo "Installed binaries:"
 ls -lh "$INIT_OUT" "$SHUTDOWN_OUT" "$DEVD_OUT" "$NET_OUT" "$LOGIN_OUT" "$PASSWD_OUT" "$SU_OUT"
-ls -lh "$USERADD_OUT" "$USERDEL_OUT" "$GROUPADD_OUT" "$GROUPDEL_OUT"
-ls -la "$SYSROOT/sbin/reboot" "$SYSROOT/sbin/poweroff" "$SYSROOT/sbin/halt"
+ls -lh "$USERADD_OUT" "$USERDEL_OUT" "$GROUPADD_OUT" "$GROUPDEL_OUT" "$USERMOD_OUT"
+ls -lh "$GROUPS_OUT" "$ID_OUT" "$WHOAMI_OUT" "$HOSTNAME_OUT"
+ls -lh "$MOUNT_OUT" "$PS_OUT" "$KILL_OUT" "$DMESG_OUT" "$FREE_OUT" "$DF_OUT"
+ls -la "$SYSROOT/sbin/reboot" "$SYSROOT/sbin/poweroff" "$SYSROOT/sbin/halt" "$SYSROOT/bin/umount"
 
 echo
 echo "[✓] KratosOS system tools & authentication built successfully."
