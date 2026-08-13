@@ -139,24 +139,98 @@ echo "[+] Compiling /usr/bin/passwd..."
     -Wl,-z,relro,-z,now
 echo "[✓] passwd compiled."
 
-# setuid root: passwd.c refuses to run unless getuid()==0, and login.c drops
-# privileges to the logging-in user's UID before exec'ing their shell — so
-# without this bit, any non-root user invoking passwd to change their own
-# password would run as their own (non-root) UID and be rejected outright.
-# Harmless to skip today (only root exists in /etc/passwd so far), but
-# required as soon as real user accounts are added.
-#
-# NOTE: this stage intentionally runs unprivileged (STAGE_SUDO=no in
-# build-all-phase3.sh), so we can only set the mode bits here — the file
-# is still owned by the build user at this point. The setuid bit only
-# grants *root* privilege once the file is actually owned by root, which
-# happens later in build-disk.sh (Step 6b, "Normalizing ownership to
-# root:root") when the sysroot is copied into the final image under sudo.
-# Setting the mode here and the ownership there together are both required;
-# neither alone is enough.
-echo "[+] Setting setuid bit on /usr/bin/passwd (ownership finalized to root later, in build-disk.sh)..."
+USERADD_SRC="$KRATOS_ROOT/init/useradd.c"
+USERDEL_SRC="$KRATOS_ROOT/init/userdel.c"
+GROUPADD_SRC="$KRATOS_ROOT/init/groupadd.c"
+GROUPDEL_SRC="$KRATOS_ROOT/init/groupdel.c"
+SU_SRC="$KRATOS_ROOT/init/su.c"
+
+USERADD_OUT="$SYSROOT/usr/sbin/useradd"
+USERDEL_OUT="$SYSROOT/usr/sbin/userdel"
+GROUPADD_OUT="$SYSROOT/usr/sbin/groupadd"
+GROUPDEL_OUT="$SYSROOT/usr/sbin/groupdel"
+SU_OUT="$SYSROOT/bin/su"
+
+echo "[+] Compiling /usr/sbin/useradd..."
+"$CC" \
+    --sysroot="$SYSROOT" \
+    -O2 \
+    -Wall \
+    -fstack-protector-strong \
+    -D_FORTIFY_SOURCE=2 \
+    -Wextra \
+    -std=gnu11 \
+    -o "$USERADD_OUT" \
+    "$USERADD_SRC" \
+    -fPIE -pie \
+    -Wl,-z,relro,-z,now
+echo "[✓] useradd compiled."
+
+echo "[+] Compiling /usr/sbin/userdel..."
+"$CC" \
+    --sysroot="$SYSROOT" \
+    -O2 \
+    -Wall \
+    -fstack-protector-strong \
+    -D_FORTIFY_SOURCE=2 \
+    -Wextra \
+    -std=gnu11 \
+    -o "$USERDEL_OUT" \
+    "$USERDEL_SRC" \
+    -fPIE -pie \
+    -Wl,-z,relro,-z,now
+echo "[✓] userdel compiled."
+
+echo "[+] Compiling /usr/sbin/groupadd..."
+"$CC" \
+    --sysroot="$SYSROOT" \
+    -O2 \
+    -Wall \
+    -fstack-protector-strong \
+    -D_FORTIFY_SOURCE=2 \
+    -Wextra \
+    -std=gnu11 \
+    -o "$GROUPADD_OUT" \
+    "$GROUPADD_SRC" \
+    -fPIE -pie \
+    -Wl,-z,relro,-z,now
+echo "[✓] groupadd compiled."
+
+echo "[+] Compiling /usr/sbin/groupdel..."
+"$CC" \
+    --sysroot="$SYSROOT" \
+    -O2 \
+    -Wall \
+    -fstack-protector-strong \
+    -D_FORTIFY_SOURCE=2 \
+    -Wextra \
+    -std=gnu11 \
+    -o "$GROUPDEL_OUT" \
+    "$GROUPDEL_SRC" \
+    -fPIE -pie \
+    -Wl,-z,relro,-z,now
+echo "[✓] groupdel compiled."
+
+echo "[+] Compiling /bin/su..."
+"$CC" \
+    --sysroot="$SYSROOT" \
+    -O2 \
+    -Wall \
+    -fstack-protector-strong \
+    -D_FORTIFY_SOURCE=2 \
+    -Wextra \
+    -std=gnu11 \
+    -o "$SU_OUT" \
+    "$SU_SRC" \
+    "$KRATOS_ROOT/init/kratos-crypt.c" \
+    -fPIE -pie \
+    -Wl,-z,relro,-z,now
+echo "[✓] su compiled."
+
+echo "[+] Setting setuid bit on /usr/bin/passwd and /bin/su..."
 chmod 4755 "$PASSWD_OUT"
-echo "[✓] passwd mode set to setuid (rwsr-xr-x); will be root:root in the final image."
+chmod 4755 "$SU_OUT"
+echo "[✓] setuid modes set on passwd and su."
 
 echo "[+] Creating symlinks for reboot, poweroff, halt..."
 ln -sf shutdown "$SYSROOT/sbin/reboot"
@@ -166,7 +240,8 @@ ln -sf shutdown "$SYSROOT/sbin/halt"
 echo "[✓] Symlinks created."
 echo
 echo "Installed binaries:"
-ls -lh "$INIT_OUT" "$SHUTDOWN_OUT" "$DEVD_OUT" "$NET_OUT" "$LOGIN_OUT" "$PASSWD_OUT"
+ls -lh "$INIT_OUT" "$SHUTDOWN_OUT" "$DEVD_OUT" "$NET_OUT" "$LOGIN_OUT" "$PASSWD_OUT" "$SU_OUT"
+ls -lh "$USERADD_OUT" "$USERDEL_OUT" "$GROUPADD_OUT" "$GROUPDEL_OUT"
 ls -la "$SYSROOT/sbin/reboot" "$SYSROOT/sbin/poweroff" "$SYSROOT/sbin/halt"
 
 echo
