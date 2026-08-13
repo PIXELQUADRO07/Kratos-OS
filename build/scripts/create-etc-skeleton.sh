@@ -84,7 +84,7 @@ EOF
 
 echo "[+] Creating /etc/hostname..."
 cat > "$ETC/hostname" <<'EOF'
-kratos
+kratos-os
 EOF
 
 echo "[+] Creating /etc/fstab..."
@@ -103,9 +103,9 @@ echo "[+] Creating /etc/os-release..."
 cat > "$ETC/os-release" <<'EOF'
 NAME="KratosOS"
 ID=kratos
-VERSION="0.1.0"
-VERSION_ID="0.1.0"
-PRETTY_NAME="KratosOS 0.1.0"
+VERSION="0.7.3"
+VERSION_ID="0.7.3"
+PRETTY_NAME="KratosOS 0.7.3"
 HOME_URL="https://kratosos.org"
 EOF
 
@@ -119,7 +119,7 @@ cat > "$ETC/issue" <<'EOF'
   ██║  ██╗██║  ██║██║  ██║   ██║   ╚██████╔╝███████╗
   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚══════╝
 
-  KratosOS 0.1.0 (GNU/Linux \r)
+  KratosOS 0.7.3 (GNU/Linux \r)
   Kernel \v on \m (\l)
 
 EOF
