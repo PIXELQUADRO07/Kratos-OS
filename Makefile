@@ -31,7 +31,7 @@ MAKEFLAGS     += --no-print-directory
 # Export KRATOS_JOBS so sub-scripts pick it up (default: nproc)
 export KRATOS_JOBS ?= $(shell nproc)
 
-.PHONY: help all \
+.PHONY: help all test \
         phase1 phase2 phase3 \
         toolchain verify verify-phase2 download \
         linux-headers binutils gcc-pass1 glibc-bootstrap libgcc glibc gcc-pass2 \
@@ -72,6 +72,7 @@ help:
 	@echo "  make pkg       make disk"
 	@echo ""
 	@echo "  Utilities:"
+	@echo "  make test           Run automated test suite (security, pkg, json, crypt)"
 	@echo "  make verify         Run Phase 1 toolchain verification"
 	@echo "  make verify-phase2  Run Phase 2 userspace verification"
 	@echo "  make download       Download all source tarballs"
@@ -84,6 +85,33 @@ help:
 	@echo "  Options:"
 	@echo "  KRATOS_JOBS=N       Parallel make jobs (default: nproc=$(shell nproc))"
 	@echo "  CLEAN=1             Wipe all stamps before building (with make all)"
+	@echo ""
+
+# ─────────────────────────────────────────────
+# Test suite
+# ─────────────────────────────────────────────
+test:
+	@echo "========================================="
+	@echo "    KratosOS Automated Test Suite"
+	@echo "========================================="
+	@mkdir -p build/tests/bin
+	@echo "[+] Compiling and running test-crypt..."
+	@gcc -Wall -Wextra -std=gnu11 -Iinit init/kratos-crypt.c build/tests/test-crypt.c -o build/tests/bin/test-crypt
+	@./build/tests/bin/test-crypt
+	@echo ""
+	@echo "[+] Compiling and running test-json..."
+	@gcc -Wall -Wextra -std=gnu11 -Ipkg pkg/kratos-json.c build/tests/test-json.c -o build/tests/bin/test-json
+	@./build/tests/bin/test-json
+	@echo ""
+	@echo "[+] Compiling and running test-deps..."
+	@gcc -Wall -Wextra -std=gnu11 -Ipkg pkg/kratos-deps.c build/tests/test-deps.c -o build/tests/bin/test-deps
+	@./build/tests/bin/test-deps
+	@echo ""
+	@echo "[+] Compiling and running test-pkg-security..."
+	@gcc -Wall -Wextra -std=gnu11 -Ipkg pkg/kratos-tar.c pkg/kratos-sha256.c build/tests/test-pkg-security.c -o build/tests/bin/test-pkg-security
+	@./build/tests/bin/test-pkg-security
+	@echo ""
+	@echo "[✓] All test suites completed successfully."
 	@echo ""
 
 # ─────────────────────────────────────────────
