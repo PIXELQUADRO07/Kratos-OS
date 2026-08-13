@@ -71,18 +71,21 @@ static pid_t spawn_tty_shell(const char *tty_dev)
             _exit(1);
         }
 
-        print_issue();
-        fflush(stdout);
-
         setenv("TERM",  "linux", 1);
         setenv("HOME",  "/root", 1);
         setenv("PATH",  "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1);
         setenv("SHELL", "/bin/bash", 1);
 
         if (access("/bin/login", X_OK) == 0) {
+            /* /bin/login prints /etc/issue itself — don't print it here too,
+             * or the banner shows up twice on every boot/login. */
             execl("/bin/login", "login", (char *)NULL);
         }
 
+        /* Fallback path: no /bin/login available, so nothing else will ever
+         * print the banner — print it here before dropping into the shell. */
+        print_issue();
+        fflush(stdout);
         execl("/bin/bash", "bash", "--login", (char *)NULL);
         perror("[init] execl bash");
         _exit(127);
