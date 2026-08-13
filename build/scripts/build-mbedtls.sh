@@ -43,13 +43,17 @@ if [ ! -f "$MBEDTLS_TAR" ]; then
     echo "[✓] Downloaded."
 fi
 
-# Extract if not present
-if [ ! -d "$SRC_DIR" ]; then
-    echo "[+] Extracting mbedTLS..."
-    mkdir -p "$KRATOS_SOURCES"
-    tar -xjf "$MBEDTLS_TAR" -C "$KRATOS_SOURCES"
-    echo "[✓] Extracted."
-fi
+# Always extract fresh. Previously this only extracted if $SRC_DIR was
+# missing, and relied on `make distclean` to reset state between runs —
+# but that left stale .o files behind (built with old CFLAGS) that got
+# silently re-archived into a "freshly timestamped" .a without ever being
+# recompiled, and the `|| true` on distclean masked the failure. Wiping
+# and re-extracting the source tree removes any possibility of that.
+echo "[+] Extracting mbedTLS (fresh copy, discarding any previous build state)..."
+rm -rf "$SRC_DIR"
+mkdir -p "$KRATOS_SOURCES"
+tar -xjf "$MBEDTLS_TAR" -C "$KRATOS_SOURCES"
+echo "[✓] Extracted."
 
 # Clean and create work directory
 rm -rf "$WORK_DIR"
@@ -73,7 +77,7 @@ make distclean >/dev/null 2>&1 || true
 make -j"${KRATOS_JOBS:-$(nproc)}" \
     CC="$CC --sysroot=$SYSROOT" \
     AR="$AR" \
-    CFLAGS="-O2 -fstack-protector-strong -D_FORTIFY_SOURCE=2" \
+    CFLAGS="-O2 -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2" \
     LDFLAGS="--sysroot=$SYSROOT" \
     lib
 

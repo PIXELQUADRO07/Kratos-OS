@@ -17,6 +17,23 @@ mkdir -p "$ETC"
 mkdir -p "$ETC/rc.d"
 mkdir -p "$ETC/network"
 
+# ---------------------------------------------------------------------------
+# FHS base directories — these are pure MOUNT POINTS, not populated by any
+# package build, so nothing else in the pipeline ever creates them. Their
+# absence is silent at build time (nothing fails) but fatal at boot time:
+# the kernel's own CONFIG_DEVTMPFS_MOUNT auto-mount of devtmpfs onto /dev
+# right after pivoting into the real root fails with ENOENT if /dev isn't
+# there, and every mount() call in init's mount_vfs() (/proc, /sys, /dev,
+# /dev/pts, /dev/shm) fails the same way — the system limps on with no
+# real device nodes and no way to open a tty, which is exactly the
+# "hangs after network init, never reaches a shell" symptom.
+echo "[+] Creating FHS base/mountpoint directories..."
+for d in proc sys dev dev/pts dev/shm run tmp mnt media opt srv home root boot; do
+    mkdir -p "$SYSROOT/$d"
+done
+chmod 1777 "$SYSROOT/tmp"      # sticky bit: shared, world-writable, no cross-user delete
+chmod 0700 "$SYSROOT/root"     # root's home: root-only
+
 # NOTE: kratos-devd is intentionally NOT launched from /etc/rc.d/. init.c's
 # start_devd() already starts it early in the boot sequence (before
 # mount_fstab(), since UUID/LABEL resolution depends on it) and blocks until

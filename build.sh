@@ -67,6 +67,7 @@ RESET=$'\e[0m'
 # Format: "name|script|needs_sudo|description"
 
 declare -a STAGES=(
+    "host-deps|check-host-deps.sh|yes|Install/verify host build dependencies"
     "download|download.sh|no|Download all source tarballs"
     "bootstrap|bootstrap.sh|no|Initialise build directories"
     "linux-headers|install-linux-headers.sh|no|Install Linux kernel headers"

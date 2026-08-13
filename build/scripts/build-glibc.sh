@@ -155,6 +155,22 @@ GROUP ( /usr/lib/libc.so.6 /usr/lib/libc_nonshared.a AS_NEEDED ( /usr/lib/libgcc
 LINKER_SCRIPT
 fi
 
+# CRITICAL: every dynamically-linked binary we build (bash, coreutils,
+# init, ...) has "/lib64/ld-linux-x86-64.so.2" baked in as its ELF
+# interpreter (PT_INTERP) — that's GCC's hardcoded default for the
+# x86_64-*-linux-gnu target, completely independent of glibc's own
+# libc_cv_slibdir=/usr/lib setting above, which only controls where
+# glibc's *own* `make install` physically copies the loader. Without
+# this symlink, execve() of every dynamic binary in the final image
+# fails at runtime (kernel can't find the interpreter at the exact
+# absolute path stored in the binary), even though everything links
+# and builds without a single error along the way — a merged-usr
+# compat symlink, same as Arch/Fedora ship, closes that gap.
+if [ ! -e "$KRATOS_SYSROOT/lib64" ]; then
+    echo "  [+] Creating /lib64 -> usr/lib compat symlink (required for dynamic linking to work at all)..."
+    ln -sf usr/lib "$KRATOS_SYSROOT/lib64"
+fi
+
 # ---------------------------------------------------------------------------
 # Verify
 # ---------------------------------------------------------------------------
