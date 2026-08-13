@@ -1,381 +1,209 @@
 # KratosOS
 
-<img width="500" height="500" align=center alt="KRATOS_OS-removebg-preview" src="https://github.com/user-attachments/assets/c82503fe-3256-4bf6-b5ae-f0a4d458f300" />
+<p align="center">
+  <img width="400" height="400" alt="KratosOS Logo" src="https://github.com/user-attachments/assets/c82503fe-3256-4bf6-b5ae-f0a4d458f300" />
+</p>
 
 <p align="center">
-  <b>A GNU/Linux distribution built from the ground up.</b>
+  <b>An independent GNU/Linux distribution built from the ground up.</b>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/architecture-x86__64-blue">
-  <img src="https://img.shields.io/badge/status-early%20development-orange">
-  <img src="https://img.shields.io/badge/boot-UEFI-green">
+  <img src="https://img.shields.io/badge/version-v0.8.0-orange">
+  <img src="https://img.shields.io/badge/boot-UEFI%20%2F%20GPT-green">
   <img src="https://img.shields.io/badge/kernel-Linux%207.1.5-lightgrey">
   <img src="https://img.shields.io/badge/license-GPL--3.0-blue">
 </p>
 
 ---
 
-## About
+## 🌟 About KratosOS
 
-**KratosOS** is an independent GNU/Linux distribution built from the ground up.
+**KratosOS** is an independent GNU/Linux operating system built from scratch without relying on Debian, Arch Linux, Ubuntu, Alpine, or any upstream base distribution.
 
-The project does not use Debian, Arch Linux, Ubuntu or another distribution as its
-base system. Instead, KratosOS builds its own toolchain, system root, kernel,
-userspace and boot environment.
-
-The goal is to create a complete, self-contained GNU/Linux system with its own
-system infrastructure and package ecosystem.
-
-> KratosOS is currently in early development and is not intended for daily use.
-
----
-
-## Current Status
-
-KratosOS is currently capable of booting a complete minimal userspace.
-
-### Working
-
-- [x] Custom cross-toolchain
-- [x] x86_64 target
-- [x] Custom sysroot
-- [x] Linux kernel build
-- [x] Linux kernel 7.1.5
-- [x] glibc
-- [x] Bash
-- [x] GRUB 2.14
-- [x] UEFI boot support
-- [x] GPT disk image
-- [x] Custom PID 1
-- [x] Virtual filesystem mounting
-- [x] `/etc/fstab`
-- [x] `LABEL=` filesystem resolution
-- [x] `UUID=` filesystem resolution
-- [x] Hostname configuration
-- [x] System initialization scripts
-- [x] Service startup framework
-- [x] Signal handling
-- [x] Zombie process reaping
-- [x] TTY supervision
-- [x] Login
-- [x] Bash shell
-- [x] QEMU boot
-- [x] Disk image generation
-
-### In Development
-
-- [ ] Native device manager (`kratos-devd`)
-- [ ] Dynamic `/dev` management
-- [ ] Coldplug / hotplug support
-- [ ] Device permissions
-- [ ] Disk symlinks (`by-uuid`, `by-label`)
-- [ ] Native package manager
-- [ ] Package repository infrastructure
-- [ ] Networking stack/userspace
-- [ ] User management
-- [ ] Installer
-- [ ] ISO generation
-- [ ] Physical hardware testing
+Every foundational component is compiled from sources:
+- **Dedicated Cross-Toolchain**: GCC 15.2.0, glibc 2.41, Binutils 2.44
+- **Hardened Linux Kernel**: Linux 7.1.5 with native ext4, VFAT, and device support
+- **Modular PID 1 Init System**: Custom native init engine with service management, TTY supervision, and zombie reaping
+- **Native Device Management Daemon**: `kratos-devd` via Netlink `NETLINK_KOBJECT_UEVENT`
+- **Native Userspace Network & DHCP Client**: `kratos-net`
+- **Native Authentication & Password Cryptography**: `login`, `passwd`, `su`, `useradd`, `groupadd` with standalone SHA-512crypt
+- **Hardened Package Management Ecosystem (KPM)**: `kratos` CLI, `kratos-pkg` engine, `kratos-pack`, `kratos-fetch` HTTPS client with TLS, and `kratos-json` parser
 
 ---
 
-# Architecture
+## 📊 Current Status & Feature Matrix
 
-The current boot chain is approximately:
+### ✅ Implemented & Working
+
+| Component | Subsystem | Description |
+| :--- | :--- | :--- |
+| **Toolchain** | Bootstrap | x86_64 cross-compiler (GCC 15.2.0, glibc 2.41, binutils 2.44) |
+| **Boot & Kernel** | UEFI / GPT | Linux 7.1.5 kernel, GRUB 2.14 EFI, GPT partitioning, UUID & PARTUUID auto-detection |
+| **PID 1 Init** | Core Userspace | Modular PID 1, VFS mounting (`/proc`, `/sys`, `/dev`, `/run`), `/etc/fstab` parser, hostname config |
+| **Process Control** | Supervision | Signal handling, zombie reaping, TTY supervision, shutdown/reboot/poweroff |
+| **Device Manager** | `kratos-devd` | Netlink kernel uevent socket, coldplug discovery, dynamic `/dev`, group resolution via `/etc/group`, disk symlinks (`by-uuid`, `by-label`), auto-modprobe |
+| **Networking** | `kratos-net` | Loopback (`127.0.0.1/8`), physical interface discovery, native DHCP client with XID validation, `/etc/resolv.conf` DNS generation |
+| **Authentication** | Users & Security | `/bin/login`, `/usr/bin/passwd`, `/bin/su`, `/usr/sbin/useradd`, `/usr/sbin/userdel`, `/usr/sbin/groupadd`, `/usr/sbin/groupdel`, standalone SHA-512crypt |
+| **Package Manager** | `kratos` / KPM | In-process safe tar extraction, Zip-Slip & traversal defense, SHA-256 integrity checksums, dependency solver & constraints, pre/post install hooks |
+| **HTTPS Client** | `kratos-fetch` | Native HTTP/HTTPS network client using mbedTLS and CA certificate verification |
+| **JSON Engine** | `kratos-json` | Zero-dependency recursive descent JSON parser for repository indexes |
+| **Test Suite** | Testing & CI | Automated test suite (`make test`) covering cryptographic hashing, JSON parsing, dependency resolution, and security exploit defenses |
+
+### 🛠️ In Active Development
+
+- [ ] Remote package repository synchronization (`kratos update`, `kratos search`)
+- [ ] Bootable ISO image generation (`make iso`)
+- [ ] Standalone system installer (`kratos-install`)
+- [ ] Physical bare-metal hardware compatibility testing
+
+---
+
+## 🏗️ System Architecture
 
 ```text
-UEFI
- │
- ▼
-GRUB
- │
- ▼
-Linux Kernel
- │
- ▼
-/sbin/init
- │
- ├── Mount VFS
- │    ├── /proc
- │    ├── /sys
- │    ├── /dev
- │    ├── /dev/pts
- │    ├── /dev/shm
- │    ├── /run
- │    └── /tmp
- │
- ├── Parse /etc/fstab
- │
- ├── Configure hostname
- │
- ├── Execute /etc/rc.sysinit
- │
- ├── Start services
- │
- ├── Supervise TTYs
- │
- └── Start login
-        │
-        ▼
-      Bash
-Init System
+                                 ┌────────────────────────┐
+                                 │     UEFI Firmware      │
+                                 └───────────┬────────────┘
+                                             │
+                                             ▼
+                                 ┌────────────────────────┐
+                                 │       GRUB 2.14        │
+                                 └───────────┬────────────┘
+                                             │
+                                             ▼
+                                 ┌────────────────────────┐
+                                 │   Linux Kernel 7.1.5   │
+                                 └───────────┬────────────┘
+                                             │
+                                             ▼
+                                 ┌────────────────────────┐
+                                 │   /sbin/init (PID 1)   │
+                                 └─────┬──────┬──────┬────┘
+                                       │      │      │
+          ┌────────────────────────────┘      │      └────────────────────────────┐
+          ▼                                   ▼                                   ▼
+┌──────────────────┐               ┌──────────────────┐               ┌──────────────────┐
+│ Virtual FS Mount │               │  kratos-devd     │               │  kratos-net      │
+│ /proc, /sys,     │               │  Device Daemon   │               │  Network & DHCP  │
+│ /dev, /run, /tmp │               │  (Netlink)       │               │  Auto-Config     │
+└──────────────────┘               └──────────────────┘               └──────────────────┘
+                                              │
+                                              ▼
+                                   ┌──────────────────┐
+                                   │ TTY Supervision  │
+                                   │ /bin/login       │
+                                   └──────────┬───────┘
+                                              │
+                                              ▼
+                                   ┌──────────────────┐
+                                   │  GNU Bash Shell  │
+                                   └──────────────────┘
+```
 
-KratosOS uses a custom native init system instead of relying on an external
-init framework.
+---
 
-The PID 1 implementation is divided into separate components:
+## 📦 Kratos Package Manager (KPM)
 
-init/
-├── init.h
-├── init.c
-├── mount.c
-├── mount.h
-├── services.c
-├── services.h
-├── signals.c
-├── signals.h
-├── tty.c
-└── tty.h
-Components
-Component	Responsibility
-init.c	PID 1 and main supervision loop
-mount.c	VFS and filesystem mounting
-services.c	hostname, startup scripts and services
-signals.c	signal handling and zombie reaping
-tty.c	TTY supervision and login
-*.h	Shared interfaces
+KratosOS features a secure, standalone native package manager:
 
-The init system currently provides:
+```text
+kpkg archive
+   │
+   ├── metadata       (Format v2, dependencies, conflicts, provides, ABI)
+   ├── manifest       (Tracked file list)
+   ├── checksums      (SHA-256 hashes for all archive components)
+   ├── payload.tar.gz (Gzip payload extracted via in-process safe tar)
+   └── hooks/         (pre-install, post-install, pre-remove, post-remove)
+```
 
-automatic virtual filesystem mounting
-/etc/fstab parsing
-LABEL= and UUID= resolution
-hostname configuration
-early boot scripts
-service startup
-zombie reaping
-shutdown/reboot handling
-TTY supervision
-login management
-Device Management
+### CLI Usage
 
-KratosOS is designed to use a lightweight native device manager.
+```bash
+# Install a package with dependency and checksum verification
+kratos install package-1.0.0-1-x86_64.kpkg
 
-The planned daemon is:
+# Verify installed package files against DB manifest
+kratos verify bash
 
-kratos-devd
+# Inspect package details
+kratos info bash
 
-Instead of depending on a complete external userspace device-management
-framework, KratosOS intends to process Linux kernel device events directly
-through:
+# List all installed packages
+kratos list
 
-NETLINK_KOBJECT_UEVENT
+# Remove an installed package and execute removal hooks
+kratos remove package-name
+```
 
-Planned functionality includes:
+### Security Defenses Built-In
 
-coldplug device discovery
-hotplug support
-/dev node management
-device permissions
-disk identification
-by-uuid symlinks
-by-label symlinks
-Build System
+1. **In-Process Tar Extractor**: Replaces external `system("tar")` with strict POSIX ustar parsing.
+2. **Zip-Slip & Path Traversal Mitigation**: Disallows any entries containing `..`, leading `/`, or attempting to escape the target sysroot.
+3. **Symlink Escape Protection**: Symlink targets pointing outside the destination root are rejected.
+4. **Device Node Protection**: Rejects block/char device creation in unprivileged payloads.
+5. **SHA-256 Integrity Verification**: Cryptographic validation of metadata, manifests, and payloads.
 
-KratosOS uses a dedicated build environment and cross-toolchain.
+---
 
-The target currently is:
+## 🚀 Quick Start & Building
 
-x86_64-kratos-linux-gnu
+### Prerequisites (Host System)
 
-The build system produces a KratosOS sysroot containing the kernel, bootloader
-and userspace.
+- Linux host (x86_64)
+- `gcc`, `g++`, `make`, `bison`, `flex`, `texinfo`, `gawk`, `wget`, `qemu-system-x86_64`
 
-Important directories:
+### Full Build (Incremental)
 
-build/
-├── downloads/
-├── sources/
-├── work/
-├── tools/
-├── sysroot/
-└── images/
+```bash
+# Build the entire OS from scratch (all phases)
+make all
 
-The generated sysroot is the basis for the final filesystem image.
+# Run automated unit and security tests
+make test
+```
 
-Kernel
+### Individual Build Targets
 
-KratosOS currently builds:
+```bash
+make phase1         # Bootstrap toolchain (binutils, gcc, glibc)
+make phase2         # Base userspace (bash, coreutils, sed, grep, tar, etc.)
+make phase3         # Kernel, GRUB, init system, packages, disk image
 
-Linux 7.1.5
+make init           # Build init, devd, net, login, passwd, su, useradd
+make pkg            # Build kratos, kratos-pkg, kratos-pack
+make disk           # Generate bootable GPT disk image (build/images/kratosos.img)
+```
 
-The kernel is configured for x86_64 and includes the functionality required by
-the current minimal userspace.
+---
 
-Generated kernel files include:
+## 🖥️ Running in QEMU
 
-/boot/vmlinuz
-/boot/System.map
-/boot/config-7.1.5
-/lib/modules/7.1.5/
-Bootloader
+Test the generated disk image in QEMU with UEFI firmware:
 
-KratosOS currently uses:
-
-GRUB 2.14
-
-with:
-
-x86_64 EFI
-GPT
-UEFI
-
-The disk image contains:
-
-┌──────────────────────────────┐
-│ GPT                          │
-├──────────────────────────────┤
-│ EFI System Partition         │
-│ ~256 MB                      │
-├──────────────────────────────┤
-│ KratosOS root filesystem     │
-│ ~1.7 GB                      │
-└──────────────────────────────┘
-Running KratosOS
-QEMU
-
-The easiest way to test the current system is:
-
+```bash
 ./run-qemu.sh
+```
 
-The current image boots successfully in QEMU and reaches the KratosOS login
-environment.
+---
 
-Building the disk image
+## 🧪 Automated Testing (`make test`)
 
-The build system can generate a GPT disk image:
+KratosOS includes a built-in automated test suite verifying core native systems:
 
-sudo ./build/scripts/build-disk.sh
+```bash
+make test
+```
 
-The resulting image is:
+Tests included:
+- **`test-crypt`**: SHA-512crypt password hashing and Drepper test vectors
+- **`test-json`**: JSON parser validation, surrogate pair UTF-8, escape sequences, depth bounds
+- **`test-deps`**: Version comparator (`>=`, `<=`, `!=`), dependency graph solver, conflict detector
+- **`test-pkg-security`**: Path traversal exploits (`../`), device node injection, symlink escapes, SHA-256 verification
 
-build/images/kratosos.img
-Development
+---
 
-Clone the repository:
+## 📜 License
 
-git clone <repository-url>
-cd KratosOS
-
-Build the required components using the scripts in:
-
-build/scripts/
-
-The project currently requires a Linux development environment with the
-necessary host build tools.
-
-Project Roadmap
-Phase 0 — Toolchain
- Build system
- Binutils
- GCC cross compiler
- Target sysroot
-Phase 1 — Base System
- glibc
- Linux kernel
- GRUB
- Bash
- Root filesystem
- GPT disk image
- UEFI boot
-Phase 2 — Init
- PID 1
- VFS mounting
- /etc/fstab
- hostname
- startup scripts
- service framework
-Phase 3 — Process & TTY Management
- signal handling
- zombie reaping
- TTY supervision
- login
- shutdown/reboot/halt
-Phase 4 — Device Management
- kratos-devd
- netlink uevents
- coldplug
- hotplug
- dynamic /dev
- device permissions
- disk symlinks
-Phase 5 — Package Management
- package format
- package database
- dependency resolution
- package installation
- package removal
- upgrades
- repository metadata
- cryptographic package signing
- native package repositories
-Phase 6 — Networking
- network configuration
- DHCP
- DNS
- interface management
- network service
-Phase 7 — Userspace
- user management
- groups
- permissions
- login improvements
- core utilities
- filesystem utilities
-Phase 8 — Distribution
- ISO generator
- installer
- installation environment
- boot configuration
- release infrastructure
-Phase 9 — Hardware
- physical hardware boot
- storage testing
- networking hardware
- graphics
- audio
- power management
-Releases
-
-Current development milestones:
-
-Version	Status
-v0.1.0	First bootable KratosOS system
-v0.2.0	Modular init system, VFS, services and TTY management
-v0.3.0	Planned native device management
-v0.4.0	Planned package manager
-Philosophy
-
-KratosOS is built around a simple principle:
-
-Build the system instead of inheriting the system.
-
-Rather than starting from an existing distribution and replacing individual
-components, KratosOS builds its own foundation progressively.
-
-The project aims to keep the base system understandable, modular and
-independent while still remaining compatible with the GNU/Linux ecosystem.
-
-Contributing
-
-KratosOS is currently an experimental development project.
-
-Development is focused on the core system, build infrastructure and boot
-process. Contributions, ideas and technical discussion are welcome.
-
-License
-
-KratosOS is released under the GNU General Public License v3.0.
-
-See LICENSE for details.
+KratosOS is free software released under the **GNU General Public License v3.0**. See the [LICENSE](LICENSE) file for details.
