@@ -28,7 +28,8 @@ Every foundational component is compiled from sources:
 - **Modular PID 1 Init System**: Custom native init engine with service management, TTY supervision, and zombie reaping
 - **Native Device Management Daemon**: `kratos-devd` via Netlink `NETLINK_KOBJECT_UEVENT`
 - **Native Userspace Network & DHCP Client**: `kratos-net`
-- **Native Authentication & Password Cryptography**: `login`, `passwd`, `su`, `useradd`, `groupadd` with standalone SHA-512crypt
+- **Native Authentication & Password Cryptography**: `login`, `passwd`, `su`, `useradd`, `userdel`, `usermod`, `groupadd`, `groupdel` with standalone SHA-512crypt
+- **Complete System Utilities**: Native `mount`/`umount`, `ps`, `kill`, `dmesg`, `free`, `df`, `hostname`, `id`, `groups`, `whoami`
 - **Hardened Package Management Ecosystem (KPM)**: `kratos` CLI, `kratos-pkg` engine, `kratos-pack`, `kratos-fetch` HTTPS client with TLS, and `kratos-json` parser
 
 ---
@@ -45,7 +46,8 @@ Every foundational component is compiled from sources:
 | **Process Control** | Supervision | Signal handling, zombie reaping, TTY supervision, shutdown/reboot/poweroff |
 | **Device Manager** | `kratos-devd` | Netlink kernel uevent socket, coldplug discovery, dynamic `/dev`, group resolution via `/etc/group`, disk symlinks (`by-uuid`, `by-label`), auto-modprobe |
 | **Networking** | `kratos-net` | Loopback (`127.0.0.1/8`), physical interface discovery, native DHCP client with XID validation, `/etc/resolv.conf` DNS generation |
-| **Authentication** | Users & Security | `/bin/login`, `/usr/bin/passwd`, `/bin/su`, `/usr/sbin/useradd`, `/usr/sbin/userdel`, `/usr/sbin/groupadd`, `/usr/sbin/groupdel`, standalone SHA-512crypt |
+| **Authentication** | Users & Security | `/bin/login`, `/usr/bin/passwd`, `/bin/su`, `/usr/sbin/useradd`, `/usr/sbin/userdel`, `/usr/sbin/usermod`, `/usr/sbin/groupadd`, `/usr/sbin/groupdel`, standalone SHA-512crypt |
+| **System Utilities** | Core Userspace | Native `mount`/`umount`, `ps`, `kill`, `dmesg`, `free`, `df`, `hostname`, `id`, `groups`, `whoami` — all implemented from scratch |
 | **Package Manager** | `kratos` / KPM | In-process safe tar extraction, Zip-Slip & traversal defense, SHA-256 integrity checksums, dependency solver & constraints, pre/post install hooks |
 | **HTTPS Client** | `kratos-fetch` | Native HTTP/HTTPS network client using mbedTLS and CA certificate verification |
 | **JSON Engine** | `kratos-json` | Zero-dependency recursive descent JSON parser for repository indexes |
@@ -171,7 +173,7 @@ make phase1         # Bootstrap toolchain (binutils, gcc, glibc)
 make phase2         # Base userspace (bash, coreutils, sed, grep, tar, etc.)
 make phase3         # Kernel, GRUB, init system, packages, disk image
 
-make init           # Build init, devd, net, login, passwd, su, useradd
+make init           # Build init, devd, net, login, passwd, su, useradd + all system utilities
 make pkg            # Build kratos, kratos-pkg, kratos-pack
 make disk           # Generate bootable GPT disk image (build/images/kratosos.img)
 ```
