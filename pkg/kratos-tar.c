@@ -117,6 +117,11 @@ static int is_safe_symlink_target(const char *linkname)
 {
     if (!linkname || linkname[0] == '\0') return 0;
 
+    /* Reject absolute targets: a symlink pointing outside dest_dir (e.g.
+     * "/etc") lets any later archive entry that writes "through" it land
+     * on the real filesystem instead of inside the extraction root. */
+    if (linkname[0] == '/' || linkname[0] == '\\') return 0;
+
     /* Reject traversal out of bounds */
     if (strcmp(linkname, "..") == 0 ||
         strncmp(linkname, "../", 3) == 0 ||

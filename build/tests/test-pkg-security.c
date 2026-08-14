@@ -164,6 +164,36 @@ int main(void)
     check("Test 5: Symlink escape '../../etc/shadow' rejected",
           res == KRATOS_TAR_ERR_SYMLINK_ESCAPE);
 
+    /* ── Test 5b: Absolute-Path Symlink Escape (write-through-symlink) ── */
+    char abs_sym_tar[512];
+    snprintf(abs_sym_tar, sizeof(abs_sym_tar), "%s/abssym.tar", test_dir);
+    fd = open(abs_sym_tar, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd >= 0) {
+        char block[512] = {0};
+        snprintf(block, 100, "shortcut");
+        snprintf(block + 100, 8, "0000777");
+        snprintf(block + 124, 12, "00000000000");
+        block[156] = '2'; /* symlink */
+        snprintf(block + 157, 100, "/tmp"); /* absolute target */
+        memcpy(block + 257, "ustar  ", 6);
+
+        memset(block + 148, ' ', 8);
+        unsigned long sum = 0;
+        for (int i = 0; i < 512; i++) sum += (unsigned char)block[i];
+        snprintf(block + 148, 7, "%06lo", sum);
+        block[154] = '\0';
+        block[155] = ' ';
+
+        write(fd, block, 512);
+        char zero[1024] = {0};
+        write(fd, zero, 1024);
+        close(fd);
+    }
+
+    res = kratos_tar_extract_file(abs_sym_tar, extract_dest, NULL, NULL);
+    check("Test 5b: Absolute symlink target '/tmp' rejected",
+          res == KRATOS_TAR_ERR_SYMLINK_ESCAPE);
+
     /* ── Test 6: Valid Archive Roundtrip Extraction ── */
     char src_dir[PATH_MAX];
     snprintf(src_dir, sizeof(src_dir), "%s/src", test_dir);
