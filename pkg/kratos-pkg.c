@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -742,6 +743,7 @@ static int verify_installed_pkg(const char *pkg_name, const char *target_root)
     printf("[kratos-pkg] Verifying installed package: %s\n", pkg_name);
     char line[PATH_MAX];
     int missing_files = 0;
+    int modified_files = 0;
     int total_files = 0;
 
     while (fgets(line, sizeof(line), f)) {
@@ -749,8 +751,12 @@ static int verify_installed_pkg(const char *pkg_name, const char *target_root)
         while (l > 0 && (line[l-1] == '\n' || line[l-1] == '\r')) line[--l] = '\0';
         if (line[0] == '\0') continue;
 
-        const char *clean_rel = line;
-        while (clean_rel[0] == '/') clean_rel++;
+        char stored_hash[KRATOS_SHA256_HEX_SIZE];
+        char clean_rel[PATH_MAX];
+        parse_manifest_line(line, stored_hash, sizeof(stored_hash),
+                            clean_rel, sizeof(clean_rel));
+
+        while (clean_rel[0] == '/') memmove(clean_rel, clean_rel + 1, strlen(clean_rel));
 
         char full_target[PATH_MAX];
         snprintf(full_target, sizeof(full_target), "%s/%s",
@@ -760,15 +766,30 @@ static int verify_installed_pkg(const char *pkg_name, const char *target_root)
         if (access(full_target, F_OK) != 0) {
             printf("  [!] Missing: %s\n", clean_rel);
             missing_files++;
+        } else if (stored_hash[0]) {
+            /* Verify SHA-256 hash for regular files */
+            char computed[KRATOS_SHA256_HEX_SIZE];
+            if (kratos_sha256_file(full_target, computed) == 0 &&
+                strcasecmp(stored_hash, computed) != 0) {
+                printf("  [!] Modified: %s\n", clean_rel);
+                printf("       Expected: %s\n", stored_hash);
+                printf("       Computed: %s\n", computed);
+                modified_files++;
+            }
         }
     }
     fclose(f);
 
-    if (missing_files == 0) {
-        printf("  [✓] All %d tracked files verified.\n", total_files);
+    int issues = missing_files + modified_files;
+    if (issues == 0) {
+        printf("  [\xe2\x9c\x93] All %d tracked files verified.\n", total_files);
         return 0;
     } else {
-        printf("  [!] %d of %d files are missing or modified.\n", missing_files, total_files);
+        if (missing_files > 0)
+            printf("  [!] %d file(s) missing.\n", missing_files);
+        if (modified_files > 0)
+            printf("  [!] %d file(s) modified (checksum mismatch).\n", modified_files);
+        printf("  [!] %d of %d files have issues.\n", issues, total_files);
         return 1;
     }
 }
