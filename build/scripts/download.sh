@@ -28,14 +28,31 @@ declare -A URLS=(
     ["coreutils-${COREUTILS_VERSION}.tar.xz"]="https://ftp.gnu.org/gnu/coreutils/coreutils-${COREUTILS_VERSION}.tar.xz"
 )
 
-# SHA-256 checksums (update these after first download with: sha256sum <file>)
+# SHA-256 checksums
+# Sources:
+#   linux:     verified from mirrors.kernel.org/pub/linux/kernel/v7.x/sha256sums.asc (PGP-signed)
+#   gnu pkgs:  GNU releases ship .sig (GPG) files, not sha256sum files. Hashes below are computed
+#              on first download via 'make update-checksums' or manually with: sha256sum <file>
+#              After computing, replace the PENDING_* values with the actual hash.
 declare -A SHA256=(
-    ["linux-${LINUX_VERSION}.tar.xz"]="PLACEHOLDER_linux_${LINUX_VERSION}"
-    ["binutils-${BINUTILS_VERSION}.tar.xz"]="PLACEHOLDER_binutils_${BINUTILS_VERSION}"
-    ["gcc-${GCC_VERSION}.tar.xz"]="PLACEHOLDER_gcc_${GCC_VERSION}"
-    ["glibc-${GLIBC_VERSION}.tar.xz"]="PLACEHOLDER_glibc_${GLIBC_VERSION}"
-    ["bash-${BASH_VERSION}.tar.gz"]="PLACEHOLDER_bash_${BASH_VERSION}"
-    ["coreutils-${COREUTILS_VERSION}.tar.xz"]="PLACEHOLDER_coreutils_${COREUTILS_VERSION}"
+    # ✅ Verified from PGP-signed kernel.org sha256sums.asc
+    ["linux-${LINUX_VERSION}.tar.xz"]="22a0196b3cbcdf34dc27b77561f4d040585fd3447edc9ab3531a1ac79e3041e7"
+
+    # ⏳ Compute after first download: sha256sum build/downloads/binutils-${BINUTILS_VERSION}.tar.xz
+    ["binutils-${BINUTILS_VERSION}.tar.xz"]="PENDING_binutils_${BINUTILS_VERSION}"
+
+    # ⏳ Compute after first download: sha256sum build/downloads/gcc-${GCC_VERSION}.tar.xz
+    ["gcc-${GCC_VERSION}.tar.xz"]="PENDING_gcc_${GCC_VERSION}"
+
+    # ⏳ Compute after first download: sha256sum build/downloads/glibc-${GLIBC_VERSION}.tar.xz
+    # Note: glibc 2.42 released 2025-07-28 — verify against gnu.org GPG .sig
+    ["glibc-${GLIBC_VERSION}.tar.xz"]="PENDING_glibc_${GLIBC_VERSION}"
+
+    # ⏳ Compute after first download: sha256sum build/downloads/bash-${BASH_VERSION}.tar.gz
+    ["bash-${BASH_VERSION}.tar.gz"]="PENDING_bash_${BASH_VERSION}"
+
+    # ⏳ Compute after first download: sha256sum build/downloads/coreutils-${COREUTILS_VERSION}.tar.xz
+    ["coreutils-${COREUTILS_VERSION}.tar.xz"]="PENDING_coreutils_${COREUTILS_VERSION}"
 )
 
 # ---------------------------------------------------------------------------
@@ -48,10 +65,12 @@ verify_checksum() {
     local filename
     filename="$(basename "$archive")"
 
-    # Skip verification if checksum is a placeholder
-    if [[ "$expected" == PLACEHOLDER_* ]]; then
-        echo "  [~] SHA256 not yet set for $filename — skipping verification"
-        echo "      Run: sha256sum $archive"
+    # Skip verification if checksum is not yet set
+    if [[ "$expected" == PLACEHOLDER_* || "$expected" == PENDING_* ]]; then
+        echo "  [~] SHA256 not yet recorded for $filename — skipping verification"
+        echo "      To compute and record it, run:"
+        echo "        sha256sum \"$archive\""
+        echo "      Then update the SHA256 array in $(basename "${BASH_SOURCE[0]}")"
         return 0
     fi
 

@@ -10,7 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/architecture-x86__64-blue">
-  <img src="https://img.shields.io/badge/version-v0.8.0-orange">
+  <img src="https://img.shields.io/badge/version-v0.7.8.4-orange">
   <img src="https://img.shields.io/badge/boot-UEFI%20%2F%20GPT-green">
   <img src="https://img.shields.io/badge/kernel-Linux%207.1.5-lightgrey">
   <img src="https://img.shields.io/badge/license-GPL--3.0-blue">
@@ -23,7 +23,7 @@
 **KratosOS** is an independent GNU/Linux operating system built from scratch without relying on Debian, Arch Linux, Ubuntu, Alpine, or any upstream base distribution.
 
 Every foundational component is compiled from sources:
-- **Dedicated Cross-Toolchain**: GCC 15.2.0, glibc 2.41, Binutils 2.44
+- **Dedicated Cross-Toolchain**: GCC 15.2.0, glibc 2.42, Binutils 2.45
 - **Hardened Linux Kernel**: Linux 7.1.5 with native ext4, VFAT, and device support
 - **Modular PID 1 Init System**: Custom native init engine with service management, TTY supervision, and zombie reaping
 - **Native Device Management Daemon**: `kratos-devd` via Netlink `NETLINK_KOBJECT_UEVENT`
@@ -40,7 +40,7 @@ Every foundational component is compiled from sources:
 
 | Component | Subsystem | Description |
 | :--- | :--- | :--- |
-| **Toolchain** | Bootstrap | x86_64 cross-compiler (GCC 15.2.0, glibc 2.41, binutils 2.44) |
+| **Toolchain** | Bootstrap | x86_64 cross-compiler (GCC 15.2.0, glibc 2.42, Binutils 2.45) |
 | **Boot & Kernel** | UEFI / GPT | Linux 7.1.5 kernel, GRUB 2.14 EFI, GPT partitioning, UUID & PARTUUID auto-detection |
 | **PID 1 Init** | Core Userspace | Modular PID 1, VFS mounting (`/proc`, `/sys`, `/dev`, `/run`), `/etc/fstab` parser, hostname config |
 | **Process Control** | Supervision | Signal handling, zombie reaping, TTY supervision, shutdown/reboot/poweroff |
@@ -55,10 +55,16 @@ Every foundational component is compiled from sources:
 
 ### 🛠️ In Active Development
 
-- [ ] Remote package repository synchronization (`kratos update`, `kratos search`)
 - [ ] Bootable ISO image generation (`make iso`)
 - [ ] Standalone system installer (`kratos-install`)
 - [ ] Physical bare-metal hardware compatibility testing
+- [ ] Package signing (Ed25519 via mbedTLS)
+
+### ✅ Recently Completed
+
+- [x] Remote package repository synchronization (`kratos update`, `kratos search`, `kratos upgrade`)
+- [x] Repository index format (`index.json`) with HTTPS fetch and local cache
+- [x] Multi-repository support (`/etc/kratos/repos.d/`)
 
 ---
 
