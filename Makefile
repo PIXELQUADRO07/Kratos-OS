@@ -111,6 +111,10 @@ test:
 	@gcc -Wall -Wextra -std=gnu11 -DHOST_BUILD -Ipkg pkg/kratos-repo.c pkg/kratos-json.c pkg/kratos-sha256.c pkg/kratos-deps.c pkg/kratos-tar.c pkg/kratos-sign.c build/tests/test-repo.c -o build/tests/bin/test-repo
 	@./build/tests/bin/test-repo
 	@echo ""
+	@echo "[+] Compiling and running test-sign..."
+	@gcc -Wall -Wextra -std=gnu11 -DHOST_BUILD -Ipkg pkg/kratos-sign.c build/tests/test-sign.c -o build/tests/bin/test-sign
+	@./build/tests/bin/test-sign
+	@echo ""
 	@echo "[+] Compiling and running test-pkg-security..."
 	@gcc -Wall -Wextra -std=gnu11 -Ipkg pkg/kratos-tar.c pkg/kratos-sha256.c build/tests/test-pkg-security.c -o build/tests/bin/test-pkg-security
 	@./build/tests/bin/test-pkg-security
