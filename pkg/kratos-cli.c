@@ -30,10 +30,12 @@ static void show_help(void)
     printf("  list                  List all installed packages\n");
     printf("  info    <name>        Display detailed package information\n");
     printf("  verify  <name>        Verify files of an installed package\n");
-    printf("  search  <query>       Search available packages\n");
-    printf("  update                Update package repository database\n");
-    printf("  upgrade               Upgrade installed packages\n");
+    printf("  search  <query>       Search available packages in repository\n");
+    printf("  update                Sync package repository database\n");
+    printf("  upgrade               Upgrade all upgradable packages\n");
     printf("  help                  Show this help screen\n\n");
+    printf("Repository:\n");
+    printf("  Run 'kratos update' before using 'search' or 'upgrade'.\n\n");
 }
 
 int main(int argc, char *argv[])
@@ -47,7 +49,8 @@ int main(int argc, char *argv[])
 
     if (strcmp(cmd, "install") == 0 || strcmp(cmd, "remove") == 0 ||
         strcmp(cmd, "list") == 0 || strcmp(cmd, "info") == 0 ||
-        strcmp(cmd, "verify") == 0)
+        strcmp(cmd, "verify") == 0 || strcmp(cmd, "update") == 0 ||
+        strcmp(cmd, "search") == 0 || strcmp(cmd, "upgrade") == 0)
     {
         /* Resolve backend path considering KRATOS_SYSROOT if set */
         const char *sysroot = getenv("KRATOS_SYSROOT");
@@ -70,9 +73,6 @@ int main(int argc, char *argv[])
         perror("[kratos] execv /usr/libexec/kratos-pkg failed");
         free(new_argv);
         return 1;
-    } else if (strcmp(cmd, "update") == 0 || strcmp(cmd, "upgrade") == 0 || strcmp(cmd, "search") == 0) {
-        printf("[kratos] Repository command '%s' is in development.\n", cmd);
-        return 0;
     } else {
         fprintf(stderr, "[kratos] Unknown command '%s'. Run 'kratos help' for usage.\n", cmd);
         return 1;

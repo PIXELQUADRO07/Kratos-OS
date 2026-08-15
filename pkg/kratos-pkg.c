@@ -18,6 +18,7 @@
 #include "kratos-tar.h"
 #include "kratos-sha256.h"
 #include "kratos-deps.h"
+#include "kratos-repo.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -804,6 +805,14 @@ int main(int argc, char *argv[])
         return info_pkg(argv[arg_start], target_root);
     } else if (strcmp(cmd, "verify") == 0 && argc >= arg_start + 1) {
         return verify_installed_pkg(argv[arg_start], target_root);
+    } else if (strcmp(cmd, "update") == 0) {
+        return kratos_repo_update(target_root);
+    } else if (strcmp(cmd, "search") == 0) {
+        const char *query = (argc >= arg_start + 1) ? argv[arg_start] : "";
+        int found = kratos_repo_search(query, target_root);
+        return (found >= 0) ? 0 : 1;
+    } else if (strcmp(cmd, "upgrade") == 0) {
+        return kratos_repo_upgrade(target_root);
     } else {
         fprintf(stderr, "Invalid command or arguments.\n");
         return 1;
