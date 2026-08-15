@@ -145,24 +145,24 @@ int main(int argc, char *argv[])
     }
 
     /* Default full output: uid=N(name) gid=N(name) groups=N(name),... */
-    struct passwd *pu = getpwuid(euid);
-    struct group *gg = getgrgid(egid);
+    struct passwd *pu = getpwuid(uid);
+    struct group *gg = getgrgid(gid);
 
-    printf("uid=%u", euid);
+    printf("uid=%u", uid);
     if (pu) printf("(%s)", pu->pw_name);
 
-    printf(" gid=%u", egid);
+    printf(" gid=%u", gid);
     if (gg) printf("(%s)", gg->gr_name);
 
     if (euid != uid) {
-        struct passwd *rpu = getpwuid(uid);
-        printf(" euid=%u", uid);
-        if (rpu) printf("(%s)", rpu->pw_name);
+        struct passwd *epu = getpwuid(euid);
+        printf(" euid=%u", euid);
+        if (epu) printf("(%s)", epu->pw_name);
     }
     if (egid != gid) {
-        struct group *rgg = getgrgid(gid);
-        printf(" egid=%u", gid);
-        if (rgg) printf("(%s)", rgg->gr_name);
+        struct group *egg = getgrgid(egid);
+        printf(" egid=%u", egid);
+        if (egg) printf("(%s)", egg->gr_name);
     }
 
     /* Supplementary groups */
