@@ -14,6 +14,7 @@
 #include "kratos-repo.h"
 #include "kratos-json.h"
 #include "kratos-sha256.h"
+#include "kratos-sign.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -466,6 +467,52 @@ int kratos_repo_update(const char *sysroot)
             continue;
         }
         free(test_pkgs);
+
+        /* Signature Verification if public key is present */
+        char pubkey_path[PATH_MAX];
+        snprintf(pubkey_path, sizeof(pubkey_path), "%s/etc/kratos/keys/%s.pub", sysroot, conf.name);
+        
+        /* Fallback to default official.pub */
+        if (access(pubkey_path, F_OK) != 0) {
+            snprintf(pubkey_path, sizeof(pubkey_path), "%s/etc/kratos/keys/official.pub", sysroot);
+        }
+
+        if (access(pubkey_path, F_OK) == 0) {
+            printf("  [~] Public key found at '%s' — verifying index signature...\n", pubkey_path);
+            
+            char sig_url[PATH_MAX];
+            char sig_path_tmp[PATH_MAX];
+            char sig_path[PATH_MAX];
+            
+            snprintf(sig_url,      sizeof(sig_url),      "%s/%s.sig", clean_url, REPO_INDEX_FILE);
+            snprintf(sig_path_tmp, sizeof(sig_path_tmp), "%s/%s.sig.tmp", cache_dir, REPO_INDEX_FILE);
+            snprintf(sig_path,     sizeof(sig_path),     "%s/%s.sig", cache_dir, REPO_INDEX_FILE);
+            
+            printf("  Fetching signature: %s\n", sig_url);
+            if (fetch_url(sig_url, sig_path_tmp, sysroot) != 0) {
+                fprintf(stderr, "  [!] Signature verification failed: Signature file not found or download failed.\n");
+                unlink(index_path_tmp);
+                errors++;
+                continue;
+            }
+            
+            if (kratos_verify_file(index_path_tmp, sig_path_tmp, pubkey_path) != 0) {
+                fprintf(stderr, "  [!] Signature verification FAILED for repository '%s'!\n", conf.name);
+                fprintf(stderr, "      The repository index is unsigned or signed with an untrusted key.\n");
+                unlink(index_path_tmp);
+                unlink(sig_path_tmp);
+                errors++;
+                continue;
+            }
+            
+            printf("  [✓] Signature verified successfully.\n");
+            
+            if (rename(sig_path_tmp, sig_path) != 0) {
+                unlink(sig_path_tmp);
+            }
+        } else {
+            printf("  [!] Warning: No public key found in /etc/kratos/keys/ for '%s'. Proceeding without signature verification.\n", conf.name);
+        }
 
         /* Atomic replace: rename tmp -> final */
         if (rename(index_path_tmp, index_path) != 0) {
