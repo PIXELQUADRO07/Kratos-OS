@@ -10,7 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/architecture-x86__64-blue">
-  <img src="https://img.shields.io/badge/version-v0.7.8.4-orange">
+  <img src="https://img.shields.io/badge/version-v0.8.0-orange">
   <img src="https://img.shields.io/badge/boot-UEFI%20%2F%20GPT-green">
   <img src="https://img.shields.io/badge/kernel-Linux%207.1.5-lightgrey">
   <img src="https://img.shields.io/badge/license-GPL--3.0-blue">
