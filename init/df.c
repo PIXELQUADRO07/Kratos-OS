@@ -96,7 +96,14 @@ int main(int argc, char *argv[])
                 char dev[256], mp[256], type[64];
                 if (sscanf(line, "%255s %255s %63s", dev, mp, type) >= 3) {
                     size_t mlen = strlen(mp);
-                    if (strncmp(target, mp, mlen) == 0 && mlen > best_len) {
+                    /* Require a full path-component match: either the
+                     * target equals mp exactly, or the next character in
+                     * target right after the mp prefix is '/'. Without
+                     * this, target="/homework/x" would wrongly match
+                     * mountpoint "/home" on a plain byte-prefix test. */
+                    int boundary_ok = (target[mlen] == '\0' || target[mlen] == '/' ||
+                                       (mlen > 0 && mp[mlen-1] == '/'));
+                    if (mlen > 0 && strncmp(target, mp, mlen) == 0 && boundary_ok && mlen > best_len) {
                         best_len = mlen;
                         strncpy(best_dev, dev, sizeof(best_dev) - 1);
                         strncpy(best_mp, mp, sizeof(best_mp) - 1);
