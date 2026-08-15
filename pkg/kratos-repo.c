@@ -333,7 +333,7 @@ int kratos_repo_load_all(repo_list_t *list, const char *sysroot)
         size_t nl = strlen(ent->d_name);
         if (nl < 6 || strcmp(ent->d_name + nl - 5, ".conf") != 0) continue;
 
-        char conf_path[PATH_MAX];
+        char conf_path[PATH_MAX + 256];
         snprintf(conf_path, sizeof(conf_path), "%s/%s", conf_dir, ent->d_name);
 
         repo_conf_t conf;
@@ -412,7 +412,7 @@ int kratos_repo_update(const char *sysroot)
         size_t nl = strlen(ent->d_name);
         if (nl < 6 || strcmp(ent->d_name + nl - 5, ".conf") != 0) continue;
 
-        char conf_path[PATH_MAX];
+        char conf_path[PATH_MAX + 256];
         snprintf(conf_path, sizeof(conf_path), "%s/%s", conf_dir, ent->d_name);
 
         repo_conf_t conf;
@@ -655,7 +655,7 @@ const char *kratos_repo_download_pkg(const repo_pkg_t *pkg, const char *sysroot)
     if (!pkg || !pkg->url[0]) return NULL;
     if (!sysroot) sysroot = "";
 
-    static char out_path[PATH_MAX + 256];
+    static char out_path[PATH_MAX * 2];
 
     char pkg_cache_dir[PATH_MAX + 256];
     snprintf(pkg_cache_dir, sizeof(pkg_cache_dir), "%s%s/%s/packages",
@@ -690,7 +690,7 @@ const char *kratos_repo_download_pkg(const repo_pkg_t *pkg, const char *sysroot)
     printf("[kratos-repo] Downloading: %s (%s)\n", pkg->name, pkg->version);
     printf("  URL: %s\n", full_url);
 
-    char tmp_path[PATH_MAX + 256];
+    char tmp_path[PATH_MAX * 2 + 16];
     snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", out_path);
 
     if (fetch_url(full_url, tmp_path, sysroot) != 0) {
