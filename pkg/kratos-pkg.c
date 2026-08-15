@@ -64,27 +64,47 @@ typedef struct {
 /* Directory Initialization                                           */
 /* ------------------------------------------------------------------ */
 
+/* mkdir() is not recursive: if any parent component of `path` doesn't
+ * exist yet (e.g. target_root itself, when installing into a sysroot
+ * that's being bootstrapped from scratch), a single mkdir() call fails
+ * with ENOENT and every directory below it silently never gets created.
+ * This walks and creates each component in turn, like `mkdir -p`. */
+static void mkdir_p(const char *path)
+{
+    char tmp[PATH_MAX];
+    snprintf(tmp, sizeof(tmp), "%s", path);
+
+    for (char *p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            mkdir(tmp, 0755);
+            *p = '/';
+        }
+    }
+    mkdir(tmp, 0755);
+}
+
 static void ensure_dirs(const char *root_prefix)
 {
     char path[PATH_MAX];
 
     snprintf(path, sizeof(path), "%s%s", root_prefix, DB_ROOT);
-    mkdir(path, 0755);
+    mkdir_p(path);
 
     snprintf(path, sizeof(path), "%s%s", root_prefix, "/var/lib/kratos/db");
-    mkdir(path, 0755);
+    mkdir_p(path);
 
     snprintf(path, sizeof(path), "%s%s", root_prefix, DB_PKGS);
-    mkdir(path, 0755);
+    mkdir_p(path);
 
     snprintf(path, sizeof(path), "%s%s", root_prefix, DB_FILES);
-    mkdir(path, 0755);
+    mkdir_p(path);
 
     snprintf(path, sizeof(path), "%s%s", root_prefix, DB_CACHE);
-    mkdir(path, 0755);
+    mkdir_p(path);
 
     snprintf(path, sizeof(path), "%s%s", root_prefix, DB_KEYS);
-    mkdir(path, 0755);
+    mkdir_p(path);
 }
 
 /* ------------------------------------------------------------------ */
@@ -219,6 +239,153 @@ static int verify_package_checksums(const char *stage_dir)
     return 0;
 }
 
+/* Parses one manifest line into (hash, path). Recognizes the new
+ * "<64-hex-char sha256> <path>" format written by write_db_manifest();
+ * falls back to treating the whole line as a bare path (old format, or
+ * the staging manifest which never has hashes) so existing installed
+ * packages keep working after this format change. */
+static void parse_manifest_line(const char *line, char *hash_out, size_t hash_sz,
+                                 char *path_out, size_t path_sz)
+{
+    hash_out[0] = '\0';
+
+    size_t i = 0;
+    while (line[i] && isxdigit((unsigned char)line[i])) i++;
+
+    if (i == 64 && line[64] == ' ') {
+        snprintf(hash_out, hash_sz, "%.64s", line);
+        snprintf(path_out, path_sz, "%s", line + 65);
+    } else {
+        snprintf(path_out, path_sz, "%s", line);
+    }
+}
+
+/* Writes the DB-side manifest with a SHA-256 line prefix for every
+ * regular file (symlinks/dirs are stored path-only, since hashing them
+ * isn't meaningful), computed against what was actually extracted onto
+ * disk. This is what lets `kratos verify` detect corrupted/modified
+ * files, not just missing ones. */
+static void write_db_manifest(const char *src_manifest_path, const char *db_manifest_path,
+                               const char *target_root)
+{
+    FILE *in = fopen(src_manifest_path, "r");
+    if (!in) return;
+    FILE *out = fopen(db_manifest_path, "w");
+    if (!out) { fclose(in); return; }
+
+    char line[PATH_MAX];
+    while (fgets(line, sizeof(line), in)) {
+        size_t l = strlen(line);
+        while (l > 0 && (line[l-1] == '\n' || line[l-1] == '\r')) line[--l] = '\0';
+        if (line[0] == '\0') continue;
+
+        const char *clean_rel = line;
+        while (clean_rel[0] == '/') clean_rel++;
+        if (!kratos_is_safe_relpath(clean_rel)) continue;
+
+        char full_path[PATH_MAX];
+        snprintf(full_path, sizeof(full_path), "%s/%s",
+                 (target_root && target_root[0]) ? target_root : "", clean_rel);
+
+        struct stat st;
+        char hash[KRATOS_SHA256_HEX_SIZE] = {0};
+        if (lstat(full_path, &st) == 0 && S_ISREG(st.st_mode) &&
+            kratos_sha256_file(full_path, hash) == 0) {
+            fprintf(out, "%s %s\n", hash, clean_rel);
+        } else {
+            fprintf(out, "%s\n", clean_rel);
+        }
+    }
+
+    fclose(in);
+    fclose(out);
+}
+
+/* ------------------------------------------------------------------ */
+/* Manifest Diffing (for upgrade/reinstall orphan cleanup)             */
+/* ------------------------------------------------------------------ */
+
+typedef struct {
+    char **paths;
+    size_t count;
+} path_set_t;
+
+static void path_set_load(path_set_t *set, const char *manifest_path)
+{
+    set->paths = NULL;
+    set->count = 0;
+
+    FILE *f = fopen(manifest_path, "r");
+    if (!f) return;
+
+    char line[PATH_MAX];
+    while (fgets(line, sizeof(line), f)) {
+        size_t l = strlen(line);
+        while (l > 0 && (line[l-1] == '\n' || line[l-1] == '\r')) line[--l] = '\0';
+        if (line[0] == '\0') continue;
+
+        const char *clean_rel = line;
+        while (clean_rel[0] == '/') clean_rel++;
+        if (!kratos_is_safe_relpath(clean_rel)) continue;
+
+        char **grown = realloc(set->paths, (set->count + 1) * sizeof(char *));
+        if (!grown) break;
+        set->paths = grown;
+        set->paths[set->count++] = strdup(clean_rel);
+    }
+    fclose(f);
+}
+
+static void path_set_free(path_set_t *set)
+{
+    for (size_t i = 0; i < set->count; i++) free(set->paths[i]);
+    free(set->paths);
+    set->paths = NULL;
+    set->count = 0;
+}
+
+static int path_set_contains(const path_set_t *set, const char *path)
+{
+    for (size_t i = 0; i < set->count; i++) {
+        if (strcmp(set->paths[i], path) == 0) return 1;
+    }
+    return 0;
+}
+
+/* Delete every file present in `old_manifest` but absent from
+ * `new_manifest`. Without this, upgrading/reinstalling a package with
+ * install_kpkg(..., force=1) silently overwrites the DB entry while
+ * files that existed in the old version (e.g. a renamed binary or a
+ * dropped config) are never removed and stay orphaned on disk forever. */
+static void remove_orphaned_files(const char *old_manifest, const char *new_manifest,
+                                   const char *target_root)
+{
+    path_set_t old_set = {0}, new_set = {0};
+    path_set_load(&old_set, old_manifest);
+    if (old_set.count == 0) { path_set_free(&old_set); return; }
+    path_set_load(&new_set, new_manifest);
+
+    int removed = 0;
+    for (size_t i = 0; i < old_set.count; i++) {
+        if (path_set_contains(&new_set, old_set.paths[i])) continue;
+
+        char target_file[PATH_MAX];
+        snprintf(target_file, sizeof(target_file), "%s/%s",
+                 (target_root && target_root[0]) ? target_root : "", old_set.paths[i]);
+
+        struct stat st;
+        if (lstat(target_file, &st) == 0 && (S_ISREG(st.st_mode) || S_ISLNK(st.st_mode))) {
+            if (unlink(target_file) == 0) removed++;
+        }
+    }
+    if (removed > 0) {
+        printf("  [+] Removed %d orphaned file(s) from previous version.\n", removed);
+    }
+
+    path_set_free(&old_set);
+    path_set_free(&new_set);
+}
+
 /* ------------------------------------------------------------------ */
 /* Package Installation                                                */
 /* ------------------------------------------------------------------ */
@@ -257,6 +424,28 @@ static int install_kpkg(const char *kpkg_path, const char *target_root, int forc
     printf("  Package:     %s (%s-%s)\n", meta.name, meta.version, meta.release);
     printf("  Arch:        %s\n", meta.arch);
     printf("  Description: %s\n", meta.description);
+
+    /* 3b. Already-installed check. Without this, reinstalling/upgrading
+     * silently overwrote the existing DB entry with no warning and no
+     * cleanup of files the old version had but the new one doesn't. */
+    char existing_db_meta[PATH_MAX];
+    snprintf(existing_db_meta, sizeof(existing_db_meta), "%s%s/%s", target_root, DB_PKGS, meta.name);
+    int already_installed = (access(existing_db_meta, F_OK) == 0);
+    if (already_installed) {
+        pkg_meta_t existing_meta;
+        const char *existing_ver = (read_metadata(existing_db_meta, &existing_meta) == 0)
+                                    ? existing_meta.version : "?";
+        if (!force) {
+            fprintf(stderr,
+                    "[kratos-pkg] Error: Package '%s' is already installed (version %s).\n"
+                    "  Use --force to reinstall/upgrade to %s.\n",
+                    meta.name, existing_ver, meta.version);
+            kratos_rm_rf(stage_dir);
+            return -1;
+        }
+        printf("  [i] Package already installed (version %s) — upgrading to %s.\n",
+               existing_ver, meta.version);
+    }
 
     /* 4. Verify Checksums */
     if (verify_package_checksums(stage_dir) < 0) {
@@ -359,10 +548,25 @@ static int install_kpkg(const char *kpkg_path, const char *target_root, int forc
     meta.install_time = time(NULL);
     write_metadata(db_meta_path, &meta);
 
-    /* 12. Save File Manifest to DB */
+    /* 12. Save File Manifest to DB — preserve the old manifest first (if
+     * this is an upgrade/reinstall) so we can diff it against the new one
+     * below and clean up any files the previous version had that the new
+     * version doesn't. */
     char db_manifest_path[PATH_MAX];
     snprintf(db_manifest_path, sizeof(db_manifest_path), "%s%s/%s", target_root, DB_FILES, meta.name);
+
+    char old_manifest_backup[PATH_MAX] = {0};
+    if (already_installed) {
+        snprintf(old_manifest_backup, sizeof(old_manifest_backup), "%s.upgrading-%d", db_manifest_path, getpid());
+        kratos_copy_file(db_manifest_path, old_manifest_backup, 0644);
+    }
+
     kratos_copy_file(manifest_path, db_manifest_path, 0644);
+
+    if (old_manifest_backup[0]) {
+        remove_orphaned_files(old_manifest_backup, manifest_path, target_root);
+        unlink(old_manifest_backup);
+    }
 
     /* 13. Save Hooks to DB for removal */
     char hooks_src[PATH_MAX];
