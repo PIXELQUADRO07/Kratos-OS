@@ -38,8 +38,16 @@ int kratos_version_cmp(const char *ver1, const char *ver2)
         while (*p2 != '\0' && !isalnum((unsigned char)*p2)) p2++;
 
         if (*p1 == '\0' && *p2 == '\0') return 0;
-        if (*p1 == '\0') return -1;
-        if (*p2 == '\0') return 1;
+        if (*p1 == '\0') {
+            /* p1 exhausted, p2 has a remaining suffix: a leading digit
+             * means p2 is a numeric continuation (newer point release),
+             * a leading letter means it's a pre-release tag (older than
+             * the bare version p1). */
+            return isdigit((unsigned char)*p2) ? -1 : 1;
+        }
+        if (*p2 == '\0') {
+            return isdigit((unsigned char)*p1) ? 1 : -1;
+        }
 
         if (is_digit_str(p1) && is_digit_str(p2)) {
             /* Compare numeric segments */
