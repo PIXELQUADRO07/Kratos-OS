@@ -172,84 +172,93 @@ static int parse_index_json(const char *filepath,
     fclose(f);
 
     /* Parse JSON */
-    kratos_json_value_t *root = kratos_json_parse(buf, rd);
+    json_value_t *root = json_parse(buf, rd);
     free(buf);
-    if (!root || root->type != KRATOS_JSON_OBJECT) {
-        kratos_json_free(root);
+    if (!root || json_type(root) != JSON_OBJECT) {
+        json_free(root);
         return -1;
     }
 
     /* Find "packages" array */
-    kratos_json_value_t *pkgs_arr = kratos_json_object_get(root, "packages");
-    if (!pkgs_arr || pkgs_arr->type != KRATOS_JSON_ARRAY) {
-        kratos_json_free(root);
+    const json_value_t *pkgs_arr = json_object_get(root, "packages");
+    if (!pkgs_arr || json_type(pkgs_arr) != JSON_ARRAY) {
+        json_free(root);
         return -1;
     }
 
-    size_t count = pkgs_arr->u.array.count;
+    size_t count = json_array_size(pkgs_arr);
     if (count == 0) {
         *pkgs_out  = NULL;
         *count_out = 0;
-        kratos_json_free(root);
+        json_free(root);
         return 0;
     }
 
     repo_pkg_t *pkgs = calloc(count, sizeof(repo_pkg_t));
-    if (!pkgs) { kratos_json_free(root); return -1; }
+    if (!pkgs) { json_free(root); return -1; }
 
     size_t valid = 0;
     for (size_t i = 0; i < count; i++) {
-        kratos_json_value_t *entry = pkgs_arr->u.array.items[i];
-        if (!entry || entry->type != KRATOS_JSON_OBJECT) continue;
+        const json_value_t *entry = json_array_get(pkgs_arr, i);
+        if (!entry || json_type(entry) != JSON_OBJECT) continue;
 
         repo_pkg_t *p = &pkgs[valid];
 
         /* Required fields */
-        kratos_json_value_t *v;
-        v = kratos_json_object_get(entry, "name");
-        if (!v || v->type != KRATOS_JSON_STRING) continue;
-        snprintf(p->name, sizeof(p->name), "%s", v->u.string);
+        const json_value_t *v;
+        v = json_object_get(entry, "name");
+        if (!v || json_type(v) != JSON_STRING) continue;
+        snprintf(p->name, sizeof(p->name), "%s", json_get_string(v));
 
-        v = kratos_json_object_get(entry, "version");
-        if (!v || v->type != KRATOS_JSON_STRING) continue;
-        snprintf(p->version, sizeof(p->version), "%s", v->u.string);
+        v = json_object_get(entry, "version");
+        if (!v || json_type(v) != JSON_STRING) continue;
+        snprintf(p->version, sizeof(p->version), "%s", json_get_string(v));
 
         /* Optional fields */
-        v = kratos_json_object_get(entry, "arch");
-        if (v && v->type == KRATOS_JSON_STRING)
-            snprintf(p->arch, sizeof(p->arch), "%s", v->u.string);
+        v = json_object_get(entry, "arch");
+        if (v && json_type(v) == JSON_STRING)
+            snprintf(p->arch, sizeof(p->arch), "%s", json_get_string(v));
         else
             snprintf(p->arch, sizeof(p->arch), "x86_64");
 
-        v = kratos_json_object_get(entry, "description");
-        if (v && v->type == KRATOS_JSON_STRING)
-            snprintf(p->description, sizeof(p->description), "%s", v->u.string);
+        v = json_object_get(entry, "description");
+        if (v && json_type(v) == JSON_STRING)
+            snprintf(p->description, sizeof(p->description), "%s", json_get_string(v));
 
-        v = kratos_json_object_get(entry, "sha256");
-        if (v && v->type == KRATOS_JSON_STRING)
-            snprintf(p->sha256, sizeof(p->sha256), "%s", v->u.string);
+        v = json_object_get(entry, "sha256");
+        if (v && json_type(v) == JSON_STRING)
+            snprintf(p->sha256, sizeof(p->sha256), "%s", json_get_string(v));
 
-        v = kratos_json_object_get(entry, "url");
-        if (v && v->type == KRATOS_JSON_STRING)
-            snprintf(p->url, sizeof(p->url), "%s", v->u.string);
+        v = json_object_get(entry, "url");
+        if (v && json_type(v) == JSON_STRING)
+            snprintf(p->url, sizeof(p->url), "%s", json_get_string(v));
 
-        v = kratos_json_object_get(entry, "depends");
-        if (v && v->type == KRATOS_JSON_STRING)
-            snprintf(p->depends, sizeof(p->depends), "%s", v->u.string);
+        v = json_object_get(entry, "depends");
+        if (v && json_type(v) == JSON_STRING)
+            snprintf(p->depends, sizeof(p->depends), "%s", json_get_string(v));
 
-        v = kratos_json_object_get(entry, "release");
-        if (v && v->type == KRATOS_JSON_NUMBER)
-            p->release = (int)v->u.number;
-        else
+        v = json_object_get(entry, "release");
+        if (v && json_type(v) == JSON_NUMBER) {
+            long rel = 1;
+            json_get_long(v, &rel);
+            p->release = (int)rel;
+        } else {
             p->release = 1;
+        }
 
-        v = kratos_json_object_get(entry, "size");
-        if (v && v->type == KRATOS_JSON_NUMBER)
-            p->size = (long)v->u.number;
+        v = json_object_get(entry, "size");
+        if (v && json_type(v) == JSON_NUMBER) {
+            long sz = 0;
+            json_get_long(v, &sz);
+            p->size = sz;
+        }
 
-        v = kratos_json_object_get(entry, "installed_size");
-        if (v && v->type == KRATOS_JSON_NUMBER)
-            p->installed_size = (long)v->u.number;
+        v = json_object_get(entry, "installed_size");
+        if (v && json_type(v) == JSON_NUMBER) {
+            long sz = 0;
+            json_get_long(v, &sz);
+            p->installed_size = sz;
+        }
 
         /* Repo metadata */
         snprintf(p->repo_name, sizeof(p->repo_name), "%s", repo_name);
@@ -259,7 +268,7 @@ static int parse_index_json(const char *filepath,
         valid++;
     }
 
-    kratos_json_free(root);
+    json_free(root);
     *pkgs_out  = pkgs;
     *count_out = valid;
     return 0;
