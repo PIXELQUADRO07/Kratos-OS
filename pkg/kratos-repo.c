@@ -435,9 +435,9 @@ int kratos_repo_update(const char *sysroot)
         repo_mkdir_p(cache_dir);
 
         /* Fetch index.json */
-        char index_url[PATH_MAX];
-        char index_path_tmp[PATH_MAX];
-        char index_path[PATH_MAX];
+        char index_url[PATH_MAX + 256];
+        char index_path_tmp[PATH_MAX + 256];
+        char index_path[PATH_MAX + 256];
 
         /* Strip trailing slash from URL */
         size_t url_len = strlen(conf.url);
@@ -469,7 +469,7 @@ int kratos_repo_update(const char *sysroot)
         free(test_pkgs);
 
         /* Signature Verification if public key is present */
-        char pubkey_path[PATH_MAX];
+        char pubkey_path[PATH_MAX + 256];
         snprintf(pubkey_path, sizeof(pubkey_path), "%s/etc/kratos/keys/%s.pub", sysroot, conf.name);
         
         /* Fallback to default official.pub */
@@ -480,9 +480,9 @@ int kratos_repo_update(const char *sysroot)
         if (access(pubkey_path, F_OK) == 0) {
             printf("  [~] Public key found at '%s' — verifying index signature...\n", pubkey_path);
             
-            char sig_url[PATH_MAX];
-            char sig_path_tmp[PATH_MAX];
-            char sig_path[PATH_MAX];
+            char sig_url[PATH_MAX + 256];
+            char sig_path_tmp[PATH_MAX + 256];
+            char sig_path[PATH_MAX + 256];
             
             snprintf(sig_url,      sizeof(sig_url),      "%s/%s.sig", clean_url, REPO_INDEX_FILE);
             snprintf(sig_path_tmp, sizeof(sig_path_tmp), "%s/%s.sig.tmp", cache_dir, REPO_INDEX_FILE);
@@ -524,7 +524,7 @@ int kratos_repo_update(const char *sysroot)
         }
 
         /* Update last-update timestamp */
-        char stamp_path[PATH_MAX];
+        char stamp_path[PATH_MAX + 256];
         snprintf(stamp_path, sizeof(stamp_path), "%s/%s", cache_dir, REPO_STAMP_FILE);
         FILE *sf = fopen(stamp_path, "w");
         if (sf) { fprintf(sf, "%ld\n", (long)time(NULL)); fclose(sf); }
@@ -628,7 +628,7 @@ int kratos_repo_search(const char *query, const char *sysroot)
 
             /* Truncate description to fit 44 chars */
             char desc[45];
-            snprintf(desc, sizeof(desc), "%s", pkg->description);
+            snprintf(desc, sizeof(desc), "%.44s", pkg->description);
 
             printf("%-24s %-12s %-10s %s\n",
                    pkg->name, pkg->version, repo->name, desc);
@@ -655,9 +655,9 @@ const char *kratos_repo_download_pkg(const repo_pkg_t *pkg, const char *sysroot)
     if (!pkg || !pkg->url[0]) return NULL;
     if (!sysroot) sysroot = "";
 
-    static char out_path[PATH_MAX];
+    static char out_path[PATH_MAX + 256];
 
-    char pkg_cache_dir[PATH_MAX];
+    char pkg_cache_dir[PATH_MAX + 256];
     snprintf(pkg_cache_dir, sizeof(pkg_cache_dir), "%s%s/%s/packages",
              sysroot, REPO_CACHE_ROOT, pkg->repo_name);
     repo_mkdir_p(pkg_cache_dir);
@@ -690,7 +690,7 @@ const char *kratos_repo_download_pkg(const repo_pkg_t *pkg, const char *sysroot)
     printf("[kratos-repo] Downloading: %s (%s)\n", pkg->name, pkg->version);
     printf("  URL: %s\n", full_url);
 
-    char tmp_path[PATH_MAX];
+    char tmp_path[PATH_MAX + 256];
     snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", out_path);
 
     if (fetch_url(full_url, tmp_path, sysroot) != 0) {
@@ -766,7 +766,7 @@ int kratos_repo_upgrade(const char *sysroot)
     while ((ent = readdir(d)) != NULL) {
         if (ent->d_name[0] == '.' || strstr(ent->d_name, ".hooks")) continue;
 
-        char meta_path[PATH_MAX];
+        char meta_path[PATH_MAX + 256];
         snprintf(meta_path, sizeof(meta_path), "%s/%s", db_pkgs, ent->d_name);
 
         /* Read installed version from metadata */
