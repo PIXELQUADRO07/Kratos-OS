@@ -1,7 +1,7 @@
 /* test-crypt.c — Test end-to-end del KratosOS SHA-512crypt engine */
 #include <stdio.h>
 #include <string.h>
-#include "../init/kratos-crypt.h"
+#include "../../init/kratos-crypt.h"
 
 int main(void)
 {

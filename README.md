@@ -55,13 +55,13 @@ Every foundational component is compiled from sources:
 
 ### 🛠️ In Active Development
 
-- [ ] Bootable ISO image generation (`make iso`)
 - [ ] Standalone system installer (`kratos-install`)
 - [ ] Physical bare-metal hardware compatibility testing
-- [ ] Package signing (Ed25519 via mbedTLS)
 
 ### ✅ Recently Completed
 
+- [x] Package signing and verification (Ed25519 via mbedTLS), keygen and sign-repo tools
+- [x] Bootable ISO image generation (`make iso`) with GRUB Live CD and initramfs
 - [x] Remote package repository synchronization (`kratos update`, `kratos search`, `kratos upgrade`)
 - [x] Repository index format (`index.json`) with HTTPS fetch and local cache
 - [x] Multi-repository support (`/etc/kratos/repos.d/`)
@@ -208,6 +208,8 @@ Tests included:
 - **`test-crypt`**: SHA-512crypt password hashing and Drepper test vectors
 - **`test-json`**: JSON parser validation, surrogate pair UTF-8, escape sequences, depth bounds
 - **`test-deps`**: Version comparator (`>=`, `<=`, `!=`), dependency graph solver, conflict detector
+- **`test-repo`**: Repository client loading, package search, multi-repo index parsing
+- **`test-sign`**: Ed25519 signature generation and verification (host stub)
 - **`test-pkg-security`**: Path traversal exploits (`../`), device node injection, symlink escapes, SHA-256 verification
 
 ---
