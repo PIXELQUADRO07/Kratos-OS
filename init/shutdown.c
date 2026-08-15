@@ -47,7 +47,11 @@ int main(int argc, char *argv[])
         } else if (strcmp(argv[i], "-r") == 0) {
             sig = SIGINT;
             reboot_cmd = RB_AUTOBOOT;
-        } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-P") == 0) {
+        } else if (strcmp(argv[i], "-h") == 0) {
+            /* Standard shutdown(8) semantics: -h means halt, not poweroff. */
+            sig = SIGUSR2;
+            reboot_cmd = RB_HALT_SYSTEM;
+        } else if (strcmp(argv[i], "-P") == 0) {
             sig = SIGUSR1;
             reboot_cmd = RB_POWER_OFF;
         } else if (strcmp(argv[i], "--help") == 0) {
