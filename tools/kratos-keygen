@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# tools/kratos-keygen — Generate Ed25519 repository keypairs for KratosOS
+
+set -euo pipefail
+
+show_help() {
+    echo "Usage: kratos-keygen --output-dir <directory>"
+    echo ""
+    echo "Generates a secure Ed25519 keypair for signing KratosOS repositories."
+    echo "Requires 'openssl' on the host system."
+    echo ""
+    echo "Options:"
+    echo "  --output-dir, -o    Directory where keys will be written"
+    echo "  --help, -h          Show this help text"
+}
+
+OUT_DIR=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --output-dir|-o)
+            OUT_DIR="$2"
+            shift 2
+            ;;
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "Error: Unknown argument '$1'"
+            show_help
+            exit 1
+            ;;
+    esac
+done
+
+if [[ -z "$OUT_DIR" ]]; then
+    echo "Error: Output directory (--output-dir) is required."
+    show_help
+    exit 1
+fi
+
+mkdir -p "$OUT_DIR"
+
+if ! command -v openssl &>/dev/null; then
+    echo "Error: 'openssl' command is required but not found."
+    exit 1
+fi
+
+PRIV_KEY="$OUT_DIR/official.priv"
+PUB_KEY="$OUT_DIR/official.pub"
+
+echo "[+] Generating private key..."
+openssl genpkey -algorithm ed25519 -outform PEM -out "$PRIV_KEY"
+chmod 600 "$PRIV_KEY"
+
+echo "[+] Extracting public key..."
+openssl pkey -pubout -in "$PRIV_KEY" -outform PEM -out "$PUB_KEY"
+
+echo ""
+echo "[✓] Keypair generated successfully."
+echo "  Private key: $PRIV_KEY (KEEP OFFLINE, NEVER COMMIT TO GIT!)"
+echo "  Public key:  $PUB_KEY  (To be shipped with the OS in /etc/kratos/keys/)"
