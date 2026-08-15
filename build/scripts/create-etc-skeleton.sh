@@ -158,6 +158,18 @@ EOF
 echo "[+] Pre-creating /etc/mtab symlink..."
 ln -sf /proc/self/mounts "$ETC/mtab"
 
+echo "[+] Creating Kratos Package Manager directories..."
+mkdir -p "$ETC/kratos/repos.d"
+mkdir -p "$SYSROOT/var/lib/kratos/repo-cache"
+
+echo "[+] Creating /etc/kratos/repos.d/00-official.conf..."
+cat > "$ETC/kratos/repos.d/00-official.conf" <<'EOF'
+[kratos-official]
+url=https://repo.kratosos.org
+enabled=yes
+priority=100
+EOF
+
 echo "[+] Creating /etc/rc.sysinit..."
 cat > "$ETC/rc.sysinit" <<'EOF'
 #!/bin/bash
