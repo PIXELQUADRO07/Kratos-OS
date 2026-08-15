@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# tools/kratos-sign-repo — Sign index.json or package file using Ed25519 private key
+
+set -euo pipefail
+
+show_help() {
+    echo "Usage: kratos-sign-repo --key <private_key> --file <file_to_sign>"
+    echo ""
+    echo "Signs a file using an Ed25519 private key and outputs a hex-encoded signature file."
+    echo "Requires 'openssl' and 'python3' on the host system."
+}
+
+PRIV_KEY=""
+FILE_TO_SIGN=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --key|-k)
+            PRIV_KEY="$2"
+            shift 2
+            ;;
+        --file|-f)
+            FILE_TO_SIGN="$2"
+            shift 2
+            ;;
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "Error: Unknown argument '$1'"
+            show_help
+            exit 1
+            ;;
+    esac
+done
+
+if [[ -z "$PRIV_KEY" || -z "$FILE_TO_SIGN" ]]; then
+    echo "Error: Both private key (--key) and file to sign (--file) are required."
+    show_help
+    exit 1
+fi
+
+if [[ ! -f "$PRIV_KEY" ]]; then
+    echo "Error: Private key file '$PRIV_KEY' not found."
+    exit 1
+fi
+
+if [[ ! -f "$FILE_TO_SIGN" ]]; then
+    echo "Error: File to sign '$FILE_TO_SIGN' not found."
+    exit 1
+fi
+
+# Generate signature
+SIG_BIN="${FILE_TO_SIGN}.sig.bin"
+SIG_HEX="${FILE_TO_SIGN}.sig"
+
+echo "[+] Signing $FILE_TO_SIGN..."
+openssl pkeyutl -sign -inkey "$PRIV_KEY" -rawin -in "$FILE_TO_SIGN" -out "$SIG_BIN"
+
+# Convert to hex using Python 3 (extremely portable)
+python3 -c 'import sys; print(open(sys.argv[1], "rb").read().hex().strip())' "$SIG_BIN" > "$SIG_HEX"
+
+# Cleanup temporary binary signature
+rm -f "$SIG_BIN"
+
+echo "[✓] Signature file created: $SIG_HEX"
