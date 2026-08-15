@@ -37,6 +37,7 @@ mkdir -p "$SYSROOT/usr/bin"
 mkdir -p "$SYSROOT/var/lib/kratos/db/packages"
 mkdir -p "$SYSROOT/var/lib/kratos/db/files"
 mkdir -p "$SYSROOT/var/lib/kratos/cache"
+mkdir -p "$SYSROOT/var/lib/kratos/repo-cache"
 
 echo "[+] Compiling /usr/libexec/kratos-pkg (Engine)..."
 "$CC" \
