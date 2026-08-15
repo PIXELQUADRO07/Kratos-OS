@@ -18,7 +18,7 @@
  *           last-update       <- unix timestamp of last sync
  *
  * Repository config (one file per repo):
- *   /etc/kratos/repos.d/*.conf
+ *   /etc/kratos/repos.d/ *.conf
  *       [<repo-name>]
  *       url=https://...
  *       enabled=yes
@@ -99,7 +99,7 @@ typedef struct {
 /*
  * kratos_repo_update() -- Synchronize all enabled repositories.
  *
- * For each repo in REPO_CONF_DIR/*.conf:
+ * For each repo in REPO_CONF_DIR/ *.conf:
  *   1. Fetch <url>/index.json via HTTPS (kratos-fetch)
  *   2. Validate JSON structure
  *   3. Save to REPO_CACHE_ROOT/<name>/index.json
@@ -141,7 +141,7 @@ int kratos_repo_find(const char *name, repo_pkg_t *out, const char *sysroot);
 /*
  * kratos_repo_load_all() -- Load all cached repository indexes into memory.
  *
- * Reads from REPO_CONF_DIR/*.conf and REPO_CACHE_ROOT/<name>/index.json.
+ * Reads from REPO_CONF_DIR/ *.conf and REPO_CACHE_ROOT/<name>/index.json.
  * Returns 0 on success.
  */
 int kratos_repo_load_all(repo_list_t *list, const char *sysroot);
