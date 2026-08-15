@@ -52,10 +52,12 @@ echo "[+] Compiling /usr/libexec/kratos-pkg (Engine)..."
     -o "$PKG_OUT" \
     "$PKG_SRC" \
     "$KRATOS_ROOT/pkg/kratos-repo.c" \
+    "$KRATOS_ROOT/pkg/kratos-sign.c" \
     "$KRATOS_ROOT/pkg/kratos-tar.c" \
     "$KRATOS_ROOT/pkg/kratos-sha256.c" \
     "$KRATOS_ROOT/pkg/kratos-deps.c" \
     "$KRATOS_ROOT/pkg/kratos-json.c" \
+    -lmbedtls -lmbedx509 -lmbedcrypto \
     -fPIE -pie \
     -Wl,-z,relro,-z,now
 echo "[✓] kratos-pkg engine compiled."
