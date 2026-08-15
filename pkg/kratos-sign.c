@@ -1,10 +1,37 @@
-/* kratos-sign.c — KratosOS Cryptographic Signature Verification (Ed25519)
- *
- * Utilizza mbedTLS per verificare firme digitali di indici e pacchetti.
- */
+#ifdef HOST_BUILD
 
-#define _GNU_SOURCE
+/* Stub implementation for host testing when mbedTLS is not present */
+#include "kratos-sign.h"
+#include <stdio.h>
+#include <string.h>
 
+int kratos_verify_buffer(const unsigned char *data, size_t data_len,
+                         const unsigned char *sig, size_t sig_len,
+                         const char *pubkey_path)
+{
+    (void)data; (void)data_len; (void)sig; (void)sig_len; (void)pubkey_path;
+    return 0; /* always succeed in host stub */
+}
+
+int kratos_verify_file(const char *file_path, const char *sig_path, const char *pubkey_path)
+{
+    (void)file_path; (void)sig_path; (void)pubkey_path;
+    return 0; /* always succeed in host stub */
+}
+
+int kratos_sign_buffer(const unsigned char *data, size_t data_len,
+                       unsigned char *sig_out, size_t *sig_len_out,
+                       const char *privkey_path)
+{
+    (void)data; (void)data_len; (void)privkey_path;
+    memset(sig_out, 0, 64);
+    *sig_len_out = 64;
+    return 0; /* always succeed in host stub */
+}
+
+#else
+
+/* Real implementation using mbedTLS for the target OS */
 #include "kratos-sign.h"
 
 #include <mbedtls/pk.h>
@@ -183,3 +210,5 @@ cleanup:
     mbedtls_entropy_free(&entropy);
     return (ret == 0) ? 0 : -1;
 }
+
+#endif
