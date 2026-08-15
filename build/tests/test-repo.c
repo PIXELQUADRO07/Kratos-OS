@@ -35,14 +35,14 @@ int main(void)
     snprintf(cache_dir, sizeof(cache_dir), "%s/var/lib/kratos/repo-cache/testrepo", sysroot);
 
     /* Create paths */
-    char cmd[1024];
+    char cmd[2048];
     snprintf(cmd, sizeof(cmd), "mkdir -p %s && mkdir -p %s", conf_dir, cache_dir);
     if (system(cmd) != 0) {
         fprintf(stderr, "Failed to create test directories\n");
     }
 
     /* 1. Create a mock repository conf file */
-    char conf_file[512];
+    char conf_file[1024];
     snprintf(conf_file, sizeof(conf_file), "%s/testrepo.conf", conf_dir);
     FILE *fconf = fopen(conf_file, "w");
     if (fconf) {
@@ -54,7 +54,7 @@ int main(void)
     }
 
     /* 2. Create a mock index.json file in cache */
-    char index_file[512];
+    char index_file[1024];
     snprintf(index_file, sizeof(index_file), "%s/index.json", cache_dir);
     FILE *fidx = fopen(index_file, "w");
     if (fidx) {
