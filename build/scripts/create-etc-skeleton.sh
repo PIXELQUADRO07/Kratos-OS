@@ -160,7 +160,13 @@ ln -sf /proc/self/mounts "$ETC/mtab"
 
 echo "[+] Creating Kratos Package Manager directories..."
 mkdir -p "$ETC/kratos/repos.d"
+mkdir -p "$ETC/kratos/keys"
 mkdir -p "$SYSROOT/var/lib/kratos/repo-cache"
+
+if [ -f "$PROJECT_ROOT/config/keys/official.pub" ]; then
+    echo "[+] Embedding official repository public key..."
+    cp "$PROJECT_ROOT/config/keys/official.pub" "$ETC/kratos/keys/official.pub"
+fi
 
 echo "[+] Creating /etc/kratos/repos.d/00-official.conf..."
 cat > "$ETC/kratos/repos.d/00-official.conf" <<'EOF'
