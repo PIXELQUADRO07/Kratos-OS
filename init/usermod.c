@@ -126,6 +126,12 @@ int main(int argc, char *argv[]) {
     for (size_t i = 0; i < nlines; i++) {
         char *ln = lines[i];
         char *save = strdup(ln); // keep original for non‑matching lines
+        /* Strip the trailing newline before tokenizing: strtok's last
+         * field would otherwise retain it, and the explicit \n added by
+         * fprintf() below would then produce a blank line after the
+         * rewritten entry. */
+        size_t lnlen = strlen(ln);
+        while (lnlen > 0 && (ln[lnlen-1] == '\n' || ln[lnlen-1] == '\r')) ln[--lnlen] = '\0';
         char *tok = strtok(ln, ":");
         if (!tok) { fputs(save, dst); free(save); free(lines[i]); continue; }
         if (strcmp(tok, username) == 0) {
