@@ -37,7 +37,7 @@ export KRATOS_JOBS ?= $(shell nproc)
         linux-headers binutils gcc-pass1 glibc-bootstrap libgcc glibc gcc-pass2 \
         ncurses readline bash coreutils grep sed gawk findutils \
         diffutils tar gzip xz bzip2 file-cmd \
-        kernel grub etc init pkg disk image \
+        kernel grub etc init pkg disk image iso \
         mbedtls ca-certs fetch \
         clean distclean stamps-clean
 
@@ -69,7 +69,7 @@ help:
 	@echo ""
 	@echo "  Phase 3 individual targets:"
 	@echo "  make kernel    make grub    make etc   make init"
-	@echo "  make pkg       make disk"
+	@echo "  make pkg       make disk    make iso"
 	@echo ""
 	@echo "  Utilities:"
 	@echo "  make test           Run automated test suite (security, pkg, json, crypt)"
@@ -254,6 +254,9 @@ disk image:
 	else \
 	    bash $(SCRIPTS)/build-disk.sh; \
 	fi
+
+iso:
+	@bash $(SCRIPTS)/build-iso.sh
 
 # ─────────────────────────────────────────────
 # Incremental stamps
