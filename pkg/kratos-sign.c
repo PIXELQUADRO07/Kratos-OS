@@ -193,9 +193,10 @@ int kratos_sign_buffer(const unsigned char *data, size_t data_len,
         goto cleanup;
     }
 
-    /* Sign message. Ed25519 requires MBEDTLS_MD_NONE. */
+    /* Sign message. Ed25519 requires MBEDTLS_MD_NONE.
+     * mbedTLS 3.x requires a signature buffer size (sig_size) parameter. We pass 256. */
     ret = mbedtls_pk_sign(&pk, MBEDTLS_MD_NONE, data, data_len,
-                          sig_out, sig_len_out,
+                          sig_out, 256, sig_len_out,
                           mbedtls_ctr_drbg_random, &ctr_drbg);
     if (ret != 0) {
         char err[128];
