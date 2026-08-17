@@ -124,7 +124,7 @@ menuentry "KratosOS Live (RAM disk) - Serial & Console" {
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel..."
-    linux /boot/vmlinuz rw init=/sbin/init console=tty0 console=ttyS0 kratos.build=${BUILD_ID}
+    linux /boot/vmlinuz rw init=/sbin/init console=ttyS0,115200 loglevel=3 kratos.build=${BUILD_ID} quiet
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS..."
@@ -135,7 +135,7 @@ menuentry "KratosOS Live (RAM disk) - Graphics VGA only" {
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel..."
-    linux /boot/vmlinuz rw init=/sbin/init console=tty0 kratos.build=${BUILD_ID}
+    linux /boot/vmlinuz rw init=/sbin/init console=tty0 loglevel=3 kratos.build=${BUILD_ID} quiet
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS..."

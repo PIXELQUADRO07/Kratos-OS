@@ -474,7 +474,7 @@ menuentry "KratosOS 0.1.0 (PARTUUID)" {
     insmod ext2
     insmod linux
     search --no-floppy --fs-uuid --set=root ${ROOT_UUID}
-    linux /boot/vmlinuz root=PARTUUID=${ROOT_PARTUUID} rw init=/sbin/init console=tty0 console=ttyS0 kratos.build=${BUILD_ID}
+    linux /boot/vmlinuz root=PARTUUID=${ROOT_PARTUUID} rw init=/sbin/init console=ttyS0,115200 loglevel=3 kratos.build=${BUILD_ID} quiet
 }
 
 menuentry "KratosOS 0.1.0 (VirtIO /dev/vda2)" {
@@ -482,7 +482,7 @@ menuentry "KratosOS 0.1.0 (VirtIO /dev/vda2)" {
     insmod ext2
     insmod linux
     search --no-floppy --fs-uuid --set=root ${ROOT_UUID}
-    linux /boot/vmlinuz root=/dev/vda2 rw init=/sbin/init console=tty0 console=ttyS0 kratos.build=${BUILD_ID}
+    linux /boot/vmlinuz root=/dev/vda2 rw init=/sbin/init console=ttyS0,115200 loglevel=3 kratos.build=${BUILD_ID} quiet
 }
 GRUB_EOF
 fi

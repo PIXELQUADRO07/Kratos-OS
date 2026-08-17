@@ -52,9 +52,15 @@ void shutdown_system(int cmd)
     for (;;) pause();
 }
 
+static const char *kratos_build_marker = "KRATOS_DEBUG_BUILD_20260817_01";
+
 int main(void)
 {
-    fprintf(stderr, "\n[init] KratosOS starting...\n");
+    /* Set basic environment for init and all its children (rc.sysinit, services, shells) */
+    setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1);
+    setenv("TERM", "linux", 0); // Default to linux, can be overridden by TTY spawn
+
+    fprintf(stderr, "\n[init] KratosOS starting... (%s)\n", kratos_build_marker);
 
     if (getpid() != 1) {
         fprintf(stderr, "[init] WARNING: Not running as PID 1 (PID=%d)\n", getpid());

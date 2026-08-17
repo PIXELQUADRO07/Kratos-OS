@@ -817,7 +817,35 @@ int main(int argc, char *argv[])
     }
 
     if (strcmp(cmd, "install") == 0 && argc >= arg_start + 1) {
-        return install_kpkg(argv[arg_start], target_root, force);
+        const char *arg = argv[arg_start];
+        struct stat st;
+
+        /* If the argument is an existing local file, install it directly —
+         * this preserves `kratos install ./local-build.kpkg` and
+         * `kratos install /path/to/foo.kpkg`. Otherwise treat it as a bare
+         * package name ("kratos install hello") and resolve it against the
+         * repository index: find the best available version, download it,
+         * then install the downloaded .kpkg exactly as before. */
+        if (stat(arg, &st) == 0 && S_ISREG(st.st_mode)) {
+            return install_kpkg(arg, target_root, force);
+        }
+
+        repo_pkg_t pkg;
+        if (kratos_repo_find(arg, &pkg, target_root) != 0) {
+            fprintf(stderr, "[kratos-pkg] Package '%s' not found (not a local file, "
+                            "and no match in the repository index — try 'kratos update' first).\n",
+                    arg);
+            return 1;
+        }
+
+        printf("[kratos-pkg] Resolved '%s' -> %s %s\n", arg, pkg.name, pkg.version);
+        const char *kpkg_path = kratos_repo_download_pkg(&pkg, target_root);
+        if (!kpkg_path) {
+            fprintf(stderr, "[kratos-pkg] Download failed for %s.\n", arg);
+            return 1;
+        }
+
+        return install_kpkg(kpkg_path, target_root, force);
     } else if (strcmp(cmd, "remove") == 0 && argc >= arg_start + 1) {
         return remove_pkg(argv[arg_start], target_root);
     } else if (strcmp(cmd, "list") == 0) {

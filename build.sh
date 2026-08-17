@@ -126,6 +126,65 @@ mark_undone() {
     rm -f "$(stamp_file "$1")"
 }
 
+stage_needs_rebuild() {
+    local name="$1"
+    local stamp
+    stamp="$(stamp_file "$name")"
+
+    # If the stamp doesn't exist, we must build
+    if [ ! -f "$stamp" ]; then
+        return 0
+    fi
+
+    # Check for local source modifications
+    case "$name" in
+        init)
+            if [ -n "$(find "$SCRIPT_DIR/init" -type f -newer "$stamp" -print -quit)" ]; then
+                echo "${YELLOW}[~] Source files in init/ have changed, forcing rebuild of 'init'...${RESET}"
+                return 0
+            fi
+            if [ "$BUILD_SCRIPTS/build-init.sh" -nt "$stamp" ]; then
+                echo "${YELLOW}[~] build-init.sh has changed, forcing rebuild of 'init'...${RESET}"
+                return 0
+            fi
+            ;;
+        pkg)
+            if [ -n "$(find "$SCRIPT_DIR/pkg" -type f -newer "$stamp" -print -quit)" ]; then
+                echo "${YELLOW}[~] Source files in pkg/ have changed, forcing rebuild of 'pkg'...${RESET}"
+                return 0
+            fi
+            if [ "$BUILD_SCRIPTS/build-pkg.sh" -nt "$stamp" ]; then
+                echo "${YELLOW}[~] build-pkg.sh has changed, forcing rebuild of 'pkg'...${RESET}"
+                return 0
+            fi
+            ;;
+        fetch)
+            if [ "$SCRIPT_DIR/pkg/kratos-fetch.c" -nt "$stamp" ] || [ "$BUILD_SCRIPTS/build-fetch.sh" -nt "$stamp" ]; then
+                echo "${YELLOW}[~] Source files for 'fetch' have changed, forcing rebuild...${RESET}"
+                return 0
+            fi
+            ;;
+        etc)
+            if [ "$BUILD_SCRIPTS/create-etc-skeleton.sh" -nt "$stamp" ] || [ -n "$(find "$SCRIPT_DIR/config" -type f -newer "$stamp" -print -quit)" ]; then
+                echo "${YELLOW}[~] etc skeleton or config files have changed, forcing rebuild of 'etc'...${RESET}"
+                return 0
+            fi
+            ;;
+        disk)
+            if $SYSROOT_CHANGED; then
+                echo "${YELLOW}[~] Sysroot was updated during this run, forcing rebuild of 'disk'...${RESET}"
+                return 0
+            fi
+            if [ "$BUILD_SCRIPTS/build-disk.sh" -nt "$stamp" ] || [ "$SCRIPT_DIR/config/grub/grub.cfg.template" -nt "$stamp" ]; then
+                echo "${YELLOW}[~] Disk script or GRUB template changed, forcing rebuild of 'disk'...${RESET}"
+                return 0
+            fi
+            ;;
+    esac
+
+    return 1
+}
+
 # ---------------------------------------------------------------------------
 # Clean stamps
 # ---------------------------------------------------------------------------
@@ -207,6 +266,7 @@ TOTAL="${#STAGES[@]}"
 CURRENT=0
 SKIPPED=0
 RAN=0
+SYSROOT_CHANGED=false
 T_GLOBAL_START="$(date +%s)"
 
 for entry in "${STAGES[@]}"; do
@@ -221,7 +281,13 @@ for entry in "${STAGES[@]}"; do
     fi
 
     # --- Incremental check ---
-    if is_done "$name"; then
+    force_rebuild=false
+    if stage_needs_rebuild "$name"; then
+        force_rebuild=true
+        mark_undone "$name"
+    fi
+
+    if is_done "$name" && ! $force_rebuild; then
         ts="$(cat "$(stamp_file "$name")")"
         printf "  ${GREEN}[✓]${RESET} ${DIM}%-20s already built (%s)${RESET}\n" "$name" "$ts"
         SKIPPED=$((SKIPPED + 1))
@@ -256,6 +322,11 @@ for entry in "${STAGES[@]}"; do
 
     mark_done "$name"
     RAN=$((RAN + 1))
+
+    # If this stage modifies sysroot, track it
+    if [ "$name" != "host-deps" ] && [ "$name" != "download" ] && [ "$name" != "bootstrap" ] && [ "$name" != "disk" ]; then
+        SYSROOT_CHANGED=true
+    fi
 
     echo
     printf "  ${GREEN}[✓] %-20s completed in %ds${RESET}\n" "$name" "$elapsed"

@@ -59,7 +59,7 @@ menuentry "KratosOS 0.1.0" {
 
     search --no-floppy --fs-uuid --set=root ${REAL_UUID}
 
-    linux /boot/vmlinuz root=UUID=${REAL_UUID} rw console=ttyS0 console=tty0
+    linux /boot/vmlinuz root=UUID=${REAL_UUID} rw console=ttyS0,115200 loglevel=3 quiet
 }
 GRUB_EOF
 

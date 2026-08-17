@@ -95,6 +95,8 @@ void run_services(void)
     DIR *d = opendir("/etc/rc.d");
     if (!d) return;
 
+    int log_fd = open("/run/boot.log", O_WRONLY | O_CREAT | O_APPEND, 0644);
+
     struct dirent *entry;
     while ((entry = readdir(d)) != NULL) {
         if (entry->d_name[0] == '.') continue;
@@ -106,10 +108,22 @@ void run_services(void)
             fprintf(stderr, "[init] Starting service: %s\n", entry->d_name);
             pid_t pid = fork();
             if (pid == 0) {
+                if (log_fd >= 0) {
+                    dup2(log_fd, STDOUT_FILENO);
+                    dup2(log_fd, STDERR_FILENO);
+                    close(log_fd);
+                } else {
+                    int null_fd = open("/dev/null", O_RDWR);
+                    dup2(null_fd, STDIN_FILENO);
+                    dup2(null_fd, STDOUT_FILENO);
+                    dup2(null_fd, STDERR_FILENO);
+                    close(null_fd);
+                }
                 execl(path, path, (char *)NULL);
                 _exit(127);
             }
         }
     }
+    if (log_fd >= 0) close(log_fd);
     closedir(d);
 }

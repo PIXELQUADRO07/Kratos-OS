@@ -16,6 +16,7 @@ echo
 mkdir -p "$ETC"
 mkdir -p "$ETC/rc.d"
 mkdir -p "$ETC/network"
+mkdir -p "$ETC/profile.d"
 
 # ---------------------------------------------------------------------------
 # FHS base directories — these are pure MOUNT POINTS, not populated by any
@@ -44,13 +45,53 @@ chmod 0700 "$SYSROOT/root"     # root's home: root-only
 echo "[+] Creating /etc/passwd..."
 cat > "$ETC/passwd" <<'EOF'
 root:x:0:0:root:/root:/bin/bash
+bin:x:1:1:bin:/dev/null:/usr/bin/false
+daemon:x:6:6:Daemon User:/dev/null:/usr/bin/false
+messagebus:x:18:18:D-Bus Message Daemon User:/run/dbus:/usr/bin/false
+systemd-journal-gateway:x:73:73:systemd Journal Gateway:/:/usr/bin/false
+systemd-journal-remote:x:74:74:systemd Journal Remote:/:/usr/bin/false
+systemd-journal-upload:x:75:75:systemd Journal Upload:/:/usr/bin/false
+systemd-network:x:76:76:systemd Network Management:/:/usr/bin/false
+systemd-resolve:x:77:77:systemd Resolver:/:/usr/bin/false
+systemd-timesync:x:78:78:systemd Time Synchronization:/:/usr/bin/false
+systemd-coredump:x:79:79:systemd Core Dumper:/:/usr/bin/false
+nobody:x:65534:65534:Unprivileged User:/dev/null:/usr/bin/false
 EOF
 
 echo "[+] Creating /etc/group..."
 cat > "$ETC/group" <<'EOF'
 root:x:0:
+bin:x:1:daemon
+sys:x:2:
+kmem:x:3:
+tape:x:4:
 tty:x:5:
-disk:x:6:
+daemon:x:6:
+floppy:x:7:
+disk:x:8:
+lp:x:9:
+dialout:x:10:
+audio:x:11:
+video:x:12:
+utmp:x:13:
+usb:x:14:
+cdrom:x:15:
+adm:x:16:
+messagebus:x:18:
+systemd-journal:x:23:
+input:x:24:
+mail:x:34:
+kvm:x:61:
+systemd-journal-gateway:x:73:
+systemd-journal-remote:x:74:
+systemd-journal-upload:x:75:
+systemd-network:x:76:
+systemd-resolve:x:77:
+systemd-timesync:x:78:
+systemd-coredump:x:79:
+wheel:x:97:
+users:x:999:
+nogroup:x:65534:
 EOF
 
 echo "[+] Creating /etc/shadow..."
@@ -128,13 +169,134 @@ cat > "$ETC/issue" <<'EOF'
 
 EOF
 
-echo "[+] Creating /etc/profile..."
+echo "[+] Creating /etc/profile (LFS 13.0 style)..."
 cat > "$ETC/profile" <<'EOF'
+# /etc/profile — KratosOS Global Environment Initialization
+
+# Functions to help managing paths
+pathremove () {
+        local IFS=':'
+        local NEWPATH
+        local DIR
+        local PATHVARIABLE=${2:-PATH}
+        for DIR in ${!PATHVARIABLE} ; do
+                if [ "$DIR" != "$1" ] ; then
+                        NEWPATH=${NEWPATH:+$NEWPATH:}$DIR
+                fi
+        done
+        export $PATHVARIABLE="$NEWPATH"
+}
+
+pathprepend () {
+        pathremove $1 $2
+        local PATHVARIABLE=${2:-PATH}
+        export $PATHVARIABLE="$1${!PATHVARIABLE:+:${!PATHVARIABLE}}"
+}
+
+pathappend () {
+        pathremove $1 $2
+        local PATHVARIABLE=${2:-PATH}
+        export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
+}
+
+# Set a basic PATH
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-export HOME=/root
-export SHELL=/bin/bash
-export TERM=linux
-export PS1='\[\033[1;32m\]\h\[\033[0m\]:\[\033[1;34m\]\w\[\033[0m\]# '
+
+# Default environment
+export HOME=${HOME:-/root}
+export SHELL=${SHELL:-/bin/bash}
+export TERM=${TERM:-linux}
+
+# Source modular profile scripts
+if [ -d /etc/profile.d ]; then
+  for i in /etc/profile.d/*.sh; do
+    if [ -r "$i" ]; then
+      . "$i"
+    fi
+  done
+  unset i
+fi
+
+# Source bashrc for interactive shells
+if [ -n "$BASH_VERSION" ] && [ -f /etc/bash.bashrc ]; then
+  . /etc/bash.bashrc
+fi
+EOF
+
+echo "[+] Creating /etc/bash.bashrc..."
+cat > "$ETC/bash.bashrc" <<'EOF'
+# /etc/bash.bashrc — KratosOS System-wide Bash Configuration
+
+# PS1: [user@host:cwd]#
+export PS1='\[\033[1;32m\]\u@\h\[\033[0m\]:\[\033[1;34m\]\w\[\033[0m\]\$ '
+
+# Useful aliases
+alias ls='ls --color=auto'
+alias ll='ls -l'
+alias l='ls -CF'
+alias grep='grep --color=auto'
+EOF
+
+echo "[+] Creating /etc/profile.d/umask.sh..."
+cat > "$ETC/profile.d/umask.sh" <<'EOF'
+# By default we want the umask to get set.
+if [ "$(id -gn)" = "$(id -un)" -a $EUID -gt 99 ]; then
+  umask 002
+else
+  umask 022
+fi
+EOF
+
+echo "[+] Creating /etc/profile.d/i18n.sh..."
+cat > "$ETC/profile.d/i18n.sh" <<'EOF'
+# Set up i18n variables
+export LANG=en_US.UTF-8
+EOF
+
+echo "[+] Creating /etc/profile.d/dircolors.sh..."
+cat > "$ETC/profile.d/dircolors.sh" <<'EOF'
+# Set up dircolors
+if [ -x /usr/bin/dircolors ]; then
+    if [ -f /etc/dircolors ]; then
+        eval $(dircolors -b /etc/dircolors)
+    else
+        eval $(dircolors -b)
+    fi
+fi
+EOF
+
+echo "[+] Creating /etc/profile.d/readline.sh..."
+cat > "$ETC/profile.d/readline.sh" <<'EOF'
+# Set up INPUTRC
+if [ -z "$INPUTRC" -a ! -f "$HOME/.inputrc" ]; then
+  export INPUTRC=/etc/inputrc
+fi
+EOF
+
+echo "[+] Creating /etc/profile.d/extrapaths.sh..."
+cat > "$ETC/profile.d/extrapaths.sh" <<'EOF'
+# Setup extra paths
+if [ -d /usr/local/lib/pkgconfig ]; then
+  pathappend /usr/local/lib/pkgconfig PKG_CONFIG_PATH
+fi
+if [ -d /usr/lib/pkgconfig ]; then
+  pathappend /usr/lib/pkgconfig PKG_CONFIG_PATH
+fi
+EOF
+
+echo "[+] Creating /etc/inputrc..."
+cat > "$ETC/inputrc" <<'EOF'
+# /etc/inputrc — LFS 13.0 standard inputrc
+set horizontal-scroll-mode Off
+set meta-flag On
+set input-meta On
+set output-meta On
+set show-all-if-ambiguous On
+set bell-style none
+
+# Arrow keys history search
+"\e[A": history-search-backward
+"\e[B": history-search-forward
 EOF
 
 echo "[+] Creating /etc/resolv.conf..."
@@ -186,12 +348,35 @@ cat > "$ETC/rc.sysinit" <<'EOF'
 #!/bin/bash
 # /etc/rc.sysinit — KratosOS Early System Initialization
 
-echo "[rc.sysinit] Starting KratosOS initialization..."
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export TERM=linux
 
-# Ensure /etc/mtab points to /proc/self/mounts
-if [ ! -L /etc/mtab ]; then
-    ln -sf /proc/self/mounts /etc/mtab 2>/dev/null || true
-fi
+# Reduce kernel message verbosity to avoid interleaving with login/shell
+dmesg -n 1
+
+echo "
+  Initializing KratosOS $(cat /etc/os-release | grep VERSION_ID | cut -d'=' -f2 | tr -d '\"')
+"
+
+# 1. Mount virtual filesystems (init handles core, but we double-check)
+[ -d /proc/self ] || mount -t proc proc /proc
+[ -d /sys/kernel ] || mount -t sysfs sysfs /sys
+[ -d /dev/pts ] || mkdir -p /dev/pts && mount -t devpts devpts /dev/pts -o gid=5,mode=620
+
+# 2. Setup /etc/mtab
+ln -sf /proc/self/mounts /etc/mtab 2>/dev/null || true
+
+# 3. Clean up temporary files from previous boot
+echo "[rc.sysinit] Cleaning /tmp and /run..."
+rm -rf /run/* /tmp/*
+mkdir -p /run/lock /run/user /run/shm
+chmod 1777 /tmp /run/shm
+
+# 4. Initialize random seed (if possible)
+[ -f /var/lib/urandom/seed ] && cat /var/lib/urandom/seed > /dev/urandom
+
+# 5. Populate /etc/issue dynamically if needed
+# (currently static in skeleton)
 
 echo "[rc.sysinit] System initialization complete."
 EOF

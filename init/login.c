@@ -83,16 +83,51 @@ static void restore_sane_termios(void)
     ioctl(STDIN_FILENO, TIOCSWINSZ, &ws);
 }
 
+#include <sys/utsname.h>
+
 static void print_issue(void)
 {
     FILE *f = fopen("/etc/issue", "r");
-    if (f) {
-        char buf[256];
-        while (fgets(buf, sizeof(buf), f)) {
-            fputs(buf, stdout);
+    if (!f) return;
+
+    struct utsname uts;
+    uname(&uts);
+
+    char host[256];
+    if (gethostname(host, sizeof(host)) != 0) strcpy(host, "kratos");
+
+    const char *tty = ttyname(STDIN_FILENO);
+    if (!tty) tty = "tty";
+    if (strncmp(tty, "/dev/", 5) == 0) tty += 5;
+
+    /* Clear screen and home cursor for a clean login experience */
+    printf("\033[H\033[J");
+
+    int c;
+    while ((c = fgetc(f)) != EOF) {
+        if (c == '\\') {
+            c = fgetc(f);
+            switch (c) {
+                case 's': fputs(uts.sysname, stdout); break;
+                case 'n': fputs(host, stdout); break;
+                case 'r': fputs(uts.release, stdout); break;
+                case 'v': fputs(uts.version, stdout); break;
+                case 'm': fputs(uts.machine, stdout); break;
+                case 'l': fputs(tty, stdout); break;
+                case '\\': putchar('\\'); break;
+                default:
+                    if (c != EOF) {
+                        putchar('\\');
+                        putchar(c);
+                    }
+                    break;
+            }
+        } else {
+            putchar(c);
         }
-        fclose(f);
     }
+    fclose(f);
+    fflush(stdout);
 }
 
 /* Build the "<hostname> login: " prompt from the real system hostname
@@ -204,15 +239,22 @@ int main(int argc, char *argv[])
      * Authentication successful
      * ---------------------------------------------------------------- */
 
+    const char *tty = ttyname(STDIN_FILENO);
+
     /* Dynamic last-login timestamp */
     {
         time_t now = time(NULL);
         char tbuf[64];
         struct tm *tm_info = localtime(&now);
         strftime(tbuf, sizeof(tbuf), "%a %b %e %H:%M:%S %Y", tm_info);
-        const char *tty = ttyname(STDIN_FILENO);
         printf("Last login: %s on %s\n", tbuf, tty ? tty : "tty");
     }
+
+    /* Save TERM before clearing environment */
+    const char *parent_term = getenv("TERM");
+    char *term_copy = parent_term ? strdup(parent_term) : NULL;
+
+    clearenv();
 
     /* Drop privileges & setup user environment */
     if (initgroups(pw->pw_name, pw->pw_gid) < 0) {
@@ -234,7 +276,14 @@ int main(int argc, char *argv[])
     setenv("HOME",    pw->pw_dir,  1);
     setenv("SHELL",   pw->pw_shell[0] ? pw->pw_shell : "/bin/bash", 1);
     setenv("PATH",    "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1);
-    setenv("TERM",    "linux", 1);
+
+    if (term_copy && term_copy[0] != '\0') {
+        setenv("TERM", term_copy, 1);
+        free(term_copy);
+    } else {
+        int is_serial = (tty && strncmp(tty, "/dev/ttyS", 9) == 0);
+        setenv("TERM", is_serial ? "vt100" : "linux", 1);
+    }
 
     const char *shell = pw->pw_shell[0] ? pw->pw_shell : "/bin/bash";
 

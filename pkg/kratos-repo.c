@@ -298,8 +298,8 @@ static int fetch_url(const char *url, const char *out_path, const char *sysroot)
 
     if (pid == 0) {
         /* Child: exec kratos-fetch */
-        execl(fetch_bin, "kratos-fetch", url, out_path, (char *)NULL);
-        execlp("kratos-fetch", "kratos-fetch", url, out_path, (char *)NULL);
+        execl(fetch_bin, "kratos-fetch", url, "-o", out_path, (char *)NULL);
+        execlp("kratos-fetch", "kratos-fetch", url, "-o", out_path, (char *)NULL);
         perror("[kratos-repo] exec kratos-fetch failed");
         _exit(127);
     }

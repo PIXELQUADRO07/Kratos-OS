@@ -24,7 +24,7 @@ menuentry "KratosOS 0.1.0 (PARTUUID Auto-Detect)" --class kratos --class os {
     insmod linux
     search --no-floppy --fs-uuid --set=root @ROOT_UUID@
     echo "Loading KratosOS Linux Kernel..."
-    linux /boot/vmlinuz root=PARTUUID=@ROOT_PARTUUID@ rw init=/sbin/init console=tty0 console=ttyS0 kratos.build=@BUILD_ID@
+    linux /boot/vmlinuz root=PARTUUID=@ROOT_PARTUUID@ rw init=/sbin/init console=ttyS0,115200 loglevel=3 kratos.build=@BUILD_ID@ quiet
 }
 
 menuentry "KratosOS 0.1.0 (VirtIO /dev/vda2)" --class kratos --class os {
@@ -33,7 +33,7 @@ menuentry "KratosOS 0.1.0 (VirtIO /dev/vda2)" --class kratos --class os {
     insmod linux
     search --no-floppy --fs-uuid --set=root @ROOT_UUID@
     echo "Loading KratosOS (VirtIO Target)..."
-    linux /boot/vmlinuz root=/dev/vda2 rw init=/sbin/init console=tty0 console=ttyS0 kratos.build=@BUILD_ID@
+    linux /boot/vmlinuz root=/dev/vda2 rw init=/sbin/init console=ttyS0,115200 loglevel=3 kratos.build=@BUILD_ID@ quiet
 }
 
 menuentry "KratosOS 0.1.0 (Emergency Bash Shell)" --class kratos --class os {
@@ -42,7 +42,7 @@ menuentry "KratosOS 0.1.0 (Emergency Bash Shell)" --class kratos --class os {
     insmod linux
     search --no-floppy --fs-uuid --set=root @ROOT_UUID@
     echo "Starting emergency maintenance shell..."
-    linux /boot/vmlinuz root=PARTUUID=@ROOT_PARTUUID@ rw init=/bin/bash console=tty0 console=ttyS0 kratos.build=@BUILD_ID@
+    linux /boot/vmlinuz root=PARTUUID=@ROOT_PARTUUID@ rw init=/bin/bash console=ttyS0,115200 loglevel=3 kratos.build=@BUILD_ID@ quiet
 }
 
 menuentry "Power Off System" {

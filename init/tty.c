@@ -81,7 +81,15 @@ static pid_t spawn_tty_shell(const char *tty_dev)
             _exit(1);
         }
 
-        setenv("TERM",  "linux", 1);
+        /* /dev/ttyS0 is a real serial line, not a Linux virtual console —
+         * it doesn't understand the "linux" console's private escape
+         * sequences. Using TERM=linux there confuses readline/ncurses
+         * cursor-addressing math (stray line wraps, "clear" leaving the
+         * shell seemingly invisible). vt100 is the lowest common
+         * denominator every terminfo/termcap database ships, and is what
+         * agetty defaults to on serial ports for the same reason. */
+        int is_serial = (strncmp(tty_dev, "/dev/ttyS", 9) == 0);
+        setenv("TERM",  is_serial ? "vt100" : "linux", 1);
         setenv("HOME",  "/root", 1);
         setenv("PATH",  "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1);
         setenv("SHELL", "/bin/bash", 1);
@@ -107,7 +115,7 @@ static pid_t spawn_tty_shell(const char *tty_dev)
 void check_and_respawn_ttys(void)
 {
     for (int i = 0; i < MAX_TTYS; i++) {
-        if (ttys[i].enabled && ttys[i].pid == 0) {
+        if (ttys[i].dev && ttys[i].enabled && ttys[i].pid == 0) {
             if (access(ttys[i].dev, F_OK) == 0) {
                 ttys[i].pid = spawn_tty_shell(ttys[i].dev);
             }
