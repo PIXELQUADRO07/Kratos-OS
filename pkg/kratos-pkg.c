@@ -389,6 +389,57 @@ static void remove_orphaned_files(const char *old_manifest, const char *new_mani
 }
 
 /* ------------------------------------------------------------------ */
+/* Recursive Dependency Resolution & Installation                      */
+/* ------------------------------------------------------------------ */
+
+static int install_kpkg(const char *kpkg_path, const char *target_root, int force);
+
+static int install_repo_pkg_recursive(const char *name, const char *target_root, int force, int depth)
+{
+    if (depth > 20) {
+        fprintf(stderr, "[kratos-pkg] Error: Circular dependency or too deep recursion for '%s'\n", name);
+        return -1;
+    }
+
+    /* Check if already installed and satisfies requirements (simplified for now: just exists) */
+    char db_meta[PATH_MAX];
+    snprintf(db_meta, sizeof(db_meta), "%s%s/%s", target_root, DB_PKGS, name);
+    if (access(db_meta, F_OK) == 0 && !force) {
+        return 0;
+    }
+
+    repo_pkg_t pkg;
+    if (kratos_repo_find(name, &pkg, target_root) != 0) {
+        /* Special case: 'glibc' and 'kpm' are often provided by the base system without a DB entry yet.
+         * For now, if not found in repo and it's 'glibc', we assume it's there.
+         * A better way is to pre-register them in the DB during image creation. */
+        if (strcmp(name, "glibc") == 0) return 0;
+
+        fprintf(stderr, "[kratos-pkg] Error: Package '%s' not found in repository index. Run 'kratos update' first.\n", name);
+        return -1;
+    }
+
+    /* Resolve and install dependencies before this package */
+    if (pkg.depends[0] != '\0') {
+        kratos_dep_list_t deps;
+        kratos_parse_dependencies(pkg.depends, &deps);
+        for (size_t i = 0; i < deps.count; i++) {
+            if (install_repo_pkg_recursive(deps.rules[i].name, target_root, 0, depth + 1) != 0) {
+                return -1;
+            }
+        }
+    }
+
+    /* Download */
+    printf("[kratos-pkg] Resolved '%s' -> %s %s\n", name, pkg.name, pkg.version);
+    const char *kpkg_path = kratos_repo_download_pkg(&pkg, target_root);
+    if (!kpkg_path) return -1;
+
+    /* Install */
+    return install_kpkg(kpkg_path, target_root, force);
+}
+
+/* ------------------------------------------------------------------ */
 /* Package Installation                                                */
 /* ------------------------------------------------------------------ */
 
@@ -821,31 +872,13 @@ int main(int argc, char *argv[])
         struct stat st;
 
         /* If the argument is an existing local file, install it directly —
-         * this preserves `kratos install ./local-build.kpkg` and
-         * `kratos install /path/to/foo.kpkg`. Otherwise treat it as a bare
-         * package name ("kratos install hello") and resolve it against the
-         * repository index: find the best available version, download it,
-         * then install the downloaded .kpkg exactly as before. */
+         * this preserves `kratos install ./local-build.kpkg`.
+         * Otherwise treat it as a bare package name and resolve recursively. */
         if (stat(arg, &st) == 0 && S_ISREG(st.st_mode)) {
             return install_kpkg(arg, target_root, force);
         }
 
-        repo_pkg_t pkg;
-        if (kratos_repo_find(arg, &pkg, target_root) != 0) {
-            fprintf(stderr, "[kratos-pkg] Package '%s' not found (not a local file, "
-                            "and no match in the repository index — try 'kratos update' first).\n",
-                    arg);
-            return 1;
-        }
-
-        printf("[kratos-pkg] Resolved '%s' -> %s %s\n", arg, pkg.name, pkg.version);
-        const char *kpkg_path = kratos_repo_download_pkg(&pkg, target_root);
-        if (!kpkg_path) {
-            fprintf(stderr, "[kratos-pkg] Download failed for %s.\n", arg);
-            return 1;
-        }
-
-        return install_kpkg(kpkg_path, target_root, force);
+        return install_repo_pkg_recursive(arg, target_root, force, 0);
     } else if (strcmp(cmd, "remove") == 0 && argc >= arg_start + 1) {
         return remove_pkg(argv[arg_start], target_root);
     } else if (strcmp(cmd, "list") == 0) {

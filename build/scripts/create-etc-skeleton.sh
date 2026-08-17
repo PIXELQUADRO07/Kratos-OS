@@ -394,6 +394,25 @@ fi
 EOF
 chmod +x "$ETC/rc.d/10-network"
 
+echo "[+] Pre-registering base system packages in KPM database..."
+# This ensures that packages depending on glibc or kpm find them as "installed"
+mkdir -p "$SYSROOT/var/lib/kratos/db/packages"
+cat > "$SYSROOT/var/lib/kratos/db/packages/glibc" <<EOF
+name=glibc
+version=2.42
+release=1
+arch=x86_64
+description=GNU C Library (Base System)
+EOF
+
+cat > "$SYSROOT/var/lib/kratos/db/packages/kpm" <<EOF
+name=kpm
+version=0.7.8
+release=1
+arch=x86_64
+description=Kratos Package Manager (Base System)
+EOF
+
 echo
 echo "[+] /etc skeleton created successfully."
 echo
