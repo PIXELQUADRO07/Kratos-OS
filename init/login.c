@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <time.h>
 #include <termios.h>
 #include <unistd.h>
@@ -74,6 +75,12 @@ static void restore_sane_termios(void)
         t.c_lflag |= (ECHO | ECHOE | ECHOK | ICANON | ISIG);
         tcsetattr(STDIN_FILENO, TCSANOW, &t);
     }
+
+    /* Stessa fix di tty.c: senza questa la shell lanciata dopo il
+     * login eredita una winsize 0x0 su seriale e mostra gli stessi
+     * artefatti (cursore fuori posto, righe che si "cancellano"). */
+    struct winsize ws = { .ws_row = 24, .ws_col = 80, .ws_xpixel = 0, .ws_ypixel = 0 };
+    ioctl(STDIN_FILENO, TIOCSWINSZ, &ws);
 }
 
 static void print_issue(void)
