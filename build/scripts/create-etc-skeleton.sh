@@ -338,7 +338,7 @@ echo "[+] Creating /etc/kratos/repos.d/00-official.conf..."
 # cartella (es. "packages/hello-2.12-1-x86_64.kpkg").
 cat > "$ETC/kratos/repos.d/00-official.conf" <<'EOF'
 [kratos-official]
-url=https://PIXELQUADRO07.github.io/KratosOS-Packages-First_package/repository/x86_64/stable
+url=https://raw.githubusercontent.com/PIXELQUADRO07/KratosOS-Packages/main/repository/x86_64/stable
 enabled=yes
 priority=100
 EOF
