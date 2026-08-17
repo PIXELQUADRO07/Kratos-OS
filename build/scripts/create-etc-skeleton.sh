@@ -169,9 +169,14 @@ if [ -f "$PROJECT_ROOT/config/keys/official.pub" ]; then
 fi
 
 echo "[+] Creating /etc/kratos/repos.d/00-official.conf..."
+# NOTA: "url" deve puntare ESATTAMENTE alla cartella che contiene
+# index.json (non alla root del repo), perché kratos-repo.c costruisce
+# l'URL di download come "<url>/<pkg.url>" e nell'index.json generato
+# da scripts/generate-index.sh il campo "url" è relativo a questa
+# cartella (es. "packages/hello-2.12-1-x86_64.kpkg").
 cat > "$ETC/kratos/repos.d/00-official.conf" <<'EOF'
 [kratos-official]
-url=https://repo.kratosos.org
+url=https://PIXELQUADRO07.github.io/KratosOS-Packages-First_package/repository/x86_64/stable
 enabled=yes
 priority=100
 EOF
