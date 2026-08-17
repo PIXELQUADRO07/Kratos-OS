@@ -17,6 +17,16 @@ static void set_sane_termios(int fd)
         t.c_lflag |= (ECHO | ECHOE | ECHOK | ICANON | ISIG);
         tcsetattr(fd, TCSANOW, &t);
     }
+
+    /* Nessuno propaga mai una window size su questa tty. Su ttyS0
+     * (seriale) il kernel non ha alcuna dimensione di default (a
+     * differenza della VGA console), quindi TIOCGWINSZ torna 0x0.
+     * bash/readline con winsize 0x0 sbagliano i calcoli di
+     * wrap-around e riposizionamento del cursore, causando schermate
+     * che vanno a capo da sole o sembrano "cancellare tutto". Diamo
+     * un default sano (80x24) finché non gestiamo SIGWINCH. */
+    struct winsize ws = { .ws_row = 24, .ws_col = 80, .ws_xpixel = 0, .ws_ypixel = 0 };
+    ioctl(fd, TIOCSWINSZ, &ws);
 }
 
 static int setup_tty(const char *tty_dev)
