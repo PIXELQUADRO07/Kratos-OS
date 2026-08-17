@@ -29,7 +29,7 @@ mkdir -p "$ETC/profile.d"
 # real device nodes and no way to open a tty, which is exactly the
 # "hangs after network init, never reaches a shell" symptom.
 echo "[+] Creating FHS base/mountpoint directories..."
-for d in proc sys dev dev/pts dev/shm run tmp mnt media opt srv home root boot; do
+for d in proc sys dev dev/pts dev/shm run tmp mnt media opt srv home root boot etc/ssl/certs; do
     mkdir -p "$SYSROOT/$d"
 done
 chmod 1777 "$SYSROOT/tmp"      # sticky bit: shared, world-writable, no cross-user delete

@@ -388,6 +388,9 @@ static int run_dhcp_client(const char *ifname)
 
     close(dhcp_sock);
 
+    printf("[kratos-net] Configuring %s: IP=%s Mask=%s GW=%s DNS=%s\n",
+           ifname, ip_str, mask_str, gw_str[0] ? gw_str : "none", dns_str);
+
     set_iface_ip(ifname, ip_str, mask_str);
     if (gw_str[0] != '\0') {
         set_default_gateway(ifname, gw_str);
@@ -403,19 +406,34 @@ static int run_dhcp_client(const char *ifname)
 
 static void auto_configure_network(void)
 {
+    printf("[kratos-net] Starting automatic network configuration...\n");
     setup_loopback();
 
     DIR *d = opendir("/sys/class/net");
-    if (!d) return;
+    if (!d) {
+        perror("[kratos-net] Could not open /sys/class/net");
+        return;
+    }
 
     struct dirent *entry;
+    int configured = 0;
     while ((entry = readdir(d)) != NULL) {
         if (entry->d_name[0] == '.') continue;
         if (strcmp(entry->d_name, "lo") == 0) continue;
 
+        /* Skip virtual interfaces like sit0, etc if present */
+        if (strncmp(entry->d_name, "sit", 3) == 0) continue;
+
         printf("[kratos-net] Discovered interface: %s\n", entry->d_name);
-        run_dhcp_client(entry->d_name);
-        break; /* Configure primary ethernet interface */
+        if (run_dhcp_client(entry->d_name) == 0) {
+            configured++;
+            /* In auto mode, we usually just want one external interface configured */
+            break;
+        }
+    }
+
+    if (configured == 0) {
+        fprintf(stderr, "[kratos-net] Warning: No network interfaces were successfully configured via DHCP.\n");
     }
 
     closedir(d);

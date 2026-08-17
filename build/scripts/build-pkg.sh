@@ -14,10 +14,12 @@ CC="$TOOLS/bin/$TARGET-gcc"
 PKG_SRC="$KRATOS_ROOT/pkg/kratos-pkg.c"
 CLI_SRC="$KRATOS_ROOT/pkg/kratos-cli.c"
 PACK_SRC="$KRATOS_ROOT/pkg/kratos-pack.c"
+FETCH_SRC="$KRATOS_ROOT/pkg/kratos-fetch.c"
 
 PKG_OUT="$SYSROOT/usr/libexec/kratos-pkg"
 CLI_OUT="$SYSROOT/usr/bin/kratos"
 PACK_OUT="$SYSROOT/usr/bin/kratos-pack"
+FETCH_OUT="$SYSROOT/usr/bin/kratos-fetch"
 
 echo "========================================"
 echo "       KRATOSOS PACKAGE TOOLS BUILD"
@@ -96,9 +98,26 @@ echo "[+] Compiling /usr/bin/kratos-pack (Package Builder)..."
     -Wl,-z,relro,-z,now
 echo "[✓] kratos-pack tool compiled."
 
+echo "[+] Compiling /usr/bin/kratos-fetch (HTTPS Client)..."
+"$CC" \
+    --sysroot="$SYSROOT" \
+    -O2 \
+    -Wall \
+    -fstack-protector-strong \
+    -D_FORTIFY_SOURCE=2 \
+    -Wextra \
+    -std=gnu11 \
+    -I"$KRATOS_ROOT/pkg" \
+    -o "$FETCH_OUT" \
+    "$FETCH_SRC" \
+    -lmbedtls -lmbedx509 -lmbedcrypto \
+    -fPIE -pie \
+    -Wl,-z,relro,-z,now
+echo "[✓] kratos-fetch compiled."
+
 echo
 echo "Installed package binaries:"
-ls -lh "$PKG_OUT" "$CLI_OUT" "$PACK_OUT"
+ls -lh "$PKG_OUT" "$CLI_OUT" "$PACK_OUT" "$FETCH_OUT"
 
 echo
 echo "[✓] KratosOS Package Manager built successfully."
