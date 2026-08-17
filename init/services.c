@@ -36,8 +36,6 @@ void set_hostname(void)
 
 void start_devd(void)
 {
-    fprintf(stderr, "[init] Starting device daemon (kratos-devd)...\n");
-
     int pipefd[2];
     if (pipe(pipefd) < 0) {
         perror("[init] pipe for devd failed");
@@ -75,13 +73,12 @@ void start_devd(void)
     int status;
     waitpid(pid, &status, 0);
 
-    fprintf(stderr, "[init] kratos-devd coldplug complete.\n");
+    fprintf(stderr, "[init] Devices ready.\n");
 }
 
 void run_sysinit(void)
 {
     if (access("/etc/rc.sysinit", X_OK) == 0) {
-        fprintf(stderr, "[init] Running /etc/rc.sysinit...\n");
         pid_t pid = fork();
         if (pid == 0) {
             execl("/etc/rc.sysinit", "/etc/rc.sysinit", (char *)NULL);

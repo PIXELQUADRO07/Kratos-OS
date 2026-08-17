@@ -54,10 +54,7 @@ void shutdown_system(int cmd)
 
 int main(void)
 {
-    fprintf(stderr, "\n");
-    fprintf(stderr, "========================================\n");
-    fprintf(stderr, "       KratosOS Init System (PID 1)\n");
-    fprintf(stderr, "========================================\n");
+    fprintf(stderr, "\n[init] KratosOS starting...\n");
 
     if (getpid() != 1) {
         fprintf(stderr, "[init] WARNING: Not running as PID 1 (PID=%d)\n", getpid());
@@ -84,7 +81,7 @@ int main(void)
     /* Avvia i servizi */
     run_services();
 
-    fprintf(stderr, "[init] System startup complete. Spawning shells...\n\n");
+    fprintf(stderr, "[init] Startup complete.\n\n");
 
     /* Loop principale di supervisione */
     for (;;) {

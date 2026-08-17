@@ -19,8 +19,9 @@ static void try_mount(const char *src, const char *tgt,
 
 void mount_vfs(void)
 {
-    fprintf(stderr, "[init] Mounting virtual filesystems...\n");
-
+    /* Silenzioso in caso di successo: try_mount() stampa comunque un
+     * WARNING se un mount fallisce, quindi qui non serve annunciare
+     * ogni singolo passo per avere un boot pulito. */
     try_mount("proc",     "/proc",     "proc",     MS_NOSUID | MS_NODEV | MS_NOEXEC, NULL);
     try_mount("sysfs",    "/sys",      "sysfs",    MS_NOSUID | MS_NODEV | MS_NOEXEC, NULL);
     try_mount("devtmpfs", "/dev",      "devtmpfs", MS_NOSUID,                        "mode=0755,size=10m");
@@ -36,8 +37,6 @@ void mount_vfs(void)
 
     mkdir("/tmp", 1777);
     try_mount("tmpfs",    "/tmp",      "tmpfs",    MS_NOSUID | MS_NODEV,             "mode=1777,size=128m");
-
-    fprintf(stderr, "[init] Virtual filesystems mounted.\n");
 }
 
 static const char *resolve_dev_spec(const char *spec, char *buf, size_t buflen)
@@ -62,8 +61,7 @@ void mount_fstab(void)
 
     struct mntent mnt;
     char buf[1024];
-
-    fprintf(stderr, "[init] Mounting filesystems from /etc/fstab...\n");
+    int mounted = 0;
 
     while (getmntent_r(f, &mnt, buf, sizeof(buf))) {
         if (strcmp(mnt.mnt_type, "proc") == 0 ||
@@ -80,9 +78,12 @@ void mount_fstab(void)
 
         mkdir(mnt.mnt_dir, 0755);
         if (mount(target_dev, mnt.mnt_dir, mnt.mnt_type, 0, mnt.mnt_opts) == 0) {
-            fprintf(stderr, "[init] Mounted %s on %s (%s)\n",
-                    target_dev, mnt.mnt_dir, mnt.mnt_type);
+            mounted++;
         }
+    }
+
+    if (mounted > 0) {
+        fprintf(stderr, "[init] Mounted %d filesystem(s) from /etc/fstab.\n", mounted);
     }
 
     endmntent(f);
