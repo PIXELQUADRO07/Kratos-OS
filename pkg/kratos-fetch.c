@@ -191,7 +191,23 @@ static int tls_connect(tls_ctx_t *ctx, const char *host, const char *port)
     }
 
     const char *pers = "kratos_fetch";
+
     /* Seed the RNG */
+    ret = mbedtls_ctr_drbg_seed(&ctx->ctr_drbg, mbedtls_entropy_func,
+                                 &ctx->entropy,
+                                 (const unsigned char *)pers, strlen(pers));
+    if (ret != 0) {
+        fprintf(stderr, "[kratos-fetch] Error: DRBG seed failed (-0x%04x)\n", -ret);
+        return -1;
+    }
+
+    /* Load CA certificates */
+    ret = mbedtls_x509_crt_parse_file(&ctx->cacert, CA_BUNDLE_PATH);
+    if (ret < 0) {
+        fprintf(stderr, "[kratos-fetch] Error: Failed to load CA bundle %s (-0x%04x)\n",
+                CA_BUNDLE_PATH, -ret);
+        return -1;
+    }
 
     /* SSL/TLS setup */
     ret = mbedtls_ssl_config_defaults(&ctx->conf,
