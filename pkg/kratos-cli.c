@@ -36,6 +36,14 @@ static void show_help(void)
     printf("  help                  Show this help screen\n\n");
     printf("Repository:\n");
     printf("  Run 'kratos update' before using 'search' or 'upgrade'.\n\n");
+    printf("Installation Bundles (Prefixes):\n");
+    printf("  all           Full system installation\n");
+    printf("  core          Essential system & base tools\n");
+    printf("  networking    Networking & connectivity tools\n");
+    printf("  cybersecurity Security, auditing & privacy tools\n");
+    printf("  development   IDEs, languages & dev tools\n");
+    printf("  productivity  Multimedia, graphics & communication\n");
+    printf("  top10         Most essential packages\n\n");
 }
 
 int main(int argc, char *argv[])

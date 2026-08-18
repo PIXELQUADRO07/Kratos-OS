@@ -66,6 +66,18 @@ Every foundational component is compiled from sources:
 - [x] Repository index format (`index.json`) with HTTPS fetch and local cache
 - [x] Multi-repository support (`/etc/kratos/repos.d/`)
 
+### Installation Bundles (Prefixes)
+
+KratosOS supports metapackages to install sets of related tools in one command:
+
+- `all`: Full installation of all recommended packages.
+- `core`: Essential system utilities, toolchain, and monitoring tools.
+- `networking`: Networking tools and connectivity utilities.
+- `cybersecurity`: Penetration testing, forensics, and privacy tools.
+- `development`: Editors, compilers, runtimes, and container tools.
+- `productivity`: Multimedia, graphics, and communication apps.
+- `top10`: The most essential packages for a functional system.
+
 ---
 
 ## 🏗️ System Architecture
@@ -130,7 +142,10 @@ kpkg archive
 
 ```bash
 # Install a package with dependency and checksum verification
-kratos install package-1.0.0-1-x86_64.kpkg
+kratos install bash
+
+# Install an installation bundle (prefix)
+kratos install networking
 
 # Verify installed package files against DB manifest
 kratos verify bash
