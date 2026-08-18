@@ -228,6 +228,13 @@ int kratos_check_dependencies_satisfied(const kratos_dep_list_t *list, const cha
         char installed_ver[64] = {0};
 
         if (get_installed_pkg_version(rule->name, db_root, installed_ver, sizeof(installed_ver)) != 0) {
+            /* Special case: glibc and kpm are part of the base system.
+             * If they are not in the DB, we treat them as satisfied to allow
+             * bootstrapping until the DB is fully populated. */
+            if (strcmp(rule->name, "glibc") == 0 || strcmp(rule->name, "kpm") == 0) {
+                continue;
+            }
+
             if (missing_out && missing_size > 0) {
                 if (rule->op != OP_ANY && rule->version[0] != '\0') {
                     const char *op_sym = "=";

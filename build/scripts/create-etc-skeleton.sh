@@ -413,6 +413,102 @@ arch=x86_64
 description=Kratos Package Manager (Base System)
 EOF
 
+cat > "$SYSROOT/var/lib/kratos/db/packages/ncurses" <<EOF
+name=ncurses
+version=6.5
+release=1
+arch=x86_64
+description=Ncurses Libraries (Base System)
+EOF
+
+cat > "$SYSROOT/var/lib/kratos/db/packages/readline" <<EOF
+name=readline
+version=8.2
+release=1
+arch=x86_64
+description=GNU Readline Library (Base System)
+EOF
+
+cat > "$SYSROOT/var/lib/kratos/db/packages/bash" <<EOF
+name=bash
+version=5.3
+release=1
+arch=x86_64
+description=GNU Bourne-Again SHell (Base System)
+EOF
+
+cat > "$SYSROOT/var/lib/kratos/db/packages/coreutils" <<EOF
+name=coreutils
+version=9.7
+release=1
+arch=x86_64
+description=GNU Core Utilities (Base System)
+EOF
+
+cat > "$SYSROOT/var/lib/kratos/db/packages/grep" <<EOF
+name=grep
+version=3.11
+release=1
+arch=x86_64
+description=GNU Grep (Base System)
+EOF
+
+cat > "$SYSROOT/var/lib/kratos/db/packages/sed" <<EOF
+name=sed
+version=4.9
+release=1
+arch=x86_64
+description=GNU Stream Editor (Base System)
+EOF
+
+cat > "$SYSROOT/var/lib/kratos/db/packages/findutils" <<EOF
+name=findutils
+version=4.10.0
+release=1
+arch=x86_64
+description=GNU Find Utilities (Base System)
+EOF
+
+cat > "$SYSROOT/var/lib/kratos/db/packages/tar" <<EOF
+name=tar
+version=1.35
+release=1
+arch=x86_64
+description=GNU Tape Archiver (Base System)
+EOF
+
+cat > "$SYSROOT/var/lib/kratos/db/packages/gzip" <<EOF
+name=gzip
+version=1.14
+release=1
+arch=x86_64
+description=GNU Data Compression (Base System)
+EOF
+
+cat > "$SYSROOT/var/lib/kratos/db/packages/mbedtls" <<EOF
+name=mbedtls
+version=3.6.3
+release=1
+arch=x86_64
+description=Mbed TLS Library (Base System)
+EOF
+
+cat > "$SYSROOT/var/lib/kratos/db/packages/zlib" <<EOF
+name=zlib
+version=1.3.1
+release=1
+arch=x86_64
+description=Zlib Compression Library (Base System)
+EOF
+
+cat > "$SYSROOT/var/lib/kratos/db/packages/zstd" <<EOF
+name=zstd
+version=1.5.6
+release=1
+arch=x86_64
+description=Zstandard Compression (Base System)
+EOF
+
 echo
 echo "[+] /etc skeleton created successfully."
 echo
