@@ -280,9 +280,23 @@ static int parse_index_json(const char *filepath,
 /* ------------------------------------------------------------------ */
 
 /* Invoke kratos-fetch <url> <output_path>
+ * If URL starts with file://, it performs a local copy instead.
  * Returns 0 on success, -1 on error. */
 static int fetch_url(const char *url, const char *out_path, const char *sysroot)
 {
+    if (strncmp(url, "file://", 7) == 0) {
+        const char *src_path = url + 7;
+        /* Simple local copy using a subprocess to avoid reimplementing cp */
+        pid_t pid = fork();
+        if (pid == 0) {
+            execlp("cp", "cp", src_path, out_path, (char *)NULL);
+            _exit(127);
+        }
+        int status;
+        waitpid(pid, &status, 0);
+        return (WIFEXITED(status) && WEXITSTATUS(status) == 0) ? 0 : -1;
+    }
+
     char fetch_bin[PATH_MAX];
     if (sysroot && sysroot[0])
         snprintf(fetch_bin, sizeof(fetch_bin), "%s/usr/bin/kratos-fetch", sysroot);

@@ -58,18 +58,27 @@ typedef struct {
     char host[256];
     char path[MAX_URL_LEN];
     char port[8];
+    int  is_https;
 } parsed_url_t;
 
 static int parse_url(const char *url, parsed_url_t *out)
 {
     memset(out, 0, sizeof(*out));
 
-    if (strncmp(url, "https://", 8) != 0) {
-        fprintf(stderr, "[kratos-fetch] Error: only HTTPS URLs are supported.\n");
+    const char *host_start;
+    if (strncmp(url, "https://", 8) == 0) {
+        out->is_https = 1;
+        host_start = url + 8;
+        strcpy(out->port, "443");
+    } else if (strncmp(url, "http://", 7) == 0) {
+        out->is_https = 0;
+        host_start = url + 7;
+        strcpy(out->port, "80");
+    } else {
+        fprintf(stderr, "[kratos-fetch] Error: only HTTP and HTTPS URLs are supported.\n");
         return -1;
     }
 
-    const char *host_start = url + 8;
     const char *path_start = strchr(host_start, '/');
     const char *port_start = strchr(host_start, ':');
 
@@ -82,7 +91,6 @@ static int parse_url(const char *url, parsed_url_t *out)
         memcpy(out->port, port_start + 1, port_len);
     } else {
         host_len = path_start ? (size_t)(path_start - host_start) : strlen(host_start);
-        strcpy(out->port, "443");
     }
 
     if (host_len >= sizeof(out->host)) host_len = sizeof(out->host) - 1;
@@ -108,6 +116,7 @@ typedef struct {
     mbedtls_x509_crt        cacert;
     mbedtls_ctr_drbg_context ctr_drbg;
     mbedtls_entropy_context  entropy;
+    int                     is_https;
 } tls_ctx_t;
 
 static void tls_init(tls_ctx_t *ctx)
@@ -170,30 +179,19 @@ static int net_connect_with_timeout(mbedtls_net_context *net,
 static int tls_connect(tls_ctx_t *ctx, const char *host, const char *port)
 {
     int ret;
-    const char *pers = "kratos_fetch";
-
-    /* Seed the RNG */
-    ret = mbedtls_ctr_drbg_seed(&ctx->ctr_drbg, mbedtls_entropy_func,
-                                 &ctx->entropy,
-                                 (const unsigned char *)pers, strlen(pers));
-    if (ret != 0) {
-        fprintf(stderr, "[kratos-fetch] Error: DRBG seed failed (-0x%04x)\n", -ret);
-        return -1;
-    }
-
-    /* Load CA certificates */
-    ret = mbedtls_x509_crt_parse_file(&ctx->cacert, CA_BUNDLE_PATH);
-    if (ret < 0) {
-        fprintf(stderr, "[kratos-fetch] Error: Failed to load CA bundle %s (-0x%04x)\n",
-                CA_BUNDLE_PATH, -ret);
-        return -1;
-    }
 
     /* TCP connect (bounded by CONNECT_TIMEOUT_SEC) */
     if (net_connect_with_timeout(&ctx->net, host, port) != 0) {
         fprintf(stderr, "[kratos-fetch] Error: TCP connect to %s:%s failed\n", host, port);
         return -1;
     }
+
+    if (!ctx->is_https) {
+        return 0; /* No TLS handshake for HTTP */
+    }
+
+    const char *pers = "kratos_fetch";
+    /* Seed the RNG */
 
     /* SSL/TLS setup */
     ret = mbedtls_ssl_config_defaults(&ctx->conf,
@@ -264,9 +262,17 @@ static int tls_write_all(tls_ctx_t *ctx, const char *buf, size_t len)
 {
     size_t written = 0;
     while (written < len) {
-        int ret = mbedtls_ssl_write(&ctx->ssl,
+        int ret;
+        if (ctx->is_https) {
+            ret = mbedtls_ssl_write(&ctx->ssl,
                                      (const unsigned char *)buf + written,
                                      len - written);
+        } else {
+            ret = mbedtls_net_send(&ctx->net,
+                                    (const unsigned char *)buf + written,
+                                    len - written);
+        }
+
         if (ret > 0) {
             written += (size_t)ret;
         } else if (ret != MBEDTLS_ERR_SSL_WANT_WRITE) {
@@ -301,7 +307,13 @@ static long reader_read(body_reader_t *r, unsigned char *out, size_t want)
     }
 
     for (;;) {
-        int ret = mbedtls_ssl_read(&r->ctx->ssl, out, want);
+        int ret;
+        if (r->ctx->is_https) {
+            ret = mbedtls_ssl_read(&r->ctx->ssl, out, want);
+        } else {
+            ret = mbedtls_net_recv(&r->ctx->net, out, want);
+        }
+
         if (ret > 0) {
             return ret;
         } else if (ret == 0 || ret == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY) {
@@ -380,10 +392,12 @@ static int do_https_get(const char *url, const char *output_path, int redirect_c
     parsed_url_t pu;
     if (parse_url(url, &pu) != 0) return -1;
 
-    if (!g_quiet) fprintf(stderr, "[kratos-fetch] Connecting to %s:%s...\n", pu.host, pu.port);
+    if (!g_quiet) fprintf(stderr, "[kratos-fetch] Connecting to %s:%s (%s)...\n",
+                          pu.host, pu.port, pu.is_https ? "HTTPS" : "HTTP");
 
     tls_ctx_t ctx;
     tls_init(&ctx);
+    ctx.is_https = pu.is_https;
 
     if (tls_connect(&ctx, pu.host, pu.port) != 0) {
         tls_free(&ctx);
@@ -649,7 +663,7 @@ static void show_help(void)
 {
     printf("Usage: kratos-fetch <url> [-o output_file] [-q]\n");
     printf("\n");
-    printf("Download a file via HTTPS with certificate verification.\n");
+    printf("Download a file via HTTP or HTTPS with certificate verification.\n");
     printf("\n");
     printf("Options:\n");
     printf("  -o <file>   Write output to file instead of stdout\n");
