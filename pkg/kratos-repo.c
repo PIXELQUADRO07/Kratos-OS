@@ -337,7 +337,6 @@ int kratos_repo_load_all(repo_list_t *list, const char *sysroot)
 
     DIR *d = opendir(conf_dir);
     if (!d) {
-        /* No repos configured yet — not an error */
         return 0;
     }
 
@@ -366,20 +365,12 @@ int kratos_repo_load_all(repo_list_t *list, const char *sysroot)
                  sysroot, REPO_CACHE_ROOT, conf.name, REPO_INDEX_FILE);
 
         if (access(index_path, R_OK) == 0) {
-            parse_index_json(index_path, repo->name, repo->url, repo->priority,
-                             &repo->packages, &repo->pkg_count);
-
-            /* Read last-update timestamp */
-            char stamp_path[PATH_MAX];
-            snprintf(stamp_path, sizeof(stamp_path), "%s%s/%s/%s",
-                     sysroot, REPO_CACHE_ROOT, conf.name, REPO_STAMP_FILE);
-            FILE *sf = fopen(stamp_path, "r");
-            if (sf) {
-                long ts = 0;
-                fscanf(sf, "%ld", &ts);
-                repo->last_update = (time_t)ts;
-                fclose(sf);
+            if (parse_index_json(index_path, repo->name, repo->url, repo->priority,
+                                 &repo->packages, &repo->pkg_count) < 0) {
+                fprintf(stderr, "[kratos-repo] Warning: Failed to parse cached index for '%s'\n", conf.name);
             }
+        } else {
+            /* Debug: why is the index missing if update worked? */
         }
 
         list->repo_count++;
