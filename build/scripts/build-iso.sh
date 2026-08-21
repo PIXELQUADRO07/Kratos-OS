@@ -68,9 +68,19 @@ fi
 # ------------------------------------------------------------
 echo "[Step 2] Preparing fresh ISO staging directories..."
 rm -rf "$ISO_ROOT"
+
+if [ -d "$IMAGE_DIR" ] && [ ! -w "$IMAGE_DIR" ]; then
+    echo "[~] Fixing permissions on $IMAGE_DIR..."
+    if [ "$(id -u)" -eq 0 ]; then
+        chown -R "${SUDO_USER:-$(id -un)}:${SUDO_USER:-$(id -gn)}" "$IMAGE_DIR" 2>/dev/null || true
+    else
+        sudo chown -R "$(id -u):$(id -g)" "$IMAGE_DIR" 2>/dev/null || true
+    fi
+fi
+
+mkdir -p "$IMAGE_DIR"
 rm -f "$ISO_OUT"
 mkdir -p "$ISO_ROOT/boot/grub/branding"
-mkdir -p "$IMAGE_DIR"
 
 if [ -f "$KRATOS_ROOT/Branding/KratosOS.png" ]; then
     cp "$KRATOS_ROOT/Branding/KratosOS.png" "$ISO_ROOT/boot/grub/branding/KratosOS.png"

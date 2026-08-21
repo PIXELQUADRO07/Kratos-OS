@@ -178,6 +178,9 @@ else
 fi
 
 mkdir -p "$IMAGE_DIR"
+if [ -n "${SUDO_USER:-}" ]; then
+    chown -R "$SUDO_USER:$(id -gn "$SUDO_USER")" "$IMAGE_DIR" 2>/dev/null || true
+fi
 rm -f "$IMAGE"
 truncate -s "${IMAGE_SIZE_MB}M" "$IMAGE"
 
