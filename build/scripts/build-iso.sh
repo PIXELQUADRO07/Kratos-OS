@@ -49,17 +49,36 @@ if ! command -v grub-mkrescue &>/dev/null; then
 fi
 
 # ------------------------------------------------------------
-# Step 1: Clean and recreate ISO Root Staging Area
+# Step 1: Sync latest Live and Calamares configs to Sysroot
 # ------------------------------------------------------------
-echo "[Step 1] Preparing ISO staging directories..."
-rm -rf "$ISO_ROOT"
-mkdir -p "$ISO_ROOT/boot/grub"
-mkdir -p "$IMAGE_DIR"
+echo "[Step 1] Syncing latest Live, Desktop and Calamares configurations..."
+if [ -x "$SCRIPT_DIR/build-xorg.sh" ]; then
+    bash "$SCRIPT_DIR/build-xorg.sh"
+fi
+if [ -x "$SCRIPT_DIR/build-xfce.sh" ]; then
+    bash "$SCRIPT_DIR/build-xfce.sh"
+fi
+if [ -x "$SCRIPT_DIR/build-calamares.sh" ]; then
+    bash "$SCRIPT_DIR/build-calamares.sh"
+fi
 
 # ------------------------------------------------------------
-# Step 2: Copy Kernel Image
+# Step 2: Clean and recreate ISO Root Staging Area
 # ------------------------------------------------------------
-echo "[Step 2] Copying Linux kernel bzImage..."
+echo "[Step 2] Preparing fresh ISO staging directories..."
+rm -rf "$ISO_ROOT"
+rm -f "$ISO_OUT"
+mkdir -p "$ISO_ROOT/boot/grub/branding"
+mkdir -p "$IMAGE_DIR"
+
+if [ -f "$KRATOS_ROOT/Branding/KratosOS.png" ]; then
+    cp "$KRATOS_ROOT/Branding/KratosOS.png" "$ISO_ROOT/boot/grub/branding/KratosOS.png"
+fi
+
+# ------------------------------------------------------------
+# Step 3: Copy Kernel Image
+# ------------------------------------------------------------
+echo "[Step 3] Copying Linux kernel bzImage..."
 KERNEL_SRC="$SYSROOT/boot/vmlinuz"
 if [ ! -f "$KERNEL_SRC" ]; then
     # Try finding versioned kernel in sysroot/boot/
@@ -76,9 +95,9 @@ cp "$KERNEL_SRC" "$ISO_ROOT/boot/vmlinuz"
 echo "[✓] Kernel copied."
 
 # ------------------------------------------------------------
-# Step 3: Package Sysroot into compressed initramfs
+# Step 4: Package Sysroot into compressed initramfs
 # ------------------------------------------------------------
-echo "[Step 3] Packing KratosOS sysroot into read-write initramfs..."
+echo "[Step 4] Packing KratosOS sysroot into read-write initramfs..."
 INITRAMFS_OUT="$ISO_ROOT/boot/initramfs.cpio.gz"
 
 # We exclude boot/ directory to avoid packing the kernel and grub configs inside
@@ -96,9 +115,9 @@ echo "[✓] Initramfs created: $INITRAMFS_OUT"
 echo "  Size: $(du -sh "$INITRAMFS_OUT" | cut -f1)"
 
 # ------------------------------------------------------------
-# Step 4: Generate Live GRUB Config
+# Step 5: Generate Live GRUB Config
 # ------------------------------------------------------------
-echo "[Step 4] Generating custom Live CD grub.cfg..."
+echo "[Step 5] Generating custom Live CD grub.cfg..."
 BUILD_ID="$(date -u +%Y%m%dT%H%M%SZ)"
 
 cat > "$ISO_ROOT/boot/grub/grub.cfg" << GRUB_EOF
@@ -164,15 +183,15 @@ GRUB_EOF
 echo "[✓] Live grub.cfg written."
 
 # ------------------------------------------------------------
-# Step 5: Build ISO via grub-mkrescue
+# Step 6: Build ISO via grub-mkrescue
 # ------------------------------------------------------------
-echo "[Step 5] Invoking grub-mkrescue..."
+echo "[Step 6] Invoking grub-mkrescue..."
 grub-mkrescue -o "$ISO_OUT" "$ISO_ROOT" 2>&1 | sed 's/^/    /'
 
 # ------------------------------------------------------------
-# Step 6: Cleanup
+# Step 7: Cleanup
 # ------------------------------------------------------------
-echo "[Step 6] Cleaning up staging directory..."
+echo "[Step 7] Cleaning up staging directory..."
 rm -rf "$ISO_ROOT"
 
 echo
