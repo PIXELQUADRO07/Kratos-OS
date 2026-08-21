@@ -20,12 +20,22 @@ if command -v dbus-launch >/dev/null 2>&1; then
     eval $(dbus-launch --sh-syntax --exit-with-session)
 fi
 
+# Show welcome notification on startup
+(
+    sleep 2
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send "KratosOS Live Session" "Welcome to KratosOS! Feel free to explore the system. Double-click 'Install KratosOS' on the Desktop when you are ready to install." -i system-software-install -t 15000
+    fi
+) &
+
 # Start XFCE session
 if command -v xfce4-session >/dev/null 2>&1; then
     exec xfce4-session
 elif command -v xfwm4 >/dev/null 2>&1; then
     xfwm4 &
-    exec xterm
+    xfdesktop4 &
+    xfce4-panel &
+    exec xfce4-terminal
 else
     exec xterm
 fi

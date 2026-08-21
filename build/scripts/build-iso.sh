@@ -119,15 +119,15 @@ if loadfont /boot/grub/fonts/unicode.pf2 ; then
     terminal_output gfxterm
 fi
 
-menuentry "KratosOS Live Desktop (XFCE & Calamares Installer)" {
+menuentry "KratosOS Live Desktop (XFCE — Try & Install)" {
     insmod part_gpt
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel..."
-    linux /boot/vmlinuz rw init=/sbin/init quiet console=tty0
+    linux /boot/vmlinuz rw init=/sbin/init kratos.live=1 quiet console=tty0
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
-    echo "Booting KratosOS Live..."
+    echo "Booting KratosOS Live Environment..."
 }
 
 menuentry "KratosOS Live (RAM disk) - Serial & Console (Debug)" {

@@ -145,16 +145,50 @@ static void print_login_prompt(void)
 
 int main(int argc, char *argv[])
 {
-    (void)argc;
-    (void)argv;
+    const char *forced_user = NULL;
+    int force_login = 0;
 
-    print_issue();
-    fflush(stdout);
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-f") == 0 && i + 1 < argc) {
+            force_login = 1;
+            forced_user = argv[++i];
+        } else if (argv[i][0] != '-') {
+            forced_user = argv[i];
+        }
+    }
+
+    /* Check if Live environment is active from /proc/cmdline */
+    if (!forced_user) {
+        FILE *cmd = fopen("/proc/cmdline", "r");
+        if (cmd) {
+            char line[1024];
+            if (fgets(line, sizeof(line), cmd)) {
+                if (strstr(line, "kratos.live=1") || strstr(line, "kratos.live")) {
+                    const char *tty = ttyname(STDIN_FILENO);
+                    if (tty && (strcmp(tty, "/dev/tty1") == 0 || strcmp(tty, "/dev/tty0") == 0)) {
+                        forced_user = "kratos-live";
+                        force_login = 1;
+                    }
+                }
+            }
+            fclose(cmd);
+        }
+    }
+
+    if (!force_login) {
+        print_issue();
+        fflush(stdout);
+    }
 
     for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
 
     char username[128] = {0};
     char password[128] = {0};
+
+    if (forced_user) {
+        strncpy(username, forced_user, sizeof(username) - 1);
+        username[sizeof(username) - 1] = '\0';
+    }
 
     /* Prompt username */
     while (username[0] == '\0') {
@@ -205,8 +239,8 @@ int main(int argc, char *argv[])
 
     /* An explicitly empty hash ("") is the deliberate, documented KratosOS
      * convention for "no password set" (see create-etc-skeleton.sh) — that
-     * one case, and only that one, skips the password prompt. */
-    if (strlen(hash) > 0) {
+     * one case, and only that one (or force_login), skips the password prompt. */
+    if (!force_login && strlen(hash) > 0) {
         struct termios old_t;
         disable_echo(&old_t);
         printf("Password: ");
