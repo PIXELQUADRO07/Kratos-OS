@@ -154,7 +154,7 @@ menuentry "KratosOS Live Desktop (XFCE — Try & Install)" {
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel..."
-    linux /boot/vmlinuz rw init=/sbin/init kratos.live=1 quiet console=tty0
+    linux /boot/vmlinuz rw rdinit=/sbin/init kratos.live=1 quiet console=tty0
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS Live Environment..."
@@ -165,7 +165,7 @@ menuentry "KratosOS Live (RAM disk) - Serial & Console (Debug)" {
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel..."
-    linux /boot/vmlinuz rw init=/sbin/init console=ttyS0,115200 loglevel=3 kratos.build=${BUILD_ID}
+    linux /boot/vmlinuz rdinit=/sbin/init console=ttyS0,115200 loglevel=3 kratos.build=${BUILD_ID}
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS..."
@@ -176,7 +176,7 @@ menuentry "KratosOS Live (RAM disk) - Graphics VGA only" {
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel..."
-    linux /boot/vmlinuz rw init=/sbin/init console=tty0 loglevel=3 kratos.build=${BUILD_ID} quiet
+    linux /boot/vmlinuz rw rdinit=/sbin/init console=tty0 loglevel=3 kratos.build=${BUILD_ID} quiet
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS..."
@@ -192,7 +192,7 @@ menuentry "KratosOS Live (VERBOSE - Real Hardware Debug, no quiet)" {
     # blink. This entry drops quiet, raises loglevel, and mirrors output to
     # both the VGA console and ttyS0 so the actual panic text is captured
     # regardless of whether a serial cable is attached.
-    linux /boot/vmlinuz rw init=/sbin/init kratos.build=${BUILD_ID} \
+    linux /boot/vmlinuz rw rdinit=/sbin/init kratos.build=${BUILD_ID} \
         console=tty0 console=ttyS0,115200 loglevel=8 ignore_loglevel earlyprintk=vga
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
