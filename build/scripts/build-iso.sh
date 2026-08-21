@@ -158,6 +158,7 @@ menuentry "KratosOS Live Desktop (XFCE — Try & Install)" {
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS Live Environment..."
+    boot
 }
 
 menuentry "KratosOS Live (RAM disk) - Serial & Console (Debug)" {
@@ -169,6 +170,7 @@ menuentry "KratosOS Live (RAM disk) - Serial & Console (Debug)" {
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS..."
+    boot
 }
 
 menuentry "KratosOS Live (RAM disk) - Graphics VGA only" {
@@ -180,6 +182,7 @@ menuentry "KratosOS Live (RAM disk) - Graphics VGA only" {
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS..."
+    boot
 }
 
 menuentry "KratosOS Live (VERBOSE - Real Hardware Debug, no quiet)" {
@@ -197,6 +200,7 @@ menuentry "KratosOS Live (VERBOSE - Real Hardware Debug, no quiet)" {
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS (verbose)..."
+    boot
 }
 
 menuentry "Reboot System" {
