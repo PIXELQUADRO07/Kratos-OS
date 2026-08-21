@@ -29,11 +29,13 @@ mkdir -p "$ETC/profile.d"
 # real device nodes and no way to open a tty, which is exactly the
 # "hangs after network init, never reaches a shell" symptom.
 echo "[+] Creating FHS base/mountpoint directories..."
-for d in proc sys dev dev/pts dev/shm run tmp mnt media opt srv home root boot etc/ssl/certs; do
+for d in proc sys dev dev/pts dev/shm run tmp mnt media opt srv home root home/kratos-live boot etc/ssl/certs etc/sudoers.d; do
     mkdir -p "$SYSROOT/$d"
 done
 chmod 1777 "$SYSROOT/tmp"      # sticky bit: shared, world-writable, no cross-user delete
 chmod 0700 "$SYSROOT/root"     # root's home: root-only
+chmod 0755 "$SYSROOT/home/kratos-live"
+chown 1000:1000 "$SYSROOT/home/kratos-live" 2>/dev/null || true
 
 # NOTE: kratos-devd is intentionally NOT launched from /etc/rc.d/. init.c's
 # start_devd() already starts it early in the boot sequence (before
@@ -56,6 +58,7 @@ systemd-resolve:x:77:77:systemd Resolver:/:/usr/bin/false
 systemd-timesync:x:78:78:systemd Time Synchronization:/:/usr/bin/false
 systemd-coredump:x:79:79:systemd Core Dumper:/:/usr/bin/false
 nobody:x:65534:65534:Unprivileged User:/dev/null:/usr/bin/false
+kratos-live:x:1000:1000:KratosOS Live User:/home/kratos-live:/bin/bash
 EOF
 
 echo "[+] Creating /etc/group..."
@@ -89,21 +92,16 @@ systemd-network:x:76:
 systemd-resolve:x:77:
 systemd-timesync:x:78:
 systemd-coredump:x:79:
-wheel:x:97:
-users:x:999:
+wheel:x:97:root,kratos-live
+users:x:999:kratos-live
+kratos-live:x:1000:
 nogroup:x:65534:
 EOF
 
 echo "[+] Creating /etc/shadow..."
-# NOTE: login.c treats a "*" or "!" hash as a LOCKED account and skips the
-# password prompt entirely — which in this custom login flow actually means
-# "let anyone in without a password" (the opposite of "*"'s usual meaning on
-# other systems). We use the standard empty-password field instead: it hits
-# the same "skip prompt" branch in login.c (hash length 0) but is the
-# conventional way to say "no password set", so it won't confuse anyone
-# relying on normal shadow(5) semantics later.
 cat > "$ETC/shadow" <<'EOF'
 root::19700:0:99999:7:::
+kratos-live::19700:0:99999:7:::
 EOF
 chmod 600 "$ETC/shadow"
 
@@ -122,6 +120,15 @@ cat > "$ETC/shells" <<'EOF'
 /bin/sh
 /bin/bash
 EOF
+
+echo "[+] Creating /etc/sudoers..."
+cat > "$ETC/sudoers" <<'EOF'
+root ALL=(ALL:ALL) ALL
+%wheel ALL=(ALL:ALL) NOPASSWD: ALL
+kratos-live ALL=(ALL:ALL) NOPASSWD: ALL
+#includedir /etc/sudoers.d
+EOF
+chmod 440 "$ETC/sudoers"
 
 echo "[+] Creating /etc/hostname..."
 cat > "$ETC/hostname" <<'EOF'

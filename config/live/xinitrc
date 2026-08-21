@@ -1,0 +1,31 @@
+#!/bin/sh
+# /etc/live/xinitrc — Live Session X11 startup script
+
+# Set up cursor
+xsetroot -cursor_name left_ptr 2>/dev/null || true
+
+# Set up desktop layout if user is kratos-live
+USER_HOME="/home/kratos-live"
+if [ -d "$USER_HOME" ]; then
+    mkdir -p "$USER_HOME/Desktop"
+    if [ -f "/etc/live/kratosos-live.desktop" ]; then
+        cp /etc/live/kratosos-live.desktop "$USER_HOME/Desktop/kratosos-live.desktop"
+        chmod +x "$USER_HOME/Desktop/kratosos-live.desktop"
+    fi
+    chown -R kratos-live:kratos-live "$USER_HOME/Desktop" 2>/dev/null || true
+fi
+
+# Start D-Bus session if available
+if command -v dbus-launch >/dev/null 2>&1; then
+    eval $(dbus-launch --sh-syntax --exit-with-session)
+fi
+
+# Start XFCE session
+if command -v xfce4-session >/dev/null 2>&1; then
+    exec xfce4-session
+elif command -v xfwm4 >/dev/null 2>&1; then
+    xfwm4 &
+    exec xterm
+else
+    exec xterm
+fi

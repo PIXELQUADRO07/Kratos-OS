@@ -1,0 +1,29 @@
+# KratosOS Branding Descriptor for Calamares
+---
+componentName: kratosos
+
+strings:
+    productName:         "KratosOS"
+    shortProductName:    "Kratos"
+    version:             "0.7.8.2"
+    shortVersion:        "0.7"
+    versionedName:       "KratosOS 0.7.8.2"
+    shortVersionedName:  "Kratos 0.7"
+    bootloaderEntryName: "KratosOS"
+    productUrl:          "https://github.com/PIXELQUADRO07/Kratos-OS"
+    supportUrl:          "https://github.com/PIXELQUADRO07/Kratos-OS/issues"
+    knownIssuesUrl:      "https://github.com/PIXELQUADRO07/Kratos-OS/issues"
+    releaseNotesUrl:     "https://github.com/PIXELQUADRO07/Kratos-OS/releases"
+
+images:
+    productLogo:         "logo.png"
+    productIcon:         "logo.png"
+    productWelcome:      "welcome.png"
+
+style:
+   SidebarBackground:    "#1e1e2e"
+   SidebarText:          "#cdd6f4"
+   SidebarTextCurrent:   "#ffffff"
+   SidebarBackgroundCurrent: "#89b4fa"
+
+slideshow:               "show.qml"

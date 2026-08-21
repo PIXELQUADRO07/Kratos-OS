@@ -37,8 +37,8 @@ export KRATOS_JOBS ?= $(shell nproc)
         linux-headers binutils gcc-pass1 glibc-bootstrap libgcc glibc gcc-pass2 \
         ncurses readline bash coreutils grep sed gawk findutils \
         diffutils tar gzip xz bzip2 file-cmd \
-        kernel grub etc init pkg disk image iso \
-        mbedtls ca-certs fetch \
+        kernel grub etc init pkg disk image iso live-iso \
+        mbedtls ca-certs fetch xorg xfce calamares \
         clean distclean stamps-clean
 
 # ─────────────────────────────────────────────
@@ -220,7 +220,7 @@ file-cmd:
 # ─────────────────────────────────────────────
 # Phase 3 — Kernel, bootloader, init, disk image
 # ─────────────────────────────────────────────
-phase3: kernel grub mbedtls ca-certs etc init pkg fetch disk
+phase3: kernel grub mbedtls ca-certs etc init pkg fetch xorg xfce calamares disk
 
 kernel:
 	@bash $(SCRIPTS)/build-kernel.sh
@@ -246,6 +246,15 @@ ca-certs:
 fetch:
 	@bash $(SCRIPTS)/build-fetch.sh
 
+xorg:
+	@bash $(SCRIPTS)/build-xorg.sh
+
+xfce:
+	@bash $(SCRIPTS)/build-xfce.sh
+
+calamares:
+	@bash $(SCRIPTS)/build-calamares.sh
+
 # disk requires root — invoke via sudo automatically
 disk image:
 	@if [ "$$(id -u)" -ne 0 ]; then \
@@ -255,7 +264,7 @@ disk image:
 	    bash $(SCRIPTS)/build-disk.sh; \
 	fi
 
-iso:
+iso live-iso:
 	@bash $(SCRIPTS)/build-iso.sh
 
 # ─────────────────────────────────────────────

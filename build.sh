@@ -99,6 +99,9 @@ declare -a STAGES=(
     "init|build-init.sh|no|init + shutdown + devd + login + passwd"
     "pkg|build-pkg.sh|no|kpm package manager"
     "fetch|build-fetch.sh|no|kratos-fetch HTTPS client"
+    "xorg|build-xorg.sh|no|X11 graphics stack and drivers"
+    "xfce|build-xfce.sh|no|XFCE desktop environment"
+    "calamares|build-calamares.sh|no|Calamares system installer"
     "disk|build-disk.sh|yes|Disk image (requires sudo)"
 )
 

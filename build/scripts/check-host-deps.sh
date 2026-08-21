@@ -108,6 +108,10 @@ PACMAN_PACKAGES=(
     texinfo
     python
     git
+    xorriso
+    cmake
+    ninja
+    meson
 )
 
 # Full sync, not just -Sy: installing packages after only a partial index

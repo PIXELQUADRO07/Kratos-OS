@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Install KratosOS
+GenericName=System Installer
+Comment=Install KratosOS to hard disk
+Exec=sudo calamares
+Icon=system-software-install
+Terminal=false
+StartupNotify=true
+Categories=System;
