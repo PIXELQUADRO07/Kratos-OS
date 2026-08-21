@@ -182,6 +182,23 @@ menuentry "KratosOS Live (RAM disk) - Graphics VGA only" {
     echo "Booting KratosOS..."
 }
 
+menuentry "KratosOS Live (VERBOSE - Real Hardware Debug, no quiet)" {
+    insmod part_gpt
+    insmod ext2
+    insmod linux
+    echo "Loading Linux Kernel..."
+    # Every other entry hides kernel output (quiet and/or loglevel=3), so a
+    # real panic on bare metal is currently only visible as the caps-lock
+    # blink. This entry drops quiet, raises loglevel, and mirrors output to
+    # both the VGA console and ttyS0 so the actual panic text is captured
+    # regardless of whether a serial cable is attached.
+    linux /boot/vmlinuz rw init=/sbin/init kratos.build=${BUILD_ID} \
+        console=tty0 console=ttyS0,115200 loglevel=8 ignore_loglevel earlyprintk=vga
+    echo "Loading Live Ramdisk..."
+    initrd /boot/initramfs.cpio.gz
+    echo "Booting KratosOS (verbose)..."
+}
+
 menuentry "Reboot System" {
     reboot
 }

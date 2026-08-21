@@ -24,7 +24,7 @@ void mount_vfs(void)
      * ogni singolo passo per avere un boot pulito. */
     try_mount("proc",     "/proc",     "proc",     MS_NOSUID | MS_NODEV | MS_NOEXEC, NULL);
     try_mount("sysfs",    "/sys",      "sysfs",    MS_NOSUID | MS_NODEV | MS_NOEXEC, NULL);
-    try_mount("devtmpfs", "/dev",      "devtmpfs", MS_NOSUID,                        "mode=0755,size=10m");
+    try_mount("devtmpfs", "/dev",      "devtmpfs", MS_NOSUID,                        "mode=0755,size=32m");
 
     mkdir("/dev/pts", 0755);
     try_mount("devpts",   "/dev/pts",  "devpts",   MS_NOSUID | MS_NOEXEC,            "mode=0620,gid=5");
