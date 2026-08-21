@@ -151,6 +151,8 @@ fi
 
 menuentry "KratosOS Live Desktop (XFCE — Try & Install)" {
     insmod part_gpt
+    insmod fat
+    insmod iso9660
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel..."
@@ -163,6 +165,8 @@ menuentry "KratosOS Live Desktop (XFCE — Try & Install)" {
 
 menuentry "KratosOS Live (RAM disk) - Serial & Console (Debug)" {
     insmod part_gpt
+    insmod fat
+    insmod iso9660
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel..."
@@ -175,6 +179,8 @@ menuentry "KratosOS Live (RAM disk) - Serial & Console (Debug)" {
 
 menuentry "KratosOS Live (RAM disk) - Graphics VGA only" {
     insmod part_gpt
+    insmod fat
+    insmod iso9660
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel..."
@@ -187,6 +193,8 @@ menuentry "KratosOS Live (RAM disk) - Graphics VGA only" {
 
 menuentry "KratosOS Live (VERBOSE - Real Hardware Debug, no quiet)" {
     insmod part_gpt
+    insmod fat
+    insmod iso9660
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel..."
