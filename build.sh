@@ -98,6 +98,7 @@ declare -a STAGES=(
     "etc|create-etc-skeleton.sh|no|/etc skeleton (fstab, passwd, ...)"
     "init|build-init.sh|no|init + shutdown + devd + login + passwd"
     "pkg|build-pkg.sh|no|kpm package manager"
+    "inject-pkgs|install-packages.sh|no|Inject binary packages from repository"
     "fetch|build-fetch.sh|no|kratos-fetch HTTPS client"
     "xorg|build-xorg.sh|no|X11 graphics stack and drivers"
     "xfce|build-xfce.sh|no|XFCE desktop environment"

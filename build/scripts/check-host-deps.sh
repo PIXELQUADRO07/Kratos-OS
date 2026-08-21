@@ -111,6 +111,7 @@ PACMAN_PACKAGES=(
     xorriso
     cpio
     mtools
+    mbedtls
     cmake
     ninja
     meson

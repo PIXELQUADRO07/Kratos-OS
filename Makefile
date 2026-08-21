@@ -237,6 +237,9 @@ init:
 pkg:
 	@bash $(SCRIPTS)/build-pkg.sh
 
+inject-pkgs:
+	@bash $(SCRIPTS)/install-packages.sh
+
 mbedtls:
 	@bash $(SCRIPTS)/build-mbedtls.sh
 
