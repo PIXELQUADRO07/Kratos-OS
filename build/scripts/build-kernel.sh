@@ -106,6 +106,9 @@ if [ ! -f "$KBUILD_DIR/.config" ]; then
         --enable  CONFIG_VIRTIO_PCI_LEGACY \
         --enable  CONFIG_VIRTIO_BLK       \
         --enable  CONFIG_VIRTIO_MENU      \
+        --enable  CONFIG_VIRTIO_MENU      \
+        --enable  CONFIG_BLK_DEV_INITRD   \
+        --enable  CONFIG_RD_GZIP          \
         2>/dev/null || true  # tolerate older trees without scripts/config
 
     # x86_64 defconfig builds VIRTIO_BLK/VIRTIO_PCI as modules (=m) by
