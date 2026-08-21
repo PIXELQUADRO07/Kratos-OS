@@ -34,6 +34,8 @@ void mount_vfs(void)
 
     mkdir("/run", 0755);
     try_mount("tmpfs",    "/run",      "tmpfs",    MS_NOSUID | MS_NODEV,             "mode=0755,size=64m");
+    mkdir("/run/lock", 1777);
+    mkdir("/run/shm", 1777);
 
     mkdir("/tmp", 1777);
     try_mount("tmpfs",    "/tmp",      "tmpfs",    MS_NOSUID | MS_NODEV,             "mode=1777,size=128m");
@@ -50,6 +52,46 @@ static const char *resolve_dev_spec(const char *spec, char *buf, size_t buflen)
         return buf;
     }
     return spec;
+}
+
+static unsigned long parse_mount_opts(const char *opts, char *data, size_t data_len)
+{
+    unsigned long flags = 0;
+    if (data && data_len > 0) data[0] = '\0';
+    if (!opts) return 0;
+
+    char *copy = strdup(opts);
+    char *tok = strtok(copy, ",");
+    int first_data = 1;
+
+    while (tok) {
+        if (strcmp(tok, "defaults") == 0) {
+            /* ignore */
+        } else if (strcmp(tok, "ro") == 0)        flags |= MS_RDONLY;
+        else if (strcmp(tok, "rw") == 0)        flags &= ~MS_RDONLY;
+        else if (strcmp(tok, "noexec") == 0)  flags |= MS_NOEXEC;
+        else if (strcmp(tok, "exec") == 0)    flags &= ~MS_NOEXEC;
+        else if (strcmp(tok, "nosuid") == 0)  flags |= MS_NOSUID;
+        else if (strcmp(tok, "suid") == 0)    flags &= ~MS_NOSUID;
+        else if (strcmp(tok, "nodev") == 0)   flags |= MS_NODEV;
+        else if (strcmp(tok, "dev") == 0)     flags &= ~MS_NODEV;
+        else if (strcmp(tok, "noatime") == 0) flags |= MS_NOATIME;
+        else if (strcmp(tok, "relatime") == 0) flags |= MS_RELATIME;
+        else if (strcmp(tok, "bind") == 0)    flags |= MS_BIND;
+        else if (strcmp(tok, "remount") == 0) flags |= MS_REMOUNT;
+        else {
+            /* Data option (e.g. size=64m) */
+            if (data && data_len > 0) {
+                if (!first_data) strncat(data, ",", data_len - strlen(data) - 1);
+                strncat(data, tok, data_len - strlen(data) - 1);
+                first_data = 0;
+            }
+        }
+        tok = strtok(NULL, ",");
+    }
+
+    free(copy);
+    return flags;
 }
 
 void mount_fstab(void)
@@ -76,8 +118,12 @@ void mount_fstab(void)
         char resolved[512];
         const char *target_dev = resolve_dev_spec(mnt.mnt_fsname, resolved, sizeof(resolved));
 
+        char data[512];
+        unsigned long flags = parse_mount_opts(mnt.mnt_opts, data, sizeof(data));
+        const char *mount_data = (data[0] == '\0') ? NULL : data;
+
         mkdir(mnt.mnt_dir, 0755);
-        if (mount(target_dev, mnt.mnt_dir, mnt.mnt_type, 0, mnt.mnt_opts) == 0) {
+        if (mount(target_dev, mnt.mnt_dir, mnt.mnt_type, flags, mount_data) == 0) {
             mounted++;
         }
     }

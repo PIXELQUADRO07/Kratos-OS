@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
         get_password(pass, sizeof(pass));
 
         char *computed = kratos_crypt(pass, sp->sp_pwdp);
-        if (!computed || strcmp(computed, sp->sp_pwdp) != 0) {
+        if (!computed || constant_time_streq(computed, sp->sp_pwdp) == 0) {
             fprintf(stderr, "su: Authentication failure\n");
             return 1;
         }

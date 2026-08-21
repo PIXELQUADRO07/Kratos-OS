@@ -106,13 +106,39 @@ if [ ! -f "$KBUILD_DIR/.config" ]; then
         --enable  CONFIG_VIRTIO_PCI_LEGACY \
         --enable  CONFIG_VIRTIO_BLK       \
         --enable  CONFIG_VIRTIO_MENU      \
-        --enable  CONFIG_VIRTIO_MENU      \
         --enable  CONFIG_BLK_DEV_INITRD   \
         --enable  CONFIG_RD_GZIP          \
+        --enable  CONFIG_FB               \
+        --enable  CONFIG_FB_EFI           \
+        --enable  CONFIG_FB_SIMPLE        \
+        --enable  CONFIG_SYSFB            \
+        --enable  CONFIG_SYSFB_SIMPLEFB   \
+        --enable  CONFIG_DRM              \
+        --enable  CONFIG_DRM_SIMPLEDRM    \
+        --enable  CONFIG_DRM_VIRTIO_GPU   \
+        --enable  CONFIG_FRAMEBUFFER_CONSOLE \
+        --enable  CONFIG_LOGO             \
+        --enable  CONFIG_LOGO_LINUX_CLUT224 \
+        --enable  CONFIG_FB_CONSOLE_DEFERRED_TAKEOVER \
         2>/dev/null || true  # tolerate older trees without scripts/config
 
     # x86_64 defconfig builds VIRTIO_BLK/VIRTIO_PCI as modules (=m) by
     # default. There is no initramfs in this boot chain and init.c never
+    # loads kernel modules, so if these stay as modules the kernel simply
+    # cannot see /dev/vda when QEMU is run with -drive if=virtio, and it
+    # panics with "VFS: Unable to mount root fs". They must be built-in.
+    #
+    # We also force Video/DRM drivers to be built-in (=y) to avoid "blind" boot.
+    sed -i \
+        -e 's/^CONFIG_VIRTIO_PCI=m/CONFIG_VIRTIO_PCI=y/' \
+        -e 's/^CONFIG_VIRTIO_BLK=m/CONFIG_VIRTIO_BLK=y/' \
+        -e 's/^CONFIG_VIRTIO=m/CONFIG_VIRTIO=y/' \
+        -e 's/^CONFIG_DRM=m/CONFIG_DRM=y/' \
+        -e 's/^CONFIG_DRM_SIMPLEDRM=m/CONFIG_DRM_SIMPLEDRM=y/' \
+        -e 's/^CONFIG_DRM_VIRTIO_GPU=m/CONFIG_DRM_VIRTIO_GPU=y/' \
+        -e 's/^CONFIG_FB_EFI=m/CONFIG_FB_EFI=y/' \
+        -e 's/^CONFIG_SYSFB_SIMPLEFB=m/CONFIG_SYSFB_SIMPLEFB=y/' \
+        "$KBUILD_DIR/.config" 2>/dev/null || true
     # loads kernel modules, so if these stay as modules the kernel simply
     # cannot see /dev/vda when QEMU is run with -drive if=virtio, and it
     # panics with "VFS: Unable to mount root fs". They must be built-in.

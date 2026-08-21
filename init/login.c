@@ -32,26 +32,6 @@
 
 #define MAX_RETRIES 3
 
-/* Constant-time string comparison: always walks the full length of the
- * longer string, so the time taken does not depend on where the first
- * differing byte is. Prevents a timing side-channel on password hash
- * verification (a plain strcmp()/memcmp() can leak how many leading
- * characters matched via response-time differences). */
-static int constant_time_streq(const char *a, const char *b)
-{
-    size_t la = strlen(a);
-    size_t lb = strlen(b);
-    size_t max = la > lb ? la : lb;
-
-    unsigned char diff = (unsigned char)(la != lb);
-    for (size_t i = 0; i < max; i++) {
-        unsigned char ca = (i < la) ? (unsigned char)a[i] : 0;
-        unsigned char cb = (i < lb) ? (unsigned char)b[i] : 0;
-        diff |= (unsigned char)(ca ^ cb);
-    }
-    return diff == 0;
-}
-
 static void disable_echo(struct termios *old_t)
 {
     struct termios new_t;
@@ -165,7 +145,9 @@ int main(int argc, char *argv[])
             if (fgets(line, sizeof(line), cmd)) {
                 if (strstr(line, "kratos.live=1") || strstr(line, "kratos.live")) {
                     const char *tty = ttyname(STDIN_FILENO);
-                    if (tty && (strcmp(tty, "/dev/tty1") == 0 || strcmp(tty, "/dev/tty0") == 0)) {
+                    /* Autologin on primary virtual consoles and the current VC (/dev/tty0) */
+                    if (tty && (strcmp(tty, "/dev/tty1") == 0 || strcmp(tty, "/dev/tty0") == 0 ||
+                                strcmp(tty, "/dev/console") == 0)) {
                         forced_user = "kratos-live";
                         force_login = 1;
                     }

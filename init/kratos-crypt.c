@@ -330,3 +330,18 @@ char *kratos_crypt(const char *key, const char *salt)
     *ptr = '\0';
     return result;
 }
+
+int constant_time_streq(const char *a, const char *b)
+{
+    size_t la = strlen(a);
+    size_t lb = strlen(b);
+    size_t max = la > lb ? la : lb;
+
+    unsigned char diff = (unsigned char)(la != lb);
+    for (size_t i = 0; i < max; i++) {
+        unsigned char ca = (i < la) ? (unsigned char)a[i] : 0;
+        unsigned char cb = (i < lb) ? (unsigned char)b[i] : 0;
+        diff |= (unsigned char)(ca ^ cb);
+    }
+    return diff == 0;
+}

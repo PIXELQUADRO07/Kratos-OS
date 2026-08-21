@@ -149,42 +149,42 @@ if loadfont /boot/grub/fonts/unicode.pf2 ; then
     terminal_output gfxterm
 fi
 
-menuentry "KratosOS Live Desktop (XFCE — Try & Install)" {
+menuentry "KratosOS Live Session (XFCE)" {
     insmod part_gpt
     insmod fat
     insmod iso9660
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel..."
-    linux /boot/vmlinuz rw rdinit=/sbin/init kratos.live=1 quiet console=tty0
+    linux /boot/vmlinuz rw rdinit=/sbin/init console=tty0 console=ttyS0,115200 kratos.live earlycon=efifb earlyprintk=efi quiet
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS Live Environment..."
     boot
 }
 
-menuentry "KratosOS Live (RAM disk) - Serial & Console (Debug)" {
+menuentry "KratosOS Live (Console Only)" {
     insmod part_gpt
     insmod fat
     insmod iso9660
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel..."
-    linux /boot/vmlinuz rdinit=/sbin/init console=ttyS0,115200 loglevel=3 kratos.build=${BUILD_ID}
+    linux /boot/vmlinuz rw rdinit=/sbin/init console=tty0 console=ttyS0,115200 loglevel=3 kratos.build=${BUILD_ID} earlycon=efifb earlyprintk=efi quiet
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS..."
     boot
 }
 
-menuentry "KratosOS Live (RAM disk) - Graphics VGA only" {
+menuentry "KratosOS Live (Emergency Bash Shell)" {
     insmod part_gpt
     insmod fat
     insmod iso9660
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel..."
-    linux /boot/vmlinuz rw rdinit=/sbin/init console=tty0 loglevel=3 kratos.build=${BUILD_ID} quiet
+    linux /boot/vmlinuz rw rdinit=/sbin/init init=/bin/bash console=tty0 console=ttyS0,115200 loglevel=3 kratos.build=${BUILD_ID} earlycon=efifb earlyprintk=efi quiet
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS..."

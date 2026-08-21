@@ -109,6 +109,8 @@ PACMAN_PACKAGES=(
     python
     git
     xorriso
+    cpio
+    mtools
     cmake
     ninja
     meson

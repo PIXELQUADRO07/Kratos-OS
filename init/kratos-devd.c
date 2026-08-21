@@ -362,13 +362,13 @@ static void handle_modprobe(const uevent_t *ev)
 
     pid_t pid = fork();
     if (pid == 0) {
+        /* Asynchronous modprobe: exec and let it run.
+         * We don't wait for it so the daemon can continue processing other uevents. */
         execl("/sbin/modprobe", "modprobe", "-q", ev->modalias, (char *)NULL);
         execl("/bin/modprobe",  "modprobe", "-q", ev->modalias, (char *)NULL);
         _exit(0);
-    } else if (pid > 0) {
-        int status;
-        waitpid(pid, &status, 0);
     }
+    /* Parent does not waitpid() here because we ignore SIGCHLD in main() */
 }
 
 /* ------------------------------------------------------------------ */
@@ -449,6 +449,7 @@ int main(int argc, char *argv[])
 
     signal(SIGINT,  sig_handler);
     signal(SIGTERM, sig_handler);
+    signal(SIGCHLD, SIG_IGN);
 
     /* Open Netlink Socket */
     int sock = socket(AF_NETLINK, SOCK_RAW, NETLINK_KOBJECT_UEVENT);
