@@ -40,11 +40,12 @@ if [ ! -d "$SYSROOT" ] || [ ! -f "$SYSROOT/sbin/init" ]; then
     exit 1
 fi
 
-if ! command -v grub-mkrescue &>/dev/null; then
-    echo "[!] Error: 'grub-mkrescue' utility not found."
-    echo "    Install it via your host package manager:"
-    echo "      Debian/Ubuntu: sudo apt install grub-common xorriso"
-    echo "      Arch Linux:    sudo pacman -S grub xorriso"
+if ! command -v grub-mkrescue &>/dev/null || ! command -v xorriso &>/dev/null; then
+    echo "[!] Error: 'grub-mkrescue' or 'xorriso' utility not found."
+    echo "    Install missing host dependencies via:"
+    echo "      Arch Linux:    sudo pacman -S --needed grub xorriso"
+    echo "      Debian/Ubuntu: sudo apt install grub-common xorriso mtools"
+    echo "      Fedora:        sudo dnf install grub2-tools xorriso mtools"
     exit 1
 fi
 
