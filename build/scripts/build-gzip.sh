@@ -32,7 +32,8 @@ rm -rf "$BUILD_DIR"; mkdir -p "$BUILD_DIR"; cd "$BUILD_DIR"
     --prefix=/usr \
     CC="${CROSS}-gcc" \
     CFLAGS="--sysroot=$SYSROOT -I$SYSROOT/usr/include" \
-    LDFLAGS="--sysroot=$SYSROOT -L$SYSROOT/usr/lib"
+    LDFLAGS="--sysroot=$SYSROOT -L$SYSROOT/usr/lib" \
+    FORCE_UNSAFE_CONFIGURE=1
 
 make -j"$(nproc)"
 make DESTDIR="$SYSROOT" install

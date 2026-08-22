@@ -77,7 +77,7 @@ make distclean >/dev/null 2>&1 || true
 make -j"${KRATOS_JOBS:-$(nproc)}" \
     CC="$CC --sysroot=$SYSROOT" \
     AR="$AR" \
-    CFLAGS="-O2 -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2" \
+    CFLAGS="-O2 -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2 -Wno-unterminated-string-initialization" \
     LDFLAGS="--sysroot=$SYSROOT" \
     lib
 

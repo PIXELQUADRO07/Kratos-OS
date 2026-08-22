@@ -60,7 +60,8 @@ echo "[+] Configuring coreutils..."
     CFLAGS="--sysroot=$SYSROOT -I$SYSROOT/usr/include" \
     LDFLAGS="--sysroot=$SYSROOT -L$SYSROOT/usr/lib" \
     fu_cv_sys_stat_statfs2_bsize=yes \
-    gl_cv_func_working_mkstemp=yes
+    gl_cv_func_working_mkstemp=yes \
+    FORCE_UNSAFE_CONFIGURE=1
 
 echo "[+] Building coreutils ($(nproc) jobs)..."
 make -j"$(nproc)"
