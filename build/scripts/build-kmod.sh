@@ -50,8 +50,8 @@ echo "[+] Configuring kmod..."
     LDFLAGS="--sysroot=$SYSROOT -L$SYSROOT/usr/lib" \
     liblzma_CFLAGS="-I$SYSROOT/usr/include" \
     liblzma_LIBS="-L$SYSROOT/usr/lib -llzma" \
-    zstd_CFLAGS="-I$SYSROOT/usr/include" \
-    zstd_LIBS="-L$SYSROOT/usr/lib -lzstd" \
+    libzstd_CFLAGS="-I$SYSROOT/usr/include" \
+    libzstd_LIBS="-L$SYSROOT/usr/lib -lzstd" \
     zlib_CFLAGS="-I$SYSROOT/usr/include" \
     zlib_LIBS="-L$SYSROOT/usr/lib -lz" \
     PKG_CONFIG=/bin/false

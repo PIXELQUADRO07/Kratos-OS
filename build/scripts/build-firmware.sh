@@ -37,7 +37,7 @@ ARCHIVE="$DOWNLOAD_DIR/linux-firmware-$FIRMWARE_VERSION.tar.gz"
 
 if [ ! -f "$ARCHIVE" ]; then
     echo "[+] Downloading linux-firmware $FIRMWARE_VERSION..."
-    curl -L "https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/snapshot/linux-firmware-$FIRMWARE_VERSION.tar.gz" \
+    curl -L "https://mirrors.edge.kernel.org/pub/linux/kernel/firmware/linux-firmware-$FIRMWARE_VERSION.tar.gz" \
          -o "$ARCHIVE"
 else
     echo "[~] linux-firmware archive already present."

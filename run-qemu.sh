@@ -29,6 +29,8 @@ IMAGE_DEFAULT="$SCRIPT_DIR/build/images/kratosos.img"
 # ---------------------------------------------------------------------------
 
 GRAPHIC=false
+VNC=false
+SNAPSHOT=false
 KVM=true
 NO_KVM=false
 MEM="512M"
@@ -42,6 +44,8 @@ DRY_RUN=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --graphic)        GRAPHIC=true        ;;
+        --vnc)            VNC=true            ;;
+        --snapshot)       SNAPSHOT=true       ;;
         --kvm)            KVM=true            ;;
         --no-kvm)         NO_KVM=true; KVM=false ;;
         --mem)            MEM="$2"; shift     ;;
@@ -168,9 +172,18 @@ else
     CMD+=(-cpu qemu64)
 fi
 
+if $SNAPSHOT; then
+    CMD+=(-snapshot)
+    echo "  Snapshot mode: enabled (changes will not be saved)"
+fi
+
 if $GRAPHIC; then
-    CMD+=(-vga virtio)
+    CMD+=(-vga std)
     echo "${YELLOW}  VGA window mode. Close the window or press Ctrl-C to quit.${RESET}"
+elif $VNC; then
+    CMD+=(-vga std -vnc :1)
+    echo "${YELLOW}  VNC mode enabled on display :1 (port 5901).${RESET}"
+    echo "  Connect using: ${BOLD}vncviewer localhost:5901${RESET}"
 else
     CMD+=(-nographic)
     echo "  Serial console mode."
@@ -179,8 +192,8 @@ else
 fi
 
 # Serial port: forward to stdio (already done by -nographic; add explicitly
-# for graphic mode so boot messages still appear on the terminal)
-if $GRAPHIC; then
+# for graphic/VNC mode so boot messages still appear on the terminal)
+if $GRAPHIC || $VNC; then
     CMD+=(-serial stdio)
 fi
 
