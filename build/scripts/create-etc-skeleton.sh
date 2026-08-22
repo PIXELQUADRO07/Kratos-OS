@@ -68,10 +68,10 @@ bin:x:1:daemon
 sys:x:2:
 kmem:x:3:
 tape:x:4:
-tty:x:5:kratos-live
+tty:x:5:root,kratos-live
 daemon:x:6:
 floppy:x:7:
-disk:x:8:
+disk:x:8:root
 lp:x:9:
 dialout:x:10:
 audio:x:11:root,kratos-live

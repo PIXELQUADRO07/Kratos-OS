@@ -91,6 +91,8 @@ declare -a STAGES=(
     "tar|build-tar.sh|no|tar"
     "gzip|build-gzip.sh|no|gzip"
     "xz|build-xz.sh|no|xz"
+    "zlib|build-zlib.sh|no|zlib compression library"
+    "zstd|build-zstd.sh|no|zstd compression library"
     "bzip2|build-bzip2.sh|no|bzip2"
     "kmod|build-kmod.sh|no|Kernel module utilities (modprobe, ...)"
     "file|build-file.sh|no|file (magic detection)"
