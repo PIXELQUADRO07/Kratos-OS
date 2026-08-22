@@ -108,11 +108,14 @@ PACKAGES=(
     "fontconfig"
     "glib"
     "pixman"
-    # Future/Missing:
-    # "xorg-server"
-    # "xfce4-session"
-    # "xfwm4"
-    # "xfdesktop"
+    "dbus"
+    "xorg-server"
+    "xinit"
+    "xfce4-session"
+    "xfwm4"
+    "xfdesktop"
+    "xfce4-panel"
+    "xfce4-terminal"
 )
 
 echo "[+] Installing target packages..."

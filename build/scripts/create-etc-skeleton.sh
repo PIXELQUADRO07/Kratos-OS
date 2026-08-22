@@ -119,7 +119,36 @@ group:     files
 shadow:    files
 hosts:     files dns
 networks:  files
+protocols: files
+services:  files
+ethers:    files
+rpc:       files
 EOF
+
+echo "[+] Creating /etc/protocols..."
+cat > "$ETC/protocols" <<'EOF'
+ip      0       IP
+icmp    1       ICMP
+igmp    2       IGMP
+ggp     3       GGP
+tcp     6       TCP
+pup     12      PUP
+udp     17      UDP
+idp     22      IDP
+raw     255     RAW
+EOF
+
+echo "[+] Creating /etc/services..."
+cat > "$ETC/services" <<'EOF'
+ssh             22/tcp
+domain          53/tcp
+domain          53/udp
+http            80/tcp
+https           443/tcp
+EOF
+
+echo "[+] Creating /etc/localtime..."
+ln -sf /usr/share/zoneinfo/UTC "$ETC/localtime"
 
 echo "[+] Creating /etc/ld.so.conf..."
 cat > "$ETC/ld.so.conf" <<'EOF'

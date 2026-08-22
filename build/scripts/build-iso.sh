@@ -117,10 +117,16 @@ INITRAMFS_OUT="$ISO_ROOT/boot/initramfs.cpio.gz"
 echo "  Archiving sysroot (this may take a moment)..."
 (
     cd "$SYSROOT"
+    # Essential for initramfs: kernel often looks for /init
+    ln -sf sbin/init init
+
     # Find all files except boot/ and build stamps
     find . -path "./boot" -prune -o -print0 | \
         cpio --null -ov --format=newc | \
         gzip -9 > "$INITRAMFS_OUT"
+
+    # Clean up the temporary symlink from sysroot source to avoid cluttering it
+    rm -f init
 )
 echo "[✓] Initramfs created: $INITRAMFS_OUT"
 echo "  Size: $(du -sh "$INITRAMFS_OUT" | cut -f1)"
