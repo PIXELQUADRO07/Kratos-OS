@@ -120,6 +120,18 @@ if [ ! -f "$KBUILD_DIR/.config" ]; then
         --enable  CONFIG_LOGO             \
         --enable  CONFIG_LOGO_LINUX_CLUT224 \
         --enable  CONFIG_FB_CONSOLE_DEFERRED_TAKEOVER \
+        --enable  CONFIG_FB_VESA          \
+        --enable  CONFIG_ACPI_VIDEO       \
+        --enable  CONFIG_BACKLIGHT_CLASS_DEVICE \
+        --enable  CONFIG_DRM_I915         \
+        --enable  CONFIG_DRM_AMDGPU       \
+        --enable  CONFIG_DRM_RADEON       \
+        --enable  CONFIG_DRM_NOUVEAU      \
+        --enable  CONFIG_DRM_AST          \
+        --enable  CONFIG_DRM_MGAG200      \
+        --enable  CONFIG_DRM_QXL          \
+        --enable  CONFIG_DRM_BOCHS        \
+        --enable  CONFIG_DRM_VMWGFX       \
         2>/dev/null || true  # tolerate older trees without scripts/config
 
     # x86_64 defconfig builds VIRTIO_BLK/VIRTIO_PCI as modules (=m) by
@@ -129,6 +141,26 @@ if [ ! -f "$KBUILD_DIR/.config" ]; then
     # panics with "VFS: Unable to mount root fs". They must be built-in.
     #
     # We also force Video/DRM drivers to be built-in (=y) to avoid "blind" boot.
+    #
+    # NOTE: forcing every GPU driver below to =y (rather than =m, loaded on
+    # demand) is a deliberate simplicity/reliability tradeoff, not a
+    # permanent choice: this boot chain has no initramfs-time module
+    # loading (same reason VIRTIO_BLK/VIRTIO_PCI are forced =y above), so
+    # a driver built as a module would need kratos-devd's hotplug modprobe
+    # path to run reliably *before* Xorg starts in rc.d — which hasn't been
+    # verified end-to-end yet. Built-in avoids depending on that, at the
+    # cost of a noticeably larger vmlinuz and slightly slower decompression
+    # at boot (i915/amdgpu/nouveau are large drivers). Once modprobe-on-
+    # hotplug is confirmed reliable this early in boot, switching these
+    # back to =m is worth revisiting.
+    #
+    # ALSO NOTE: i915/amdgpu/nouveau typically need firmware blobs (GuC/HuC
+    # for Intel, DC/PSP/VCN for AMD, signed firmware for several Nouveau
+    # generations) from linux-firmware to reach full functionality. Without
+    # them the driver still loads and basic modesetting/output generally
+    # still works, but expect warnings in dmesg and degraded power
+    # management / no hardware video decode until linux-firmware's relevant
+    # files are copied into the sysroot's /lib/firmware before packaging.
     sed -i \
         -e 's/^CONFIG_VIRTIO_PCI=m/CONFIG_VIRTIO_PCI=y/' \
         -e 's/^CONFIG_VIRTIO_BLK=m/CONFIG_VIRTIO_BLK=y/' \
@@ -138,6 +170,16 @@ if [ ! -f "$KBUILD_DIR/.config" ]; then
         -e 's/^CONFIG_DRM_VIRTIO_GPU=m/CONFIG_DRM_VIRTIO_GPU=y/' \
         -e 's/^CONFIG_FB_EFI=m/CONFIG_FB_EFI=y/' \
         -e 's/^CONFIG_SYSFB_SIMPLEFB=m/CONFIG_SYSFB_SIMPLEFB=y/' \
+        -e 's/^CONFIG_FB_VESA=m/CONFIG_FB_VESA=y/' \
+        -e 's/^CONFIG_DRM_I915=m/CONFIG_DRM_I915=y/' \
+        -e 's/^CONFIG_DRM_AMDGPU=m/CONFIG_DRM_AMDGPU=y/' \
+        -e 's/^CONFIG_DRM_RADEON=m/CONFIG_DRM_RADEON=y/' \
+        -e 's/^CONFIG_DRM_NOUVEAU=m/CONFIG_DRM_NOUVEAU=y/' \
+        -e 's/^CONFIG_DRM_AST=m/CONFIG_DRM_AST=y/' \
+        -e 's/^CONFIG_DRM_MGAG200=m/CONFIG_DRM_MGAG200=y/' \
+        -e 's/^CONFIG_DRM_QXL=m/CONFIG_DRM_QXL=y/' \
+        -e 's/^CONFIG_DRM_BOCHS=m/CONFIG_DRM_BOCHS=y/' \
+        -e 's/^CONFIG_DRM_VMWGFX=m/CONFIG_DRM_VMWGFX=y/' \
         "$KBUILD_DIR/.config" 2>/dev/null || true
     # loads kernel modules, so if these stay as modules the kernel simply
     # cannot see /dev/vda when QEMU is run with -drive if=virtio, and it

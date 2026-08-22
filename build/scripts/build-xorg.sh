@@ -10,12 +10,45 @@ source "$SCRIPT_DIR/../config/build.conf"
 source "$SCRIPT_DIR/../config/versions.conf"
 
 SYSROOT="$KRATOS_SYSROOT"
+TOOLS="$KRATOS_TOOLS"
+CC="$TOOLS/bin/$TARGET-gcc"
+
+VTSWITCH_SRC="$KRATOS_ROOT/init/kratos-vtswitch.c"
+VTSWITCH_OUT="$SYSROOT/sbin/kratos-vtswitch"
 
 echo "========================================"
 echo "      KRATOSOS X11 STACK CONFIG"
 echo "========================================"
 echo "  Sysroot: $SYSROOT"
 echo
+
+# 0. Compile kratos-vtswitch — see kratos-vtswitch.c for why this exists:
+#    Xorg cannot switch to its own VT when run as a non-root user without
+#    systemd-logind (both true here), so start-live.sh needs a root-side
+#    helper to do it instead.
+if [ ! -f "$CC" ]; then
+    echo "[!] Cross-compiler not found: $CC"
+    exit 1
+fi
+
+if [ -f "$VTSWITCH_SRC" ]; then
+    echo "[+] Compiling /sbin/kratos-vtswitch..."
+    mkdir -p "$SYSROOT/sbin"
+    "$CC" \
+        --sysroot="$SYSROOT" \
+        -O2 \
+        -Wall \
+        -Wextra \
+        -std=gnu11 \
+        -fstack-protector-strong \
+        -D_FORTIFY_SOURCE=2 \
+        -fPIE \
+        -o "$VTSWITCH_OUT" \
+        "$VTSWITCH_SRC" \
+        -pie \
+        -Wl,-z,relro,-z,now
+    echo "[✓] kratos-vtswitch compiled."
+fi
 
 # 1. Ensure required X11 directories exist in sysroot
 mkdir -p "$SYSROOT/etc/X11/xorg.conf.d"
