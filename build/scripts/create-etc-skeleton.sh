@@ -105,6 +105,12 @@ kratos-live::19700:0:99999:7:::
 EOF
 chmod 600 "$ETC/shadow"
 
+echo "[+] Creating /etc/hosts..."
+cat > "$ETC/hosts" <<'EOF'
+127.0.0.1   localhost kratos-os
+::1         localhost kratos-os
+EOF
+
 echo "[+] Creating /etc/nsswitch.conf..."
 cat > "$ETC/nsswitch.conf" <<'EOF'
 # KratosOS NSS configuration
@@ -113,6 +119,13 @@ group:     files
 shadow:    files
 hosts:     files dns
 networks:  files
+EOF
+
+echo "[+] Creating /etc/ld.so.conf..."
+cat > "$ETC/ld.so.conf" <<'EOF'
+/usr/local/lib
+/opt/lib
+include /etc/ld.so.conf.d/*.conf
 EOF
 
 echo "[+] Creating /etc/shells..."
@@ -373,7 +386,20 @@ echo "
 # 2. Setup /etc/mtab
 ln -sf /proc/self/mounts /etc/mtab 2>/dev/null || true
 
-# 3. Clean up temporary files from previous boot
+# 3. Generate D-Bus machine-id if missing
+if [ ! -f /etc/machine-id ]; then
+    echo "[rc.sysinit] Generating /etc/machine-id..."
+    # Use kernel UUID as a source for machine-id
+    cat /proc/sys/kernel/random/uuid | tr -d '-' > /etc/machine-id
+fi
+
+# 4. Update shared library cache
+if [ -x /sbin/ldconfig ]; then
+    echo "[rc.sysinit] Updating shared library cache..."
+    ldconfig
+fi
+
+# 5. Clean up temporary files from previous boot
 echo "[rc.sysinit] Cleaning /tmp and /run..."
 rm -rf /run/* /tmp/*
 mkdir -p /run/lock /run/user /run/shm

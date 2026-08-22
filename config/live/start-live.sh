@@ -28,6 +28,13 @@ fi
 mkdir -p /run/dbus /run/user/0
 chown 18:18 /run/dbus 2>/dev/null || true
 
+# Setup XDG_RUNTIME_DIR for root (Parrot OS style)
+export XDG_RUNTIME_DIR=/run/user/0
+if [ ! -d "$XDG_RUNTIME_DIR" ]; then
+    mkdir -p "$XDG_RUNTIME_DIR"
+    chmod 700 "$XDG_RUNTIME_DIR"
+fi
+
 if command -v dbus-daemon >/dev/null 2>&1 && [ ! -e /run/dbus/system_bus_socket ]; then
     echo "[Live] Starting system D-Bus daemon..."
     dbus-daemon --system --fork 2>/dev/null || true
