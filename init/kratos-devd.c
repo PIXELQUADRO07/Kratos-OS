@@ -136,21 +136,29 @@ static void apply_device_rules(const uevent_t *ev)
              strncmp(ev->devname, "nvme", 4) == 0)
     {
         mode = 0660;
-        gid = resolve_group("disk", 6);
+        gid = resolve_group("disk", 8);
     }
     /* Input devices */
     else if (strcmp(ev->subsystem, "input") == 0 ||
              strncmp(ev->devname, "input/", 6) == 0)
     {
         mode = 0660;
-        gid = resolve_group("input", 107);
+        gid = resolve_group("input", 24);
     }
     /* Sound / Audio devices */
     else if (strcmp(ev->subsystem, "sound") == 0 ||
              strncmp(ev->devname, "snd/", 4) == 0)
     {
         mode = 0660;
-        gid = resolve_group("audio", 29);
+        gid = resolve_group("audio", 11);
+    }
+    /* Graphics devices (DRM/KMS and Framebuffer) */
+    else if (strcmp(ev->subsystem, "drm") == 0 ||
+             strncmp(ev->devname, "fb", 2) == 0 ||
+             strncmp(ev->devname, "dri/", 4) == 0)
+    {
+        mode = 0660;
+        gid = resolve_group("video", 12);
     }
 
     /* Create parent directories in /dev if needed (e.g. /dev/input/event0) */

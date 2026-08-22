@@ -132,14 +132,14 @@ echo "[Step 5] Generating custom Live CD grub.cfg..."
 BUILD_ID="$(date -u +%Y%m%dT%H%M%SZ)"
 
 cat > "$ISO_ROOT/boot/grub/grub.cfg" << GRUB_EOF
-# KratosOS Live ISO GRUB Configuration
+# KratosOS Live ISO GRUB Configuration (Parrot OS style)
 set timeout=10
 set default=0
 
 # Console & Serial output
 serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1
 terminal_input console serial
-terminal_output console serial
+terminal_output gfxterm serial
 
 # Custom Splash / gfxterm if available
 if loadfont /boot/grub/fonts/unicode.pf2 ; then
@@ -156,58 +156,38 @@ menuentry "KratosOS Live Session (XFCE)" {
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel..."
-    linux /boot/vmlinuz rw rdinit=/sbin/init console=tty0 console=ttyS0,115200 kratos.live earlycon=efifb earlyprintk=efi quiet
+    linux /boot/vmlinuz rw rdinit=/sbin/init console=tty0 loglevel=3 kratos.live quiet
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS Live Environment..."
     boot
 }
 
-menuentry "KratosOS Live (Console Only)" {
+menuentry "KratosOS Live (Safe Graphics / Nomodeset)" {
     insmod part_gpt
     insmod fat
     insmod iso9660
     insmod ext2
     insmod linux
-    echo "Loading Linux Kernel..."
-    linux /boot/vmlinuz rw rdinit=/sbin/init console=tty0 console=ttyS0,115200 loglevel=3 kratos.build=${BUILD_ID} earlycon=efifb earlyprintk=efi quiet
+    echo "Loading Linux Kernel (Safe Graphics)..."
+    linux /boot/vmlinuz rw rdinit=/sbin/init console=tty0 nomodeset loglevel=3 kratos.live quiet
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS..."
     boot
 }
 
-menuentry "KratosOS Live (Emergency Bash Shell)" {
+menuentry "KratosOS Live (Debug Mode - Verbose)" {
     insmod part_gpt
     insmod fat
     insmod iso9660
     insmod ext2
     insmod linux
-    echo "Loading Linux Kernel..."
-    linux /boot/vmlinuz rw rdinit=/sbin/init init=/bin/bash console=tty0 console=ttyS0,115200 loglevel=3 kratos.build=${BUILD_ID} earlycon=efifb earlyprintk=efi quiet
+    echo "Loading Linux Kernel (Debug)..."
+    linux /boot/vmlinuz rw rdinit=/sbin/init console=tty0 console=ttyS0,115200 loglevel=7 earlycon=efifb earlyprintk=efi kratos.live
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
-    echo "Booting KratosOS..."
-    boot
-}
-
-menuentry "KratosOS Live (VERBOSE - Real Hardware Debug, no quiet)" {
-    insmod part_gpt
-    insmod fat
-    insmod iso9660
-    insmod ext2
-    insmod linux
-    echo "Loading Linux Kernel..."
-    # Every other entry hides kernel output (quiet and/or loglevel=3), so a
-    # real panic on bare metal is currently only visible as the caps-lock
-    # blink. This entry drops quiet, raises loglevel, and mirrors output to
-    # both the VGA console and ttyS0 so the actual panic text is captured
-    # regardless of whether a serial cable is attached.
-    linux /boot/vmlinuz rw rdinit=/sbin/init kratos.build=${BUILD_ID} \
-        console=tty0 console=ttyS0,115200 loglevel=8 ignore_loglevel earlyprintk=vga
-    echo "Loading Live Ramdisk..."
-    initrd /boot/initramfs.cpio.gz
-    echo "Booting KratosOS (verbose)..."
+    echo "Booting KratosOS (debug)..."
     boot
 }
 

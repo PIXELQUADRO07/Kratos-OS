@@ -12,11 +12,21 @@ set default=0
 insmod part_gpt
 insmod ext2
 insmod linux
+insmod all_video
+insmod gfxterm
+insmod gettext
 
-# Serial and console terminal configuration (crucial for headless / QEMU -nographic)
+# Visual Theme (Parrot OS style splash support)
+if loadfont /boot/grub/fonts/unicode.pf2 ; then
+    set gfxmode=auto
+    terminal_output gfxterm
+fi
+
+# Serial and console terminal configuration
+# Parrot OS style: primary console is VGA (tty0), serial is secondary.
 serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1
 terminal_input console serial
-terminal_output console serial
+terminal_output gfxterm serial
 
 menuentry "KratosOS 0.7.8.2 Live Session (XFCE)" --class kratos --class os {
     insmod part_gpt
@@ -24,7 +34,17 @@ menuentry "KratosOS 0.7.8.2 Live Session (XFCE)" --class kratos --class os {
     insmod linux
     search --no-floppy --fs-uuid --set=root @ROOT_UUID@
     echo "Loading KratosOS Linux Kernel (Live Mode)..."
-    linux /boot/vmlinuz root=PARTUUID=@ROOT_PARTUUID@ rw init=/sbin/init console=tty0 console=ttyS0,115200 loglevel=3 kratos.build=@BUILD_ID@ kratos.live earlycon=efifb earlyprintk=efi quiet
+    # Parrot OS style: quiet, loglevel=3, no unstable debug earlycon/earlyprintk
+    linux /boot/vmlinuz root=PARTUUID=@ROOT_PARTUUID@ rw init=/sbin/init console=tty0 loglevel=3 kratos.build=@BUILD_ID@ kratos.live quiet
+}
+
+menuentry "KratosOS 0.7.8.2 Live (Safe Graphics / Nomodeset)" --class kratos --class os {
+    insmod part_gpt
+    insmod ext2
+    insmod linux
+    search --no-floppy --fs-uuid --set=root @ROOT_UUID@
+    echo "Loading KratosOS (Safe Graphics)..."
+    linux /boot/vmlinuz root=PARTUUID=@ROOT_PARTUUID@ rw init=/sbin/init console=tty0 nomodeset loglevel=3 kratos.build=@BUILD_ID@ kratos.live quiet
 }
 
 menuentry "KratosOS 0.7.8.2 (Console Only)" --class kratos --class os {
@@ -33,16 +53,17 @@ menuentry "KratosOS 0.7.8.2 (Console Only)" --class kratos --class os {
     insmod linux
     search --no-floppy --fs-uuid --set=root @ROOT_UUID@
     echo "Loading KratosOS..."
-    linux /boot/vmlinuz root=PARTUUID=@ROOT_PARTUUID@ rw init=/sbin/init console=tty0 console=ttyS0,115200 loglevel=3 kratos.build=@BUILD_ID@ earlycon=efifb earlyprintk=efi quiet
+    linux /boot/vmlinuz root=PARTUUID=@ROOT_PARTUUID@ rw init=/sbin/init console=tty0 loglevel=3 kratos.build=@BUILD_ID@ quiet
 }
 
-menuentry "KratosOS 0.7.8.2 (Emergency Bash Shell)" --class kratos --class os {
+menuentry "KratosOS 0.7.8.2 (Debug Mode - Verbose)" --class kratos --class os {
     insmod part_gpt
     insmod ext2
     insmod linux
     search --no-floppy --fs-uuid --set=root @ROOT_UUID@
-    echo "Starting emergency maintenance shell..."
-    linux /boot/vmlinuz root=PARTUUID=@ROOT_PARTUUID@ rw init=/bin/bash console=tty0 console=ttyS0,115200 loglevel=3 kratos.build=@BUILD_ID@ earlycon=efifb earlyprintk=efi quiet
+    echo "Loading KratosOS (Debug)..."
+    # Re-enable early debugging for troubleshooting
+    linux /boot/vmlinuz root=PARTUUID=@ROOT_PARTUUID@ rw init=/sbin/init console=tty0 console=ttyS0,115200 loglevel=7 kratos.build=@BUILD_ID@ earlycon=efifb earlyprintk=efi
 }
 
 menuentry "Power Off System" {

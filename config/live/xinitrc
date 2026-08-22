@@ -4,15 +4,17 @@
 # Set up cursor
 xsetroot -cursor_name left_ptr 2>/dev/null || true
 
-# Set up desktop layout if user is kratos-live
-USER_HOME="/home/kratos-live"
+# Set up desktop layout
+# If running as root, HOME is /root. If running as kratos-live, HOME is /home/kratos-live.
+USER_HOME="$HOME"
 if [ -d "$USER_HOME" ]; then
     mkdir -p "$USER_HOME/Desktop"
     if [ -f "/etc/live/kratosos-live.desktop" ]; then
         cp /etc/live/kratosos-live.desktop "$USER_HOME/Desktop/kratosos-live.desktop"
         chmod +x "$USER_HOME/Desktop/kratosos-live.desktop"
     fi
-    chown -R kratos-live:kratos-live "$USER_HOME/Desktop" 2>/dev/null || true
+    # Only chown if we are root and the directory belongs to someone else
+    # (though in live mode root usually owns everything in its own home)
 fi
 
 # Start D-Bus session if available

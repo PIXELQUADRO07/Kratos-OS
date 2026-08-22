@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
                     /* Autologin on primary virtual consoles and the current VC (/dev/tty0) */
                     if (tty && (strcmp(tty, "/dev/tty1") == 0 || strcmp(tty, "/dev/tty0") == 0 ||
                                 strcmp(tty, "/dev/console") == 0)) {
-                        forced_user = "kratos-live";
+                        forced_user = "root";
                         force_login = 1;
                     }
                 }

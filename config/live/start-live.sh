@@ -1,85 +1,85 @@
 #!/bin/bash
 # /etc/live/start-live.sh — Live Environment Initialization and Graphical Boot
+#
+# Inspired by Parrot OS / Debian Live (live-config) workflows.
 
 echo "[Live] Initializing KratosOS Live Environment..."
 
-# 1. Ensure /run/dbus directory and system dbus are available
-mkdir -p /run/dbus /run/user/1000
+# 1. Hardware Wait Loop (Parrot OS style)
+# Real hardware can be slower than QEMU at initializing DRM drivers.
+# We wait for the graphics node to appear before attempting to start X.
+echo "[Live] Waiting for graphics device..."
+READY=0
+for i in $(seq 1 15); do
+    if [ -e /dev/dri/card0 ] || [ -e /dev/fb0 ]; then
+        echo "[Live] Graphics device ready."
+        READY=1
+        break
+    fi
+    sleep 1
+done
+
+if [ "$READY" -eq 0 ]; then
+    echo "[Live] Warning: no graphics device detected after 15s. X might fail."
+fi
+
+# 2. Ensure /run/dbus directory and system dbus are available
+# D-Bus is mandatory for XFCE session stability.
+mkdir -p /run/dbus /run/user/0
 chown 18:18 /run/dbus 2>/dev/null || true
-chown kratos-live:kratos-live /run/user/1000 2>/dev/null || true
 
 if command -v dbus-daemon >/dev/null 2>&1 && [ ! -e /run/dbus/system_bus_socket ]; then
     echo "[Live] Starting system D-Bus daemon..."
     dbus-daemon --system --fork 2>/dev/null || true
+    # Give D-Bus a moment to initialize its socket
+    sleep 1
 fi
 
-# 2. Setup user home environment
-if [ -d /home/kratos-live ]; then
-    mkdir -p /home/kratos-live/Desktop
-    if [ -f /etc/live/kratosos-live.desktop ]; then
-        cp /etc/live/kratosos-live.desktop /home/kratos-live/Desktop/
-        chmod +x /home/kratos-live/Desktop/kratosos-live.desktop
-    fi
-    cp /etc/live/xinitrc /home/kratos-live/.xinitrc 2>/dev/null || true
-    chmod +x /home/kratos-live/.xinitrc
-    chown -R kratos-live:kratos-live /home/kratos-live 2>/dev/null || true
+# 3. Setup root home environment
+echo "[Live] Preparing root desktop..."
+mkdir -p /root/Desktop
+if [ -f /etc/live/kratosos-live.desktop ]; then
+    cp /etc/live/kratosos-live.desktop /root/Desktop/
+    chmod +x /root/Desktop/kratosos-live.desktop
 fi
+cp /etc/live/xinitrc /root/.xinitrc 2>/dev/null || true
+chmod +x /root/.xinitrc
 
-# 3. Launch X11 GUI as kratos-live user on VT7
-#
-# Xorg normally switches the active VT to itself once it finishes
-# initializing — but that requires CAP_SYS_TTY_CONFIG (effectively root)
-# or a running systemd-logind session to grant it. KratosOS has neither:
-# X is started as the unprivileged kratos-live user below, and there is
-# no logind. So Xorg's own self-switch silently never happens: X ends
-# up running correctly but invisibly on VT7, while the console just
-# looks frozen on whatever was last printed — indistinguishable, from
-# the screen alone, from the machine actually hanging.
-#
-# Fix: switch to VT7 explicitly, as root, via kratos-vtswitch, BEFORE
-# starting X — so by the time Xorg starts, VT7 is already the active
-# one and Xorg doesn't need a switch permission it doesn't have. If X
-# still doesn't come up within the timeout, switch back to the console
-# VT (1 — the VT login.c autologins kratos-live on) and print Xorg's
-# own log, which it always writes to disk regardless of what's
-# happening on the terminal, so a real failure is visible instead of
-# just a blank/stuck-looking screen.
+# 4. Launch X11 GUI as root on VT7
 if command -v startx >/dev/null 2>&1; then
     HAVE_VTSWITCH=0
     if command -v kratos-vtswitch >/dev/null 2>&1; then
         HAVE_VTSWITCH=1
         echo "[Live] Switching to VT7 before starting X..."
-        kratos-vtswitch 7 || echo "[Live] Warning: could not switch to VT7 (continuing anyway)."
-    else
-        echo "[Live] Warning: kratos-vtswitch not found — X may start invisibly."
+        kratos-vtswitch 7 || echo "[Live] Warning: could not switch to VT7."
     fi
 
     echo "[Live] Starting graphical XFCE session..."
-    su - kratos-live -c "startx /etc/live/xinitrc -- vt7" &
+    # We export HOME to ensure Xorg and XFCE find the correct configs.
+    export HOME=/root
+    startx /etc/live/xinitrc -- vt7 >/var/log/Xorg.start.log 2>&1 &
 
-    READY=0
+    # Verify startup
+    X_READY=0
     for i in $(seq 1 30); do
         if [ -e /tmp/.X11-unix/X0 ]; then
-            READY=1
+            X_READY=1
             break
         fi
         sleep 1
     done
 
-    if [ "$READY" -eq 1 ]; then
+    if [ "$X_READY" -eq 1 ]; then
         echo "[Live] X server is up."
     else
-        echo "[Live] X server did NOT come up within 30s."
+        echo "[Live] X server did NOT come up. Checking logs..."
         if [ "$HAVE_VTSWITCH" -eq 1 ]; then
-            echo "[Live] Switching back to VT1..."
             kratos-vtswitch 1 || true
         fi
-        echo "[Live] Xorg log (if any):"
-        for log in /home/kratos-live/.local/share/xorg/Xorg.0.log /var/log/Xorg.0.log; do
+        for log in /var/log/Xorg.0.log /var/log/Xorg.start.log; do
             if [ -f "$log" ]; then
                 echo "[Live] --- $log ---"
-                tail -n 40 "$log"
-                break
+                tail -n 30 "$log"
             fi
         done
     fi
