@@ -124,8 +124,10 @@ int main(int argc, char *argv[])
     /* Belt-and-braces: enforce mode + ownership even if the file already
      * existed with different permissions (e.g. leftover from a previous
      * failed run) and force root:root ownership. */
-    fchmod(fout_fd, S_IRUSR | S_IWUSR);
-    fchown(fout_fd, 0, 0);
+    if (fchmod(fout_fd, S_IRUSR | S_IWUSR) < 0)
+        perror("[passwd] fchmod shadow");
+    if (fchown(fout_fd, 0, 0) < 0)
+        perror("[passwd] fchown shadow");
 
     char line[512];
     int updated = 0;

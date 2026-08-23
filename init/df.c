@@ -105,9 +105,9 @@ int main(int argc, char *argv[])
                                        (mlen > 0 && mp[mlen-1] == '/'));
                     if (mlen > 0 && strncmp(target, mp, mlen) == 0 && boundary_ok && mlen > best_len) {
                         best_len = mlen;
-                        strncpy(best_dev, dev, sizeof(best_dev) - 1);
-                        strncpy(best_mp, mp, sizeof(best_mp) - 1);
-                        strncpy(best_type, type, sizeof(best_type) - 1);
+                        snprintf(best_dev, sizeof(best_dev), "%s", dev);
+                        snprintf(best_mp, sizeof(best_mp), "%s", mp);
+                        snprintf(best_type, sizeof(best_type), "%s", type);
                     }
                 }
             }

@@ -207,17 +207,75 @@ parted -s "$IMAGE" \
     "${ESP_SIZE_MB}MiB" 100%
 
 echo "[✓] Partition table:"
-parted "$IMAGE" print
+parted -s "$IMAGE" print
 
 # ------------------------------------------------------------
 # Step 3: Attach loop device
+#
+# util-linux prints the *image path* on failure even when ENOENT
+# actually refers to /dev/loop-control or /dev/loopNpY (udev race
+# with CONFIG_BLK_DEV_LOOP_MIN_COUNT=0). Attach first, then scan
+# partitions — combining --find --show --partscan in one call is
+# what produced "failed to set up loop device: No such file or
+# directory" after parted had already written a valid GPT.
 # ------------------------------------------------------------
 
 echo
 echo "[Step 3] Attaching loop device..."
 
-LOOPDEV="$(losetup --find --show --partscan "$IMAGE")"
+sync
+if [ ! -f "$IMAGE" ]; then
+    echo "[!] Image file missing after partitioning: $IMAGE"
+    exit 1
+fi
+
+if [ ! -e /dev/loop-control ]; then
+    echo "[+] Loading host loop kernel module..."
+    if command -v modprobe >/dev/null 2>&1; then
+        modprobe loop 2>/dev/null || true
+    fi
+fi
+
+if [ ! -e /dev/loop-control ]; then
+    echo "[!] /dev/loop-control is missing — the host loop driver is not available."
+    echo "[!] Load it with: sudo modprobe loop"
+    exit 1
+fi
+
+LOOPDEV=""
+for _try in $(seq 1 10); do
+    if LOOPDEV="$(losetup --find --show "$IMAGE" 2>/dev/null)" && [ -n "$LOOPDEV" ]; then
+        break
+    fi
+    LOOPDEV=""
+    sleep 0.2
+done
+
+if [ -z "$LOOPDEV" ]; then
+    echo "[!] losetup failed to attach $IMAGE"
+    echo "[!] Host loop diagnostics:"
+    ls -l /dev/loop-control /dev/loop[0-9]* 2>/dev/null || true
+    echo
+    losetup -a 2>/dev/null || true
+    echo
+    stat "$IMAGE" 2>/dev/null || true
+    echo
+    df -T "$IMAGE_DIR" 2>/dev/null || true
+    echo "[!] Loop backing files on FUSE/CIFS/NFS often fail; copy the image to /var/tmp and retry."
+    exit 1
+fi
+
 echo "[✓] Loop device: $LOOPDEV"
+
+# Partition scan as a separate step so a missing p1 node cannot
+# abort the whole attach.
+losetup --partscan "$LOOPDEV" 2>/dev/null || true
+if command -v partx >/dev/null 2>&1; then
+    partx --add "$LOOPDEV" 2>/dev/null || true
+fi
+if command -v blockdev >/dev/null 2>&1; then
+    blockdev --rereadpt "$LOOPDEV" 2>/dev/null || true
+fi
 
 ESP_DEV="${LOOPDEV}p1"
 ROOT_DEV="${LOOPDEV}p2"
@@ -234,6 +292,9 @@ until [ -b "$ESP_DEV" ] && [ -b "$ROOT_DEV" ]; do
     WAIT=$(( WAIT + 1 ))
     if [ "$WAIT" -ge 20 ]; then
         echo "[!] Timed out waiting for partition devices: $ESP_DEV  $ROOT_DEV"
+        echo "[!] Loop diagnostics:"
+        ls -l "$LOOPDEV"* 2>/dev/null || true
+        losetup -a 2>/dev/null || true
         exit 1
     fi
 done

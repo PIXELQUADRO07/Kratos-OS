@@ -6,6 +6,8 @@
 # Build ID:      @BUILD_ID@
 
 set timeout=5
+# Disk images ship a full rootfs (no squashfs). Default is Console Only —
+# kratos.live waits 15s looking for an ISO that is not on this image.
 set default=0
 
 # Core modules
@@ -28,6 +30,15 @@ serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1
 terminal_input console serial
 terminal_output gfxterm serial
 
+menuentry "KratosOS 0.7.8.2 (Console Only)" --class kratos --class os {
+    insmod part_gpt
+    insmod ext2
+    insmod linux
+    search --no-floppy --fs-uuid --set=root @ROOT_UUID@
+    echo "Loading KratosOS..."
+    linux /boot/vmlinuz root=PARTUUID=@ROOT_PARTUUID@ rw init=/sbin/init console=tty0 loglevel=3 kratos.build=@BUILD_ID@ quiet
+}
+
 menuentry "KratosOS 0.7.8.2 Live Session (XFCE)" --class kratos --class os {
     insmod part_gpt
     insmod ext2
@@ -45,15 +56,6 @@ menuentry "KratosOS 0.7.8.2 Live (Safe Graphics / Nomodeset)" --class kratos --c
     search --no-floppy --fs-uuid --set=root @ROOT_UUID@
     echo "Loading KratosOS (Safe Graphics)..."
     linux /boot/vmlinuz root=PARTUUID=@ROOT_PARTUUID@ rw init=/sbin/init console=tty0 nomodeset loglevel=3 kratos.build=@BUILD_ID@ kratos.live quiet
-}
-
-menuentry "KratosOS 0.7.8.2 (Console Only)" --class kratos --class os {
-    insmod part_gpt
-    insmod ext2
-    insmod linux
-    search --no-floppy --fs-uuid --set=root @ROOT_UUID@
-    echo "Loading KratosOS..."
-    linux /boot/vmlinuz root=PARTUUID=@ROOT_PARTUUID@ rw init=/sbin/init console=tty0 loglevel=3 kratos.build=@BUILD_ID@ quiet
 }
 
 menuentry "KratosOS 0.7.8.2 (Debug Mode - Verbose)" --class kratos --class os {

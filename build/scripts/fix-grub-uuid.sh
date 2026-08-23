@@ -16,9 +16,48 @@ IMAGE="$KRATOS_ROOT/build/images/kratosos.img"
 
 echo "[+] Image: $IMAGE"
 
-# Attach loop device
-LOOP="$(losetup --find --show --partscan "$IMAGE")"
+if [ ! -f "$IMAGE" ]; then
+    echo "[!] Image not found: $IMAGE"
+    exit 1
+fi
+
+if [ ! -e /dev/loop-control ]; then
+    echo "[+] Loading host loop kernel module..."
+    modprobe loop 2>/dev/null || true
+fi
+
+if [ ! -e /dev/loop-control ]; then
+    echo "[!] /dev/loop-control is missing — the host loop driver is not available."
+    exit 1
+fi
+
+# Attach first, then scan partitions (combined --partscan can ENOENT).
+LOOP=""
+for _try in $(seq 1 10); do
+    if LOOP="$(losetup --find --show "$IMAGE" 2>/dev/null)" && [ -n "$LOOP" ]; then
+        break
+    fi
+    LOOP=""
+    sleep 0.2
+done
+
+if [ -z "$LOOP" ]; then
+    echo "[!] losetup failed to attach $IMAGE"
+    ls -l /dev/loop-control /dev/loop[0-9]* 2>/dev/null || true
+    losetup -a 2>/dev/null || true
+    stat "$IMAGE" 2>/dev/null || true
+    exit 1
+fi
+
 echo "[+] Loop: $LOOP"
+
+losetup --partscan "$LOOP" 2>/dev/null || true
+if command -v partx >/dev/null 2>&1; then
+    partx --add "$LOOP" 2>/dev/null || true
+fi
+if command -v udevadm >/dev/null 2>&1; then
+    udevadm settle 2>/dev/null || true
+fi
 
 ROOT_DEV="${LOOP}p2"
 
