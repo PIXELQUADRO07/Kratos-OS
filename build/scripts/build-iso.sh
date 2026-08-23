@@ -153,31 +153,128 @@ cp -v "$SYSROOT/sbin/init" "$BOOTSTRAP_DIR/sbin/init"
 cp -v "$SYSROOT/bin/bash" "$BOOTSTRAP_DIR/bin/bash"
 ln -sf bash "$BOOTSTRAP_DIR/bin/sh"
 
-# Copy minimal required libraries (ld-linux, libc) to usr/lib
-cp -vd "$SYSROOT/usr/lib/"ld-linux* "$BOOTSTRAP_DIR/usr/lib/"
-cp -vd "$SYSROOT/usr/lib/"libc.so* "$BOOTSTRAP_DIR/usr/lib/"
-cp -vd "$SYSROOT/usr/lib/"libncursesw.so* "$BOOTSTRAP_DIR/usr/lib/"
-cp -vd "$SYSROOT/usr/lib/"libm.so* "$BOOTSTRAP_DIR/usr/lib/"
-cp -vd "$SYSROOT/usr/lib/"libdl.so* "$BOOTSTRAP_DIR/usr/lib/"
-cp -vd "$SYSROOT/usr/lib/"libpthread.so* "$BOOTSTRAP_DIR/usr/lib/"
+# Copy real ELF DT_NEEDED libraries (skip GNU ld scripts like libdl.so).
+copy_so_file() {
+    local src="$1"
+    local dest_dir="$2"
+    [ -e "$src" ] || return 0
+    if [ -f "$src" ] && ! [ -L "$src" ] && grep -q "GNU ld script" "$src" 2>/dev/null; then
+        return 0
+    fi
+    mkdir -p "$dest_dir"
+    cp -a "$src" "$dest_dir/"
+    if [ -L "$src" ]; then
+        local tgt
+        tgt="$(readlink -f "$src" || true)"
+        if [ -n "$tgt" ] && [ -e "$tgt" ] && [ "$tgt" != "$src" ]; then
+            cp -a "$tgt" "$dest_dir/"
+        fi
+    fi
+}
 
-# Copy essential modules (iso9660, squashfs, overlay, loop, cdrom)
+DEPS_SEEN="$BOOTSTRAP_DIR/.deps_seen"
+: > "$DEPS_SEEN"
+
+copy_needed_libs() {
+    local bin="$1"
+    local dest="$BOOTSTRAP_DIR/usr/lib"
+    mkdir -p "$dest"
+
+    local interp
+    interp="$(readelf -l "$bin" 2>/dev/null | sed -n 's/.*Requesting program interpreter: \(.*\)]/\1/p' || true)"
+    if [ -n "$interp" ]; then
+        local ipath="$SYSROOT$interp"
+        if [ ! -e "$ipath" ]; then
+            ipath="$(find "$SYSROOT/usr/lib" "$SYSROOT/lib" "$SYSROOT/lib64" "$SYSROOT/usr/lib64" \
+                -name "$(basename "$interp")" 2>/dev/null | head -n 1 || true)"
+        fi
+        if [ -n "$ipath" ] && [ -e "$ipath" ]; then
+            copy_so_file "$ipath" "$dest"
+            mkdir -p "$BOOTSTRAP_DIR$(dirname "$interp")"
+            if [ ! -e "$BOOTSTRAP_DIR$interp" ]; then
+                ln -sf "/usr/lib/$(basename "$(readlink -f "$ipath")")" "$BOOTSTRAP_DIR$interp" 2>/dev/null || \
+                    cp -a "$ipath" "$BOOTSTRAP_DIR$interp"
+            fi
+        fi
+    fi
+
+    local lib found real
+    while read -r lib; do
+        [ -n "$lib" ] || continue
+        grep -qxF "$lib" "$DEPS_SEEN" && continue
+        echo "$lib" >> "$DEPS_SEEN"
+        found="$(find "$SYSROOT/usr/lib" "$SYSROOT/lib" "$SYSROOT/usr/lib64" "$SYSROOT/lib64" \
+            -maxdepth 2 -name "$lib" 2>/dev/null | head -n 1 || true)"
+        if [ -z "$found" ]; then
+            echo "    [!] missing shared library $lib for $(basename "$bin")"
+            continue
+        fi
+        copy_so_file "$found" "$dest"
+        real="$(readlink -f "$found" || true)"
+        if [ -n "$real" ] && [ -f "$real" ]; then
+            copy_needed_libs "$real"
+        fi
+    done < <(readelf -d "$bin" 2>/dev/null | sed -n 's/.*Shared library: \[\(.*\)\]/\1/p' || true)
+}
+
+echo "  Resolving ELF dependencies for init and bash..."
+copy_needed_libs "$SYSROOT/sbin/init"
+copy_needed_libs "$SYSROOT/bin/bash"
+
+# Extra runtime libs often required by PIE + stack-protector init and bash.
+shopt -s nullglob
+for extra in \
+    "$SYSROOT/usr/lib/"libgcc_s.so* \
+    "$SYSROOT/lib/"libgcc_s.so* \
+    "$SYSROOT/usr/lib/"libssp.so* \
+    "$SYSROOT/usr/lib/"libreadline.so* \
+    "$SYSROOT/usr/lib/"libtinfo.so* \
+    "$SYSROOT/usr/lib/"libncursesw.so* \
+    "$SYSROOT/usr/lib/"libc.so.6 \
+    "$SYSROOT/usr/lib/"libm.so.6 \
+    "$SYSROOT/usr/lib/"libdl.so.2 \
+    "$SYSROOT/usr/lib/"libpthread.so.0 \
+    "$KRATOS_TOOLS/"*/lib/libgcc_s.so* \
+    "$KRATOS_TOOLS/"*/lib64/libgcc_s.so*
+do
+    copy_so_file "$extra" "$BOOTSTRAP_DIR/usr/lib"
+done
+shopt -u nullglob
+
+rm -f "$DEPS_SEEN"
+
+# Copy only live-boot modules (if built as modules). Skip the full tree.
+copy_kmod() {
+    local kver="$1"
+    local name="$2"
+    local src_root="$SYSROOT/lib/modules/$kver"
+    local dst_root="$BOOTSTRAP_DIR/lib/modules/$kver"
+    [ -d "$src_root" ] || return 0
+    local f
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        local rel="${f#"$src_root"/}"
+        mkdir -p "$dst_root/$(dirname "$rel")"
+        cp -a "$f" "$dst_root/$rel"
+    done < <(find "$src_root" -type f \( -name "${name}.ko" -o -name "${name}.ko.*" \) 2>/dev/null || true)
+}
+
 if [ -d "$SYSROOT/lib/modules" ]; then
     KERNEL_VER=$(ls "$SYSROOT/lib/modules" | head -n 1)
-    mkdir -p "$BOOTSTRAP_DIR/lib/modules/$KERNEL_VER"
-    # Copy kernel modules to /lib/modules (where the kernel expects them)
-    cp -r "$SYSROOT/lib/modules/$KERNEL_VER/kernel" "$BOOTSTRAP_DIR/lib/modules/$KERNEL_VER/"
-    depmod -a -b "$BOOTSTRAP_DIR" "$KERNEL_VER"
-fi
-
-# Copy essential modules (iso9660, squashfs, overlay, loop, cdrom)
-if [ -d "$SYSROOT/lib/modules" ]; then
-    KERNEL_VER=$(ls "$SYSROOT/lib/modules" | head -n 1)
-    mkdir -p "$BOOTSTRAP_DIR/lib/modules/$KERNEL_VER"
-    # For now, copy all modules to be safe, they are usually small if not GPU drivers
-    # GPU drivers are built-in anyway.
-    cp -r "$SYSROOT/lib/modules/$KERNEL_VER/kernel" "$BOOTSTRAP_DIR/lib/modules/$KERNEL_VER/"
-    depmod -a -b "$BOOTSTRAP_DIR" "$KERNEL_VER"
+    if [ -n "$KERNEL_VER" ]; then
+        mkdir -p "$BOOTSTRAP_DIR/lib/modules/$KERNEL_VER"
+        for _kmod in loop isofs squashfs overlay cdrom sr_mod sd_mod usb-storage \
+            virtio virtio_pci virtio_blk virtio_scsi virtio_ring ahci libahci ata_piix; do
+            copy_kmod "$KERNEL_VER" "$_kmod"
+        done
+        for _meta in modules.order modules.builtin modules.builtin.modinfo; do
+            if [ -e "$SYSROOT/lib/modules/$KERNEL_VER/$_meta" ]; then
+                cp -a "$SYSROOT/lib/modules/$KERNEL_VER/$_meta" \
+                    "$BOOTSTRAP_DIR/lib/modules/$KERNEL_VER/"
+            fi
+        done
+        depmod -a -b "$BOOTSTRAP_DIR" "$KERNEL_VER" || echo "[!] Warning: depmod failed."
+    fi
 fi
 
 (

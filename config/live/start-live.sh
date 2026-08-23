@@ -5,9 +5,12 @@
 
 echo "[Live] Initializing KratosOS Live Environment..."
 
+LIVE_USER="kratos-live"
+LIVE_HOME="/home/kratos-live"
+LIVE_UID=1000
+
 # 1. Hardware Wait Loop (Parrot OS style)
 # Real hardware can be slower than QEMU at initializing DRM drivers.
-# We wait for the graphics node to appear before attempting to start X.
 echo "[Live] Waiting for graphics device..."
 READY=0
 for i in $(seq 1 15); do
@@ -24,35 +27,44 @@ if [ "$READY" -eq 0 ]; then
 fi
 
 # 2. Ensure /run/dbus directory and system dbus are available
-# D-Bus is mandatory for XFCE session stability.
-mkdir -p /run/dbus /run/user/0
+mkdir -p /run/dbus /run/user/0 "/run/user/$LIVE_UID"
 chown 18:18 /run/dbus 2>/dev/null || true
 
-# Setup XDG_RUNTIME_DIR for root (Parrot OS style)
-export XDG_RUNTIME_DIR=/run/user/0
-if [ ! -d "$XDG_RUNTIME_DIR" ]; then
-    mkdir -p "$XDG_RUNTIME_DIR"
-    chmod 700 "$XDG_RUNTIME_DIR"
+if id "$LIVE_USER" >/dev/null 2>&1; then
+    SESSION_USER="$LIVE_USER"
+    SESSION_HOME="$LIVE_HOME"
+    SESSION_RUNTIME="/run/user/$LIVE_UID"
+    mkdir -p "$SESSION_HOME" "$SESSION_HOME/Desktop" "$SESSION_RUNTIME"
+    chown -R "$LIVE_USER:$LIVE_USER" "$SESSION_HOME" "$SESSION_RUNTIME" 2>/dev/null || true
+    chmod 700 "$SESSION_RUNTIME"
+else
+    echo "[Live] User $LIVE_USER not found, falling back to root."
+    SESSION_USER="root"
+    SESSION_HOME="/root"
+    SESSION_RUNTIME="/run/user/0"
+    mkdir -p "$SESSION_HOME" "$SESSION_HOME/Desktop" "$SESSION_RUNTIME"
+    chmod 700 "$SESSION_RUNTIME"
 fi
+
+export XDG_RUNTIME_DIR="$SESSION_RUNTIME"
 
 if command -v dbus-daemon >/dev/null 2>&1 && [ ! -e /run/dbus/system_bus_socket ]; then
     echo "[Live] Starting system D-Bus daemon..."
     dbus-daemon --system --fork 2>/dev/null || true
-    # Give D-Bus a moment to initialize its socket
     sleep 1
 fi
 
-# 3. Setup root home environment
-echo "[Live] Preparing root desktop..."
-mkdir -p /root/Desktop
+# 3. Setup session home environment
+echo "[Live] Preparing $SESSION_USER desktop..."
 if [ -f /etc/live/kratosos-live.desktop ]; then
-    cp /etc/live/kratosos-live.desktop /root/Desktop/
-    chmod +x /root/Desktop/kratosos-live.desktop
+    cp /etc/live/kratosos-live.desktop "$SESSION_HOME/Desktop/"
+    chmod +x "$SESSION_HOME/Desktop/kratosos-live.desktop"
 fi
-cp /etc/live/xinitrc /root/.xinitrc 2>/dev/null || true
-chmod +x /root/.xinitrc
+cp /etc/live/xinitrc "$SESSION_HOME/.xinitrc" 2>/dev/null || true
+chmod +x "$SESSION_HOME/.xinitrc" 2>/dev/null || true
+chown -R "$SESSION_USER:$SESSION_USER" "$SESSION_HOME" 2>/dev/null || true
 
-# 4. Launch X11 GUI as root on VT7
+# 4. Launch X11 GUI on VT7 (this script is already backgrounded by rc.d)
 if command -v startx >/dev/null 2>&1; then
     HAVE_VTSWITCH=0
     if command -v kratos-vtswitch >/dev/null 2>&1; then
@@ -61,30 +73,23 @@ if command -v startx >/dev/null 2>&1; then
         kratos-vtswitch 7 || echo "[Live] Warning: could not switch to VT7."
     fi
 
-    echo "[Live] Starting graphical XFCE session..."
-    # We export HOME to ensure Xorg and XFCE find the correct configs.
-    export HOME=/root
-    export USER=root
-    export LOGNAME=root
-    export XDG_RUNTIME_DIR=/run/user/0
-
+    echo "[Live] Starting graphical XFCE session as $SESSION_USER..."
+    mkdir -p /var/log
     echo "[Live] Invoking startx..." >> /var/log/Xorg.start.log
-    startx /etc/live/xinitrc -- vt7 -logverbose 6 >/var/log/Xorg.start.log 2>&1 &
 
-    # Verify startup
-    X_READY=0
-    for i in $(seq 1 30); do
-        if [ -e /tmp/.X11-unix/X0 ]; then
-            X_READY=1
-            break
-        fi
-        sleep 1
-    done
+    STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11; exec startx /etc/live/xinitrc -- vt7 -logverbose 6"
 
-    if [ "$X_READY" -eq 1 ]; then
-        echo "[Live] X server is up."
+    # Foreground startx: 99-live already launched us in the background.
+    if [ "$SESSION_USER" = "root" ]; then
+        eval "$STARTX_CMD" >>/var/log/Xorg.start.log 2>&1
+        STARTX_RC=$?
     else
-        echo "[Live] ERROR: X server did NOT come up. Checking logs..."
+        su - "$SESSION_USER" -c "$STARTX_CMD" >>/var/log/Xorg.start.log 2>&1
+        STARTX_RC=$?
+    fi
+
+    if [ "$STARTX_RC" -ne 0 ]; then
+        echo "[Live] ERROR: startx exited $STARTX_RC. Checking logs..."
         if [ "$HAVE_VTSWITCH" -eq 1 ]; then
             echo "[Live] Switching back to VT1..."
             kratos-vtswitch 1 || true

@@ -35,7 +35,7 @@ if command -v xfce4-session >/dev/null 2>&1; then
     exec xfce4-session
 elif command -v xfwm4 >/dev/null 2>&1; then
     xfwm4 &
-    xfdesktop4 &
+    xfdesktop &
     xfce4-panel &
     exec xfce4-terminal
 else

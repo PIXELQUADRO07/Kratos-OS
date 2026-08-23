@@ -81,56 +81,78 @@ fi
 
 # ── Tweak and resolve config ──────────────────────────────────────────
 echo "[+] Applying KratosOS kernel configuration tweaks..."
-cat >> "$KBUILD_DIR/.config" << EOF
-CONFIG_EFI_STUB=y
-CONFIG_DEVTMPFS=y
-CONFIG_DEVTMPFS_MOUNT=y
-CONFIG_EXT4_FS=y
-CONFIG_VFAT_FS=y
-CONFIG_NLS_CODEPAGE_437=y
-CONFIG_NLS_ISO8859_1=y
-CONFIG_PRINTK=y
-CONFIG_TTY=y
-CONFIG_SERIAL_8250=y
-CONFIG_SERIAL_8250_CONSOLE=y
-CONFIG_VIRTIO=y
-CONFIG_VIRTIO_PCI=y
-CONFIG_VIRTIO_PCI_LEGACY=y
-CONFIG_VIRTIO_BLK=y
-CONFIG_VIRTIO_MENU=y
-CONFIG_BLK_DEV_INITRD=y
-CONFIG_RD_GZIP=y
-CONFIG_SQUASHFS=y
-CONFIG_SQUASHFS_ZSTD=y
-CONFIG_SQUASHFS_XZ=y
-CONFIG_OVERLAY_FS=y
-CONFIG_ISO9660_FS=y
-CONFIG_BLK_DEV_LOOP=y
-CONFIG_FB=y
-CONFIG_FB_EFI=y
-CONFIG_FB_SIMPLE=y
-CONFIG_SYSFB=y
-CONFIG_SYSFB_SIMPLEFB=y
-CONFIG_DRM=y
-CONFIG_DRM_SIMPLEDRM=y
-CONFIG_DRM_VIRTIO_GPU=y
-CONFIG_FRAMEBUFFER_CONSOLE=y
-CONFIG_LOGO=y
-CONFIG_LOGO_LINUX_CLUT224=y
-CONFIG_FB_CONSOLE_DEFERRED_TAKEOVER=y
-CONFIG_FB_VESA=y
-CONFIG_ACPI_VIDEO=y
-CONFIG_BACKLIGHT_CLASS_DEVICE=y
-CONFIG_DRM_I915=y
-CONFIG_DRM_AMDGPU=y
-CONFIG_DRM_RADEON=y
-CONFIG_DRM_NOUVEAU=y
-CONFIG_DRM_AST=y
-CONFIG_DRM_MGAG200=y
-CONFIG_DRM_QXL=y
-CONFIG_DRM_BOCHS=y
-CONFIG_DRM_VMWGFX=y
-EOF
+
+# Build scripts/config if needed (lives in the output dir with O=).
+"${KMAKE[@]}" scripts/config >/dev/null
+
+kconfig() {
+    "$KBUILD_DIR/scripts/config" --file "$KBUILD_DIR/.config" "$@"
+}
+
+# Live-boot filesystems and block layer: builtin so initramfs need not
+# insmod them. Joliet is required for long ISO filenames (rootfs.squashfs).
+kconfig --enable EFI_STUB
+kconfig --enable DEVTMPFS
+kconfig --enable DEVTMPFS_MOUNT
+kconfig --enable EXT4_FS
+kconfig --enable VFAT_FS
+kconfig --enable NLS_CODEPAGE_437
+kconfig --enable NLS_ISO8859_1
+kconfig --enable PRINTK
+kconfig --enable TTY
+kconfig --enable SERIAL_8250
+kconfig --enable SERIAL_8250_CONSOLE
+kconfig --enable VIRTIO
+kconfig --enable VIRTIO_PCI
+kconfig --enable VIRTIO_PCI_LEGACY
+kconfig --enable VIRTIO_BLK
+kconfig --enable VIRTIO_SCSI
+kconfig --enable SCSI_VIRTIO
+kconfig --enable VIRTIO_MENU
+kconfig --enable BLK_DEV_INITRD
+kconfig --enable RD_GZIP
+kconfig --enable SQUASHFS
+kconfig --enable SQUASHFS_ZSTD
+kconfig --enable SQUASHFS_XZ
+kconfig --enable OVERLAY_FS
+kconfig --enable ISO9660_FS
+kconfig --enable JOLIET
+kconfig --enable BLK_DEV_LOOP
+kconfig --enable SCSI
+kconfig --enable BLK_DEV_SD
+kconfig --enable BLK_DEV_SR
+kconfig --enable ATA
+kconfig --enable SATA_AHCI
+kconfig --enable USB
+kconfig --enable USB_XHCI_HCD
+kconfig --enable USB_EHCI_HCD
+kconfig --enable USB_STORAGE
+kconfig --enable FB
+kconfig --enable FB_EFI
+kconfig --enable FB_SIMPLE
+kconfig --enable SYSFB
+kconfig --enable SYSFB_SIMPLEFB
+kconfig --enable DRM
+kconfig --enable DRM_SIMPLEDRM
+kconfig --enable DRM_VIRTIO_GPU
+kconfig --enable DRM_BOCHS
+kconfig --enable FRAMEBUFFER_CONSOLE
+kconfig --enable LOGO
+kconfig --enable LOGO_LINUX_CLUT224
+kconfig --enable FB_CONSOLE_DEFERRED_TAKEOVER
+kconfig --enable FB_VESA
+kconfig --enable ACPI_VIDEO
+kconfig --enable BACKLIGHT_CLASS_DEVICE
+
+# Heavy DRM drivers: modules, firmware lives in the squashfs not the ramdisk.
+kconfig --module DRM_I915
+kconfig --module DRM_AMDGPU
+kconfig --module DRM_RADEON
+kconfig --module DRM_NOUVEAU
+kconfig --module DRM_AST
+kconfig --module DRM_MGAG200
+kconfig --module DRM_QXL
+kconfig --module DRM_VMWGFX
 
 # Resolve any new symbols and dependencies
 "${KMAKE[@]}" olddefconfig

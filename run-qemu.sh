@@ -6,7 +6,7 @@
 #   ./run-qemu.sh --graphic         # VGA window (needs display)
 #   ./run-qemu.sh --graphic --kvm   # VGA + KVM hardware acceleration
 #   ./run-qemu.sh --kvm             # serial + KVM
-#   ./run-qemu.sh --mem 1G          # override RAM (default: 512M)
+#   ./run-qemu.sh --mem 2G          # override RAM (default: 512M disk / 2G ISO or graphic)
 #   ./run-qemu.sh --image PATH      # use a specific image file
 #   ./run-qemu.sh --iso             # boot from build/images/kratosos.iso
 #   ./run-qemu.sh --dry-run         # print the qemu command without running
@@ -35,6 +35,7 @@ SNAPSHOT=false
 KVM=true
 NO_KVM=false
 MEM="512M"
+MEM_SET=false
 IMAGE="$IMAGE_DEFAULT"
 ISO=false
 ISO_PATH="$SCRIPT_DIR/build/images/kratosos.iso"
@@ -51,7 +52,7 @@ while [[ $# -gt 0 ]]; do
         --snapshot)       SNAPSHOT=true       ;;
         --kvm)            KVM=true            ;;
         --no-kvm)         NO_KVM=true; KVM=false ;;
-        --mem)            MEM="$2"; shift     ;;
+        --mem)            MEM="$2"; MEM_SET=true; shift     ;;
         --image)          IMAGE="$2"; shift   ;;
         --iso)            ISO=true            ;;
         --dry-run)        DRY_RUN=true        ;;
@@ -67,6 +68,11 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
+
+# Live ISO + XFCE need more than 512M (initramfs, overlay tmpfs, Xorg).
+if [ "$MEM_SET" = false ] && { [ "$ISO" = true ] || [ "$GRAPHIC" = true ] || [ "$VNC" = true ]; }; then
+    MEM="2G"
+fi
 
 # ---------------------------------------------------------------------------
 # Colors

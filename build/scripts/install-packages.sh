@@ -115,8 +115,15 @@ PACKAGES=(
     "xorg-server"
     "xinit"
     "libinput"
+    "xf86-input-libinput"
+    "xkeyboard-config"
+    "dejavu-fonts"
     "shared-mime-info"
     "hicolor-icon-theme"
+    "libxfce4util"
+    "libxfce4ui"
+    "xfconf"
+    "xfce4-settings"
     "xfce4-session"
     "xfwm4"
     "xfdesktop"
@@ -125,10 +132,17 @@ PACKAGES=(
 )
 
 echo "[+] Installing target packages..."
+REQUIRED_PKGS="xorg-server xinit xfce4-session"
 for pkg in "${PACKAGES[@]}"; do
     echo "    -> Installing $pkg..."
     # --force to overwrite existing files (e.g. from etc skeleton)
-    "$HOST_KPM" install --force "$pkg" || echo "    [!] Warning: Failed to install $pkg (might be missing in repo)"
+    if ! "$HOST_KPM" install --force "$pkg"; then
+        if echo " $REQUIRED_PKGS " | grep -q " $pkg "; then
+            echo "[!] Error: required package '$pkg' failed to install."
+            exit 1
+        fi
+        echo "    [!] Warning: Failed to install $pkg (might be missing in repo)"
+    fi
 done
 
 echo
