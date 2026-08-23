@@ -30,7 +30,9 @@ void set_hostname(void)
         }
         fclose(f);
     } else {
-        sethostname("kratos-os", 9);
+        if (sethostname("kratos-os", 9) != 0) {
+            perror("[init] sethostname (default) failed");
+        }
     }
 }
 

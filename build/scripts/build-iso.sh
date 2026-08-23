@@ -50,9 +50,13 @@ if ! command -v grub-mkrescue &>/dev/null || ! command -v xorriso &>/dev/null; t
 fi
 
 # ------------------------------------------------------------
-# Step 1: Sync latest Live and Calamares configs to Sysroot
+# Step 1: Sync latest Live, Desktop and Calamares configurations
 # ------------------------------------------------------------
 echo "[Step 1] Syncing latest Live, Desktop and Calamares configurations..."
+if [ -x "$SCRIPT_DIR/install-packages.sh" ]; then
+    echo "  -> Injecting binary packages..."
+    bash "$SCRIPT_DIR/install-packages.sh"
+fi
 if [ -x "$SCRIPT_DIR/build-xorg.sh" ]; then
     bash "$SCRIPT_DIR/build-xorg.sh"
 fi
@@ -106,28 +110,85 @@ cp "$KERNEL_SRC" "$ISO_ROOT/boot/vmlinuz"
 echo "[✓] Kernel copied."
 
 # ------------------------------------------------------------
+# Step 3.5: Generate module dependencies
+# ------------------------------------------------------------
+echo "[Step 3.5] Generating kernel module dependencies (depmod)..."
+if [ -d "$SYSROOT/lib/modules" ]; then
+    KERNEL_VER=$(ls "$SYSROOT/lib/modules" | head -n 1)
+    if [ -n "$KERNEL_VER" ]; then
+        echo "  Detected kernel version: $KERNEL_VER"
+        # We use the host depmod with the -b (basedir) flag to populate /lib/modules/...
+        # in the sysroot with modules.dep, modules.alias, etc.
+        depmod -a -b "$SYSROOT" "$KERNEL_VER" || echo "[!] Warning: depmod failed."
+    fi
+fi
+
+# ------------------------------------------------------------
 # Step 4: Package Sysroot into compressed initramfs
 # ------------------------------------------------------------
-echo "[Step 4] Packing KratosOS sysroot into read-write initramfs..."
+echo "[Step 4] Packing KratosOS sysroot into SquashFS and minimal initramfs..."
 INITRAMFS_OUT="$ISO_ROOT/boot/initramfs.cpio.gz"
+SQUASHFS_OUT="$ISO_ROOT/live/rootfs.squashfs"
 
-# We exclude boot/ directory to avoid packing the kernel and grub configs inside
-# the ramdisk itself, reducing memory footprint on load.
-# We also exclude loop devs or stamps if any.
-echo "  Archiving sysroot (this may take a moment)..."
+mkdir -p "$ISO_ROOT/live"
+
+# Check for mksquashfs
+if ! command -v mksquashfs &>/dev/null; then
+    echo "[!] Error: 'mksquashfs' not found. Please install 'squashfs-tools'."
+    exit 1
+fi
+
+echo "  Creating SquashFS image (this may take a moment)..."
+mksquashfs "$SYSROOT" "$SQUASHFS_OUT" -noappend -comp zstd -e boot
+
+echo "  Creating minimal bootstrap initramfs..."
+BOOTSTRAP_DIR="$KRATOS_WORK/bootstrap_initramfs"
+rm -rf "$BOOTSTRAP_DIR"
+# Mirror the sysroot structure: /lib64 -> usr/lib
+mkdir -p "$BOOTSTRAP_DIR"/{bin,sbin,etc,usr/lib,lib,dev,proc,sys,mnt,run}
+ln -sf usr/lib "$BOOTSTRAP_DIR/lib64"
+
+# Copy essential binaries
+cp -v "$SYSROOT/sbin/init" "$BOOTSTRAP_DIR/sbin/init"
+cp -v "$SYSROOT/bin/bash" "$BOOTSTRAP_DIR/bin/bash"
+ln -sf bash "$BOOTSTRAP_DIR/bin/sh"
+
+# Copy minimal required libraries (ld-linux, libc) to usr/lib
+cp -vd "$SYSROOT/usr/lib/"ld-linux* "$BOOTSTRAP_DIR/usr/lib/"
+cp -vd "$SYSROOT/usr/lib/"libc.so* "$BOOTSTRAP_DIR/usr/lib/"
+cp -vd "$SYSROOT/usr/lib/"libncursesw.so* "$BOOTSTRAP_DIR/usr/lib/"
+cp -vd "$SYSROOT/usr/lib/"libm.so* "$BOOTSTRAP_DIR/usr/lib/"
+cp -vd "$SYSROOT/usr/lib/"libdl.so* "$BOOTSTRAP_DIR/usr/lib/"
+cp -vd "$SYSROOT/usr/lib/"libpthread.so* "$BOOTSTRAP_DIR/usr/lib/"
+
+# Copy essential modules (iso9660, squashfs, overlay, loop, cdrom)
+if [ -d "$SYSROOT/lib/modules" ]; then
+    KERNEL_VER=$(ls "$SYSROOT/lib/modules" | head -n 1)
+    mkdir -p "$BOOTSTRAP_DIR/lib/modules/$KERNEL_VER"
+    # Copy kernel modules to /lib/modules (where the kernel expects them)
+    cp -r "$SYSROOT/lib/modules/$KERNEL_VER/kernel" "$BOOTSTRAP_DIR/lib/modules/$KERNEL_VER/"
+    depmod -a -b "$BOOTSTRAP_DIR" "$KERNEL_VER"
+fi
+
+# Copy essential modules (iso9660, squashfs, overlay, loop, cdrom)
+if [ -d "$SYSROOT/lib/modules" ]; then
+    KERNEL_VER=$(ls "$SYSROOT/lib/modules" | head -n 1)
+    mkdir -p "$BOOTSTRAP_DIR/lib/modules/$KERNEL_VER"
+    # For now, copy all modules to be safe, they are usually small if not GPU drivers
+    # GPU drivers are built-in anyway.
+    cp -r "$SYSROOT/lib/modules/$KERNEL_VER/kernel" "$BOOTSTRAP_DIR/lib/modules/$KERNEL_VER/"
+    depmod -a -b "$BOOTSTRAP_DIR" "$KERNEL_VER"
+fi
+
 (
-    cd "$SYSROOT"
-    # Essential for initramfs: kernel often looks for /init
+    cd "$BOOTSTRAP_DIR"
     ln -sf sbin/init init
-
-    # Find all files except boot/ and build stamps
-    find . -path "./boot" -prune -o -print0 | \
-        cpio --null -ov --format=newc | \
-        gzip -9 > "$INITRAMFS_OUT"
-
-    # Clean up the temporary symlink from sysroot source to avoid cluttering it
-    rm -f init
+    find . -print0 | cpio --null -ov --format=newc | gzip -9 > "$INITRAMFS_OUT"
 )
+rm -rf "$BOOTSTRAP_DIR"
+
+echo "[✓] SquashFS created: $SQUASHFS_OUT"
+echo "  Size: $(du -sh "$SQUASHFS_OUT" | cut -f1)"
 echo "[✓] Initramfs created: $INITRAMFS_OUT"
 echo "  Size: $(du -sh "$INITRAMFS_OUT" | cut -f1)"
 
@@ -145,14 +206,17 @@ set default=0
 # Console & Serial output
 serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1
 terminal_input console serial
-terminal_output gfxterm serial
 
 # Custom Splash / gfxterm if available
+# We load video modules BEFORE setting terminal_output to avoid GRUB hangs.
+insmod all_video
+insmod gfxterm
+
 if loadfont /boot/grub/fonts/unicode.pf2 ; then
     set gfxmode=auto
-    insmod all_video
-    insmod gfxterm
-    terminal_output gfxterm
+    terminal_output gfxterm serial
+else
+    terminal_output console serial
 fi
 
 menuentry "KratosOS Live Session (XFCE)" {
@@ -162,7 +226,7 @@ menuentry "KratosOS Live Session (XFCE)" {
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel..."
-    linux /boot/vmlinuz rw rdinit=/sbin/init console=tty0 loglevel=3 kratos.live quiet
+    linux /boot/vmlinuz rw rdinit=/sbin/init console=ttyS0,115200 console=tty0 loglevel=7 kratos.live
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS Live Environment..."
@@ -176,7 +240,7 @@ menuentry "KratosOS Live (Safe Graphics / Nomodeset)" {
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel (Safe Graphics)..."
-    linux /boot/vmlinuz rw rdinit=/sbin/init console=tty0 nomodeset loglevel=3 kratos.live quiet
+    linux /boot/vmlinuz rw rdinit=/sbin/init console=tty0 console=ttyS0,115200 nomodeset loglevel=3 kratos.live quiet
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS..."
@@ -190,10 +254,24 @@ menuentry "KratosOS Live (Debug Mode - Verbose)" {
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel (Debug)..."
-    linux /boot/vmlinuz rw rdinit=/sbin/init console=tty0 console=ttyS0,115200 loglevel=7 earlycon=efifb earlyprintk=efi kratos.live
+    linux /boot/vmlinuz rw rdinit=/sbin/init console=tty0 console=ttyS0,115200 loglevel=7 ignore_loglevel earlycon=efifb earlyprintk=efi kratos.live
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS (debug)..."
+    boot
+}
+
+menuentry "KratosOS Live (Emergency Bash Shell)" {
+    insmod part_gpt
+    insmod fat
+    insmod iso9660
+    insmod ext2
+    insmod linux
+    echo "Loading Linux Kernel (Emergency Shell)..."
+    linux /boot/vmlinuz rw rdinit=/bin/bash console=tty0 console=ttyS0,115200 loglevel=7 ignore_loglevel kratos.live
+    echo "Loading Live Ramdisk..."
+    initrd /boot/initramfs.cpio.gz
+    echo "Booting to Bash..."
     boot
 }
 

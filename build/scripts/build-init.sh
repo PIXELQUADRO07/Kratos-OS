@@ -58,6 +58,7 @@ echo "[+] Compiling /sbin/init (modular PID 1)..."
     "$KRATOS_ROOT/init/services.c" \
     "$KRATOS_ROOT/init/signals.c" \
     "$KRATOS_ROOT/init/tty.c" \
+    "$KRATOS_ROOT/init/live.c" \
     -fPIE -pie \
     -Wl,-z,relro,-z,now
 echo "[✓] init compiled."
@@ -106,6 +107,21 @@ echo "[+] Compiling /sbin/kratos-net..."
     -fPIE -pie \
     -Wl,-z,relro,-z,now
 echo "[✓] kratos-net compiled."
+
+echo "[+] Compiling /sbin/kratos-vtswitch..."
+"$CC" \
+    --sysroot="$SYSROOT" \
+    -O2 \
+    -Wall \
+    -fstack-protector-strong \
+    -D_FORTIFY_SOURCE=2 \
+    -Wextra \
+    -std=gnu11 \
+    -o "$SYSROOT/sbin/kratos-vtswitch" \
+    "$KRATOS_ROOT/init/kratos-vtswitch.c" \
+    -fPIE -pie \
+    -Wl,-z,relro,-z,now
+echo "[✓] kratos-vtswitch compiled."
 
 echo "[+] Compiling /bin/login..."
 "$CC" \

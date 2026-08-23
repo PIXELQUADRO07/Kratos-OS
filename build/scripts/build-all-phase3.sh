@@ -37,6 +37,7 @@ declare -a STAGES=(
     "create-etc-skeleton.sh"
     "build-init.sh"
     "build-pkg.sh"
+    "install-packages.sh"
     "build-xorg.sh"
     "build-xfce.sh"
     "build-calamares.sh"
@@ -49,6 +50,7 @@ STAGE_NAMES=(
     "/etc skeleton (fstab, passwd, rc.d, ...)"
     "init system (init, shutdown, devd, login, passwd)"
     "kpm package manager"
+    "Inject binary packages"
     "X11 graphics stack"
     "XFCE desktop environment"
     "Calamares system installer"
@@ -56,7 +58,7 @@ STAGE_NAMES=(
 )
 
 # The disk step requires root.
-STAGE_SUDO=(no no no no no no no no yes)
+STAGE_SUDO=(no no no no no no no no no yes)
 
 # ---------------------------------------------------------------------------
 # Helpers

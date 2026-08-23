@@ -8,6 +8,7 @@
 #   ./run-qemu.sh --kvm             # serial + KVM
 #   ./run-qemu.sh --mem 1G          # override RAM (default: 512M)
 #   ./run-qemu.sh --image PATH      # use a specific image file
+#   ./run-qemu.sh --iso             # boot from build/images/kratosos.iso
 #   ./run-qemu.sh --dry-run         # print the qemu command without running
 #
 # Serial console mode (default, --nographic):
@@ -35,6 +36,8 @@ KVM=true
 NO_KVM=false
 MEM="512M"
 IMAGE="$IMAGE_DEFAULT"
+ISO=false
+ISO_PATH="$SCRIPT_DIR/build/images/kratosos.iso"
 DRY_RUN=false
 
 # ---------------------------------------------------------------------------
@@ -50,6 +53,7 @@ while [[ $# -gt 0 ]]; do
         --no-kvm)         NO_KVM=true; KVM=false ;;
         --mem)            MEM="$2"; shift     ;;
         --image)          IMAGE="$2"; shift   ;;
+        --iso)            ISO=true            ;;
         --dry-run)        DRY_RUN=true        ;;
         -h|--help)
             sed -n '2,20p' "$0" | sed 's/^# \?//'
@@ -129,19 +133,31 @@ fi
 
 echo "  OVMF:   $OVMF_PATH"
 
-# Disk image
-if [ ! -f "$IMAGE" ]; then
-    echo
-    echo "${RED}[!] Disk image not found: $IMAGE${RESET}"
-    echo
-    echo "    Build it first with:"
-    echo "      ./build.sh        (full build)"
-    echo "      sudo make disk    (disk step only, requires built sysroot)"
-    exit 1
+# Disk or ISO image
+if $ISO; then
+    if [ ! -f "$ISO_PATH" ]; then
+        echo
+        echo "${RED}[!] ISO image not found: $ISO_PATH${RESET}"
+        echo
+        echo "    Build it first with:"
+        echo "      ./build-iso.sh"
+        exit 1
+    fi
+    IMAGE_SIZE="$(du -sh "$ISO_PATH" | cut -f1)"
+    echo "  ISO:    $ISO_PATH ($IMAGE_SIZE)"
+else
+    if [ ! -f "$IMAGE" ]; then
+        echo
+        echo "${RED}[!] Disk image not found: $IMAGE${RESET}"
+        echo
+        echo "    Build it first with:"
+        echo "      ./build.sh        (full build)"
+        echo "      sudo make disk    (disk step only, requires built sysroot)"
+        exit 1
+    fi
+    IMAGE_SIZE="$(du -sh "$IMAGE" | cut -f1)"
+    echo "  Image:  $IMAGE ($IMAGE_SIZE)"
 fi
-
-IMAGE_SIZE="$(du -sh "$IMAGE" | cut -f1)"
-echo "  Image:  $IMAGE ($IMAGE_SIZE)"
 echo "  RAM:    $MEM"
 
 if $KVM; then
@@ -162,9 +178,14 @@ echo
 CMD=(
     qemu-system-x86_64
     -m "$MEM"
-    -drive "file=$IMAGE,format=raw,if=virtio"
     -bios "$OVMF_PATH"
 )
+
+if $ISO; then
+    CMD+=(-cdrom "$ISO_PATH" -boot d)
+else
+    CMD+=(-drive "file=$IMAGE,format=raw,if=virtio")
+fi
 
 if $KVM; then
     CMD+=(-enable-kvm -cpu host)

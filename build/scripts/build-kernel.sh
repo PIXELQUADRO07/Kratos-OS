@@ -75,128 +75,65 @@ KMAKE=(
 if [ ! -f "$KBUILD_DIR/.config" ]; then
     echo "[+] Generating x86_64 defconfig..."
     "${KMAKE[@]}" defconfig
-
-    # Enable a few extras useful for a real system
-    echo "[+] Tweaking config..."
-    # Make sure EFI stub, serial console, devtmpfs and ext4 are on.
-    #
-    # IMPORTANT: this must be the *absolute* path to scripts/config inside
-    # the kernel source tree. The rest of this script never `cd`s into
-    # $SOURCE_DIR (it uses `make -C "$SOURCE_DIR"` throughout instead), so
-    # a bare relative "scripts/config" resolves against whatever directory
-    # the caller invoked this script from — almost never the kernel tree —
-    # and silently fails every time under the `2>/dev/null || true` below.
-    # When that happens this whole --enable block becomes a no-op and you
-    # only find out at boot time, if defconfig's own defaults happen not
-    # to cover you.
-    "$SOURCE_DIR/scripts/config" --file "$KBUILD_DIR/.config" \
-        --enable  CONFIG_EFI_STUB         \
-        --enable  CONFIG_DEVTMPFS         \
-        --enable  CONFIG_DEVTMPFS_MOUNT   \
-        --enable  CONFIG_EXT4_FS          \
-        --enable  CONFIG_VFAT_FS          \
-        --enable  CONFIG_NLS_CODEPAGE_437 \
-        --enable  CONFIG_NLS_ISO8859_1    \
-        --enable  CONFIG_PRINTK           \
-        --enable  CONFIG_TTY              \
-        --enable  CONFIG_SERIAL_8250      \
-        --enable  CONFIG_SERIAL_8250_CONSOLE \
-        --enable  CONFIG_VIRTIO           \
-        --enable  CONFIG_VIRTIO_PCI       \
-        --enable  CONFIG_VIRTIO_PCI_LEGACY \
-        --enable  CONFIG_VIRTIO_BLK       \
-        --enable  CONFIG_VIRTIO_MENU      \
-        --enable  CONFIG_BLK_DEV_INITRD   \
-        --enable  CONFIG_RD_GZIP          \
-        --enable  CONFIG_FB               \
-        --enable  CONFIG_FB_EFI           \
-        --enable  CONFIG_FB_SIMPLE        \
-        --enable  CONFIG_SYSFB            \
-        --enable  CONFIG_SYSFB_SIMPLEFB   \
-        --enable  CONFIG_DRM              \
-        --enable  CONFIG_DRM_SIMPLEDRM    \
-        --enable  CONFIG_DRM_VIRTIO_GPU   \
-        --enable  CONFIG_FRAMEBUFFER_CONSOLE \
-        --enable  CONFIG_LOGO             \
-        --enable  CONFIG_LOGO_LINUX_CLUT224 \
-        --enable  CONFIG_FB_CONSOLE_DEFERRED_TAKEOVER \
-        --enable  CONFIG_FB_VESA          \
-        --enable  CONFIG_ACPI_VIDEO       \
-        --enable  CONFIG_BACKLIGHT_CLASS_DEVICE \
-        --enable  CONFIG_DRM_I915         \
-        --enable  CONFIG_DRM_AMDGPU       \
-        --enable  CONFIG_DRM_RADEON       \
-        --enable  CONFIG_DRM_NOUVEAU      \
-        --enable  CONFIG_DRM_AST          \
-        --enable  CONFIG_DRM_MGAG200      \
-        --enable  CONFIG_DRM_QXL          \
-        --enable  CONFIG_DRM_BOCHS        \
-        --enable  CONFIG_DRM_VMWGFX       \
-        2>/dev/null || true  # tolerate older trees without scripts/config
-
-    # x86_64 defconfig builds VIRTIO_BLK/VIRTIO_PCI as modules (=m) by
-    # default. There is no initramfs in this boot chain and init.c never
-    # loads kernel modules, so if these stay as modules the kernel simply
-    # cannot see /dev/vda when QEMU is run with -drive if=virtio, and it
-    # panics with "VFS: Unable to mount root fs". They must be built-in.
-    #
-    # We also force Video/DRM drivers to be built-in (=y) to avoid "blind" boot.
-    #
-    # NOTE: forcing every GPU driver below to =y (rather than =m, loaded on
-    # demand) is a deliberate simplicity/reliability tradeoff, not a
-    # permanent choice: this boot chain has no initramfs-time module
-    # loading (same reason VIRTIO_BLK/VIRTIO_PCI are forced =y above), so
-    # a driver built as a module would need kratos-devd's hotplug modprobe
-    # path to run reliably *before* Xorg starts in rc.d — which hasn't been
-    # verified end-to-end yet. Built-in avoids depending on that, at the
-    # cost of a noticeably larger vmlinuz and slightly slower decompression
-    # at boot (i915/amdgpu/nouveau are large drivers). Once modprobe-on-
-    # hotplug is confirmed reliable this early in boot, switching these
-    # back to =m is worth revisiting.
-    #
-    # ALSO NOTE: i915/amdgpu/nouveau typically need firmware blobs (GuC/HuC
-    # for Intel, DC/PSP/VCN for AMD, signed firmware for several Nouveau
-    # generations) from linux-firmware to reach full functionality. Without
-    # them the driver still loads and basic modesetting/output generally
-    # still works, but expect warnings in dmesg and degraded power
-    # management / no hardware video decode until linux-firmware's relevant
-    # files are copied into the sysroot's /lib/firmware before packaging.
-    sed -i \
-        -e 's/^CONFIG_VIRTIO_PCI=m/CONFIG_VIRTIO_PCI=y/' \
-        -e 's/^CONFIG_VIRTIO_BLK=m/CONFIG_VIRTIO_BLK=y/' \
-        -e 's/^CONFIG_VIRTIO=m/CONFIG_VIRTIO=y/' \
-        -e 's/^CONFIG_DRM=m/CONFIG_DRM=y/' \
-        -e 's/^CONFIG_DRM_SIMPLEDRM=m/CONFIG_DRM_SIMPLEDRM=y/' \
-        -e 's/^CONFIG_DRM_VIRTIO_GPU=m/CONFIG_DRM_VIRTIO_GPU=y/' \
-        -e 's/^CONFIG_FB_EFI=m/CONFIG_FB_EFI=y/' \
-        -e 's/^CONFIG_SYSFB_SIMPLEFB=m/CONFIG_SYSFB_SIMPLEFB=y/' \
-        -e 's/^CONFIG_FB_VESA=m/CONFIG_FB_VESA=y/' \
-        -e 's/^CONFIG_DRM_I915=m/CONFIG_DRM_I915=y/' \
-        -e 's/^CONFIG_DRM_AMDGPU=m/CONFIG_DRM_AMDGPU=y/' \
-        -e 's/^CONFIG_DRM_RADEON=m/CONFIG_DRM_RADEON=y/' \
-        -e 's/^CONFIG_DRM_NOUVEAU=m/CONFIG_DRM_NOUVEAU=y/' \
-        -e 's/^CONFIG_DRM_AST=m/CONFIG_DRM_AST=y/' \
-        -e 's/^CONFIG_DRM_MGAG200=m/CONFIG_DRM_MGAG200=y/' \
-        -e 's/^CONFIG_DRM_QXL=m/CONFIG_DRM_QXL=y/' \
-        -e 's/^CONFIG_DRM_BOCHS=m/CONFIG_DRM_BOCHS=y/' \
-        -e 's/^CONFIG_DRM_VMWGFX=m/CONFIG_DRM_VMWGFX=y/' \
-        "$KBUILD_DIR/.config" 2>/dev/null || true
-    # loads kernel modules, so if these stay as modules the kernel simply
-    # cannot see /dev/vda when QEMU is run with -drive if=virtio, and it
-    # panics with "VFS: Unable to mount root fs". They must be built-in.
-    # scripts/config --enable only sets bool/tristate options to 'y' when
-    # possible; force it explicitly in case a tristate default resists:
-    sed -i \
-        -e 's/^CONFIG_VIRTIO_PCI=m/CONFIG_VIRTIO_PCI=y/' \
-        -e 's/^CONFIG_VIRTIO_BLK=m/CONFIG_VIRTIO_BLK=y/' \
-        -e 's/^CONFIG_VIRTIO=m/CONFIG_VIRTIO=y/' \
-        "$KBUILD_DIR/.config" 2>/dev/null || true
-
-    # Resolve any new symbols introduced by our changes
-    "${KMAKE[@]}" olddefconfig
 else
-    echo "[~] Kernel .config already present — skipping defconfig."
+    echo "[~] Kernel .config already present — using existing config."
 fi
+
+# ── Tweak and resolve config ──────────────────────────────────────────
+echo "[+] Applying KratosOS kernel configuration tweaks..."
+cat >> "$KBUILD_DIR/.config" << EOF
+CONFIG_EFI_STUB=y
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+CONFIG_EXT4_FS=y
+CONFIG_VFAT_FS=y
+CONFIG_NLS_CODEPAGE_437=y
+CONFIG_NLS_ISO8859_1=y
+CONFIG_PRINTK=y
+CONFIG_TTY=y
+CONFIG_SERIAL_8250=y
+CONFIG_SERIAL_8250_CONSOLE=y
+CONFIG_VIRTIO=y
+CONFIG_VIRTIO_PCI=y
+CONFIG_VIRTIO_PCI_LEGACY=y
+CONFIG_VIRTIO_BLK=y
+CONFIG_VIRTIO_MENU=y
+CONFIG_BLK_DEV_INITRD=y
+CONFIG_RD_GZIP=y
+CONFIG_SQUASHFS=y
+CONFIG_SQUASHFS_ZSTD=y
+CONFIG_SQUASHFS_XZ=y
+CONFIG_OVERLAY_FS=y
+CONFIG_ISO9660_FS=y
+CONFIG_BLK_DEV_LOOP=y
+CONFIG_FB=y
+CONFIG_FB_EFI=y
+CONFIG_FB_SIMPLE=y
+CONFIG_SYSFB=y
+CONFIG_SYSFB_SIMPLEFB=y
+CONFIG_DRM=y
+CONFIG_DRM_SIMPLEDRM=y
+CONFIG_DRM_VIRTIO_GPU=y
+CONFIG_FRAMEBUFFER_CONSOLE=y
+CONFIG_LOGO=y
+CONFIG_LOGO_LINUX_CLUT224=y
+CONFIG_FB_CONSOLE_DEFERRED_TAKEOVER=y
+CONFIG_FB_VESA=y
+CONFIG_ACPI_VIDEO=y
+CONFIG_BACKLIGHT_CLASS_DEVICE=y
+CONFIG_DRM_I915=y
+CONFIG_DRM_AMDGPU=y
+CONFIG_DRM_RADEON=y
+CONFIG_DRM_NOUVEAU=y
+CONFIG_DRM_AST=y
+CONFIG_DRM_MGAG200=y
+CONFIG_DRM_QXL=y
+CONFIG_DRM_BOCHS=y
+CONFIG_DRM_VMWGFX=y
+EOF
+
+# Resolve any new symbols and dependencies
+"${KMAKE[@]}" olddefconfig
 
 # ── Build ─────────────────────────────────────────────────────────────
 echo "[+] Building kernel bzImage + modules ($JOBS jobs)..."

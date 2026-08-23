@@ -64,7 +64,12 @@ if command -v startx >/dev/null 2>&1; then
     echo "[Live] Starting graphical XFCE session..."
     # We export HOME to ensure Xorg and XFCE find the correct configs.
     export HOME=/root
-    startx /etc/live/xinitrc -- vt7 >/var/log/Xorg.start.log 2>&1 &
+    export USER=root
+    export LOGNAME=root
+    export XDG_RUNTIME_DIR=/run/user/0
+
+    echo "[Live] Invoking startx..." >> /var/log/Xorg.start.log
+    startx /etc/live/xinitrc -- vt7 -logverbose 6 >/var/log/Xorg.start.log 2>&1 &
 
     # Verify startup
     X_READY=0
@@ -79,15 +84,19 @@ if command -v startx >/dev/null 2>&1; then
     if [ "$X_READY" -eq 1 ]; then
         echo "[Live] X server is up."
     else
-        echo "[Live] X server did NOT come up. Checking logs..."
+        echo "[Live] ERROR: X server did NOT come up. Checking logs..."
         if [ "$HAVE_VTSWITCH" -eq 1 ]; then
+            echo "[Live] Switching back to VT1..."
             kratos-vtswitch 1 || true
         fi
         for log in /var/log/Xorg.0.log /var/log/Xorg.start.log; do
             if [ -f "$log" ]; then
                 echo "[Live] --- $log ---"
-                tail -n 30 "$log"
+                cat "$log"
             fi
         done
     fi
+else
+    echo "[Live] ERROR: 'startx' not found. Graphical session cannot start."
+    echo "[Live] Please ensure 'xorg-server' and 'xinit' packages are installed in the sysroot."
 fi
