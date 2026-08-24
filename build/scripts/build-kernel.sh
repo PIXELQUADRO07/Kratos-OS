@@ -82,11 +82,9 @@ fi
 # ── Tweak and resolve config ──────────────────────────────────────────
 echo "[+] Applying KratosOS kernel configuration tweaks..."
 
-# Build scripts/config if needed (lives in the output dir with O=).
-"${KMAKE[@]}" scripts/config >/dev/null
-
+# Use scripts/config from the source tree.
 kconfig() {
-    "$KBUILD_DIR/scripts/config" --file "$KBUILD_DIR/.config" "$@"
+    "$SOURCE_DIR/scripts/config" --file "$KBUILD_DIR/.config" "$@"
 }
 
 # Live-boot filesystems and block layer: builtin so initramfs need not
@@ -133,9 +131,12 @@ kconfig --enable FB_SIMPLE
 kconfig --enable SYSFB
 kconfig --enable SYSFB_SIMPLEFB
 kconfig --enable DRM
+kconfig --enable DRM_FBDEV_EMULATION
 kconfig --enable DRM_SIMPLEDRM
 kconfig --enable DRM_VIRTIO_GPU
 kconfig --enable DRM_BOCHS
+kconfig --enable VT
+kconfig --enable UNIX98_PTYS
 kconfig --enable FRAMEBUFFER_CONSOLE
 kconfig --enable LOGO
 kconfig --enable LOGO_LINUX_CLUT224

@@ -410,10 +410,16 @@ static int install_repo_pkg_recursive(const char *name, const char *target_root,
 
     repo_pkg_t pkg;
     if (kratos_repo_find(name, &pkg, target_root) != 0) {
-        /* Special case: 'glibc' and 'kpm' are often provided by the base system without a DB entry yet.
-         * For now, if not found in repo and it's 'glibc', we assume it's there.
-         * A better way is to pre-register them in the DB during image creation. */
-        if (strcmp(name, "glibc") == 0) return 0;
+        /* Bootstrap packages are compiled into the sysroot by the OS build
+         * and may not (yet) have a corresponding .kpkg in the repository. */
+        static const char *base_provided[] = {
+            "glibc", "xz", "zlib", "zstd", "bzip2", "linux-headers",
+            "kmod", "file", "mbedtls", NULL
+        };
+        for (int i = 0; base_provided[i]; i++) {
+            if (strcmp(name, base_provided[i]) == 0)
+                return 0;
+        }
 
         fprintf(stderr, "[kratos-pkg] Error: Package '%s' not found in repository index. Run 'kratos update' first.\n", name);
         return -1;
