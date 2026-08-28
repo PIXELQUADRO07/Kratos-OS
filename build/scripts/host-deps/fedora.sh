@@ -91,9 +91,12 @@ FEDORA_PACKAGES=(
 )
 
 install_fedora_deps() {
-    echo "[+] Installing Fedora Development Tools group..."
-    dnf group install -y "${FEDORA_GROUPS[@]}"
+    echo "[+] Installing packages via dnf..."
+    # Try installing development group if available (non-fatal if group name differs in DNF5)
+    dnf group install -y development-tools 2>/dev/null || \
+    dnf group install -y "Development Tools" 2>/dev/null || \
+    dnf group install -y "C Development Tools and Libraries" 2>/dev/null || true
 
-    echo "[+] Installing individual packages..."
+    echo "[+] Installing required packages..."
     dnf install -y "${FEDORA_PACKAGES[@]}"
 }
