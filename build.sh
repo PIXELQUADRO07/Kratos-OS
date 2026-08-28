@@ -10,6 +10,8 @@
 #   ./build.sh --force      # same as --clean
 #   ./build.sh --list       # show all stages and their status
 #   ./build.sh --from=STAGE # restart from a specific stage name
+#   ./build.sh --check-host # verify host tools without building
+#   ./build.sh --verbose    # show full script output (disable quiet mode)
 #
 # Individual overrides (env):
 #   KRATOS_JOBS=N   parallel make jobs (default: nproc)
@@ -25,20 +27,40 @@ BUILD_DIR="$SCRIPT_DIR/build"
 STAMP_DIR="$BUILD_DIR/.stamps"
 
 # ---------------------------------------------------------------------------
+# Colors
+# ---------------------------------------------------------------------------
+
+if [ -t 1 ]; then
+    BOLD=$'\e[1m'
+    GREEN=$'\e[32m'
+    YELLOW=$'\e[33m'
+    RED=$'\e[31m'
+    CYAN=$'\e[36m'
+    DIM=$'\e[2m'
+    RESET=$'\e[0m'
+else
+    BOLD='' GREEN='' YELLOW='' RED='' CYAN='' DIM='' RESET=''
+fi
+
+# ---------------------------------------------------------------------------
 # Parse arguments
 # ---------------------------------------------------------------------------
 
 CLEAN=false
 LIST_ONLY=false
+CHECK_HOST=false
+VERBOSE=false
 FROM_STAGE=""
 
 for arg in "$@"; do
     case "$arg" in
         --clean|--force) CLEAN=true ;;
         --list)          LIST_ONLY=true ;;
+        --check-host)    CHECK_HOST=true ;;
+        --verbose)       VERBOSE=true ;;
         --from=*)        FROM_STAGE="${arg#--from=}" ;;
         -h|--help)
-            sed -n '2,20p' "$0" | sed 's/^# \?//'
+            sed -n '2,22p' "$0" | sed 's/^# \?//'
             exit 0
             ;;
         *)
@@ -50,16 +72,13 @@ for arg in "$@"; do
 done
 
 # ---------------------------------------------------------------------------
-# Colors
+# --check-host: run host compatibility check and exit
 # ---------------------------------------------------------------------------
 
-BOLD=$'\e[1m'
-GREEN=$'\e[32m'
-YELLOW=$'\e[33m'
-RED=$'\e[31m'
-CYAN=$'\e[36m'
-DIM=$'\e[2m'
-RESET=$'\e[0m'
+if $CHECK_HOST; then
+    bash "$BUILD_SCRIPTS/check-host-deps.sh"
+    exit $?
+fi
 
 # ---------------------------------------------------------------------------
 # Stage definitions
@@ -67,7 +86,7 @@ RESET=$'\e[0m'
 # Format: "name|script|needs_sudo|description"
 
 declare -a STAGES=(
-    "host-deps|check-host-deps.sh|yes|Install/verify host build dependencies"
+    "host-deps|check-host-deps.sh|no|Verify host build dependencies"
     "download|download.sh|no|Download all source tarballs"
     "bootstrap|bootstrap.sh|no|Initialise build directories"
     "linux-headers|install-linux-headers.sh|no|Install Linux kernel headers"
@@ -110,83 +129,47 @@ declare -a STAGES=(
     "disk|build-disk.sh|yes|Disk image (requires sudo)"
 )
 
+TOTAL="${#STAGES[@]}"
+
 # ---------------------------------------------------------------------------
 # Stamp helpers
 # ---------------------------------------------------------------------------
 
 mkdir -p "$STAMP_DIR"
 
-stamp_file() { echo "$STAMP_DIR/$1.done"; }
-
-is_done() {
-    local stamp
-    stamp="$(stamp_file "$1")"
-    [ -f "$stamp" ]
-}
-
-mark_done() {
-    local stamp
-    stamp="$(stamp_file "$1")"
-    date -u +"%Y-%m-%dT%H:%M:%SZ" > "$stamp"
-}
-
-mark_undone() {
-    rm -f "$(stamp_file "$1")"
-}
+stamp_file()  { echo "$STAMP_DIR/$1.done"; }
+is_done()     { [ -f "$(stamp_file "$1")" ]; }
+mark_done()   { date -u +"%Y-%m-%dT%H:%M:%SZ" > "$(stamp_file "$1")"; }
+mark_undone() { rm -f "$(stamp_file "$1")"; }
 
 stage_needs_rebuild() {
     local name="$1"
     local stamp
     stamp="$(stamp_file "$name")"
 
-    # If the stamp doesn't exist, we must build
-    if [ ! -f "$stamp" ]; then
-        return 0
-    fi
+    [ -f "$stamp" ] || return 0
 
-    # Check for local source modifications
     case "$name" in
         init)
-            if [ -n "$(find "$SCRIPT_DIR/init" -type f -newer "$stamp" -print -quit)" ]; then
-                echo "${YELLOW}[~] Source files in init/ have changed, forcing rebuild of 'init'...${RESET}"
-                return 0
-            fi
-            if [ "$BUILD_SCRIPTS/build-init.sh" -nt "$stamp" ]; then
-                echo "${YELLOW}[~] build-init.sh has changed, forcing rebuild of 'init'...${RESET}"
-                return 0
-            fi
+            [ -n "$(find "$SCRIPT_DIR/init" -type f -newer "$stamp" -print -quit)" ] && return 0
+            [ "$BUILD_SCRIPTS/build-init.sh" -nt "$stamp" ] && return 0
             ;;
         pkg)
-            if [ -n "$(find "$SCRIPT_DIR/pkg" -type f -newer "$stamp" -print -quit)" ]; then
-                echo "${YELLOW}[~] Source files in pkg/ have changed, forcing rebuild of 'pkg'...${RESET}"
-                return 0
-            fi
-            if [ "$BUILD_SCRIPTS/build-pkg.sh" -nt "$stamp" ]; then
-                echo "${YELLOW}[~] build-pkg.sh has changed, forcing rebuild of 'pkg'...${RESET}"
-                return 0
-            fi
+            [ -n "$(find "$SCRIPT_DIR/pkg" -type f -newer "$stamp" -print -quit)" ] && return 0
+            [ "$BUILD_SCRIPTS/build-pkg.sh" -nt "$stamp" ] && return 0
             ;;
         fetch)
-            if [ "$SCRIPT_DIR/pkg/kratos-fetch.c" -nt "$stamp" ] || [ "$BUILD_SCRIPTS/build-fetch.sh" -nt "$stamp" ]; then
-                echo "${YELLOW}[~] Source files for 'fetch' have changed, forcing rebuild...${RESET}"
-                return 0
-            fi
+            { [ "$SCRIPT_DIR/pkg/kratos-fetch.c" -nt "$stamp" ] || \
+              [ "$BUILD_SCRIPTS/build-fetch.sh" -nt "$stamp" ]; } && return 0
             ;;
         etc)
-            if [ "$BUILD_SCRIPTS/create-etc-skeleton.sh" -nt "$stamp" ] || [ -n "$(find "$SCRIPT_DIR/config" -type f -newer "$stamp" -print -quit)" ]; then
-                echo "${YELLOW}[~] etc skeleton or config files have changed, forcing rebuild of 'etc'...${RESET}"
-                return 0
-            fi
+            { [ "$BUILD_SCRIPTS/create-etc-skeleton.sh" -nt "$stamp" ] || \
+              [ -n "$(find "$SCRIPT_DIR/config" -type f -newer "$stamp" -print -quit)" ]; } && return 0
             ;;
         disk)
-            if $SYSROOT_CHANGED; then
-                echo "${YELLOW}[~] Sysroot was updated during this run, forcing rebuild of 'disk'...${RESET}"
-                return 0
-            fi
-            if [ "$BUILD_SCRIPTS/build-disk.sh" -nt "$stamp" ] || [ "$SCRIPT_DIR/config/grub/grub.cfg.template" -nt "$stamp" ]; then
-                echo "${YELLOW}[~] Disk script or GRUB template changed, forcing rebuild of 'disk'...${RESET}"
-                return 0
-            fi
+            $SYSROOT_CHANGED && return 0
+            { [ "$BUILD_SCRIPTS/build-disk.sh" -nt "$stamp" ] || \
+              [ "$SCRIPT_DIR/config/grub/grub.cfg.template" -nt "$stamp" ]; } && return 0
             ;;
     esac
 
@@ -194,15 +177,53 @@ stage_needs_rebuild() {
 }
 
 # ---------------------------------------------------------------------------
+# Progress bar renderer
+#
+# draw_progress <current> <total> <stage_name> <desc>
+#
+# Renders a sticky single-line progress display:
+#   [██████████░░░░░░░░░░] 12/41  51%  gcc-pass2 — GCC pass 2 (C + C++ + libstdc++)
+#
+# Uses \r to overwrite the same terminal line. The wider info line below is
+# only printed when verbose mode is off.
+# ---------------------------------------------------------------------------
+
+BAR_WIDTH=24
+
+draw_progress() {
+    local current="$1"
+    local total="$2"
+    local name="$3"
+    local desc="$4"
+
+    local pct=$(( current * 100 / total ))
+    local filled=$(( current * BAR_WIDTH / total ))
+    local empty=$(( BAR_WIDTH - filled ))
+
+    local bar=""
+    local i
+    for (( i=0; i<filled; i++ )); do bar+="█"; done
+    for (( i=0; i<empty;  i++ )); do bar+="░"; done
+
+    # Truncate desc to fit terminal width nicely
+    local max_desc=38
+    if [ ${#desc} -gt $max_desc ]; then
+        desc="${desc:0:$((max_desc-1))}…"
+    fi
+
+    printf "\r${CYAN}[%s]${RESET} ${BOLD}%3d/%d${RESET}  %3d%%  ${YELLOW}%-20s${RESET}  %s" \
+        "$bar" "$current" "$total" "$pct" "$name" "$desc"
+}
+
+# ---------------------------------------------------------------------------
 # Clean stamps
 # ---------------------------------------------------------------------------
 
 if $CLEAN; then
-    echo "${YELLOW}[~] Removing all build stamps...${RESET}"
+    printf "${YELLOW}[~] Removing all build stamps...${RESET}\n"
     rm -rf "$STAMP_DIR"
     mkdir -p "$STAMP_DIR"
-    echo "${GREEN}[✓] Stamps cleared. All stages will be rebuilt.${RESET}"
-    echo
+    printf "${GREEN}[✓] Stamps cleared. All stages will be rebuilt.${RESET}\n\n"
 fi
 
 # ---------------------------------------------------------------------------
@@ -211,17 +232,20 @@ fi
 
 if $LIST_ONLY; then
     echo
-    echo "${BOLD}KratosOS Build Stages${RESET}"
-    echo "──────────────────────────────────────────────────────"
-    printf "  %-20s %-6s %s\n" "STAGE" "STATUS" "DESCRIPTION"
-    echo "──────────────────────────────────────────────────────"
+    printf "${BOLD}KratosOS Build Stages${RESET}\n"
+    printf "%-4s  %-22s %-26s %s\n" "Num" "Stage" "Status" "Description"
+    printf "%-4s  %-22s %-26s %s\n" "---" "-----" "------" "-----------"
+    local_idx=0
     for entry in "${STAGES[@]}"; do
-        IFS='|' read -r name _script sudo desc <<< "$entry"
+        local_idx=$(( local_idx + 1 ))
+        IFS='|' read -r name _script _sudo desc <<< "$entry"
         if is_done "$name"; then
             ts="$(cat "$(stamp_file "$name")")"
-            printf "  ${GREEN}%-20s${RESET} ${DIM}[done  %s]${RESET}  %s\n" "$name" "$ts" "$desc"
+            printf "${GREEN}%-4s  %-22s${RESET} ${DIM}done (%s)${RESET}  %s\n" \
+                "$local_idx" "$name" "$ts" "$desc"
         else
-            printf "  ${YELLOW}%-20s${RESET} [pending]            %s\n" "$name" "$desc"
+            printf "${YELLOW}%-4s  %-22s${RESET} pending                  %s\n" \
+                "$local_idx" "$name" "$desc"
         fi
     done
     echo
@@ -246,8 +270,7 @@ if [ -n "$FROM_STAGE" ]; then
         echo "    Run '$0 --list' to see valid stage names."
         exit 1
     fi
-    echo "${YELLOW}[~] Restarting from stage '$FROM_STAGE'.${RESET}"
-    echo
+    printf "${YELLOW}[~] Restarting from stage '%s'.${RESET}\n\n" "$FROM_STAGE"
 fi
 
 # ---------------------------------------------------------------------------
@@ -255,12 +278,9 @@ fi
 # ---------------------------------------------------------------------------
 
 echo
-echo "${BOLD}${CYAN}════════════════════════════════════════════════════${RESET}"
-echo "${BOLD}${CYAN}        KratosOS — Full Build System                ${RESET}"
-echo "${BOLD}${CYAN}════════════════════════════════════════════════════${RESET}"
-echo
-echo "  Jobs:   ${KRATOS_JOBS:-$(nproc)}"
-echo "  Stamps: $STAMP_DIR"
+printf "${BOLD}${CYAN}  KratosOS — Full Build  (%d stages)${RESET}\n" "$TOTAL"
+printf "${DIM}  Jobs: %s  |  Stamps: %s${RESET}\n" \
+    "${KRATOS_JOBS:-$(nproc)}" "$STAMP_DIR"
 echo
 
 export KRATOS_JOBS="${KRATOS_JOBS:-$(nproc)}"
@@ -270,21 +290,29 @@ export MAKEFLAGS="-j${KRATOS_JOBS}"
 # Run stages
 # ---------------------------------------------------------------------------
 
-TOTAL="${#STAGES[@]}"
 CURRENT=0
 SKIPPED=0
 RAN=0
 SYSROOT_CHANGED=false
 T_GLOBAL_START="$(date +%s)"
 
+# Log file — full output always saved here even in quiet mode
+LOG_FILE="$BUILD_DIR/build.log"
+> "$LOG_FILE"
+
 for entry in "${STAGES[@]}"; do
     IFS='|' read -r name script sudo_needed desc <<< "$entry"
-    CURRENT=$((CURRENT + 1))
+    CURRENT=$(( CURRENT + 1 ))
 
     # Skip disk stage if SKIP_DISK is set
     if [ "${SKIP_DISK:-0}" = "1" ] && [ "$name" = "disk" ]; then
-        echo "${DIM}  [skip] disk (SKIP_DISK=1)${RESET}"
-        SKIPPED=$((SKIPPED + 1))
+        if ! $VERBOSE; then
+            draw_progress "$CURRENT" "$TOTAL" "$name" "(skipped — SKIP_DISK=1)"
+            echo
+        else
+            printf "  ${DIM}[skip] disk (SKIP_DISK=1)${RESET}\n"
+        fi
+        SKIPPED=$(( SKIPPED + 1 ))
         continue
     fi
 
@@ -297,47 +325,82 @@ for entry in "${STAGES[@]}"; do
 
     if is_done "$name" && ! $force_rebuild; then
         ts="$(cat "$(stamp_file "$name")")"
-        printf "  ${GREEN}[✓]${RESET} ${DIM}%-20s already built (%s)${RESET}\n" "$name" "$ts"
-        SKIPPED=$((SKIPPED + 1))
+        if ! $VERBOSE; then
+            draw_progress "$CURRENT" "$TOTAL" "$name" "✓ already built"
+            printf "\n"
+        else
+            printf "  ${GREEN}[✓]${RESET} ${DIM}%-20s already built (%s)${RESET}\n" "$name" "$ts"
+        fi
+        SKIPPED=$(( SKIPPED + 1 ))
         continue
     fi
 
-    # --- Stage header ---
-    echo
-    echo "${BOLD}${CYAN}──────────────────────────────────────────────────────${RESET}"
-    printf "${BOLD}  [%d/%d] %s${RESET}\n" "$CURRENT" "$TOTAL" "$desc"
-    echo "${BOLD}${CYAN}──────────────────────────────────────────────────────${RESET}"
+    # --- Draw progress line (building) ---
+    if ! $VERBOSE; then
+        draw_progress "$CURRENT" "$TOTAL" "$name" "$desc"
+        # Leave cursor on same line; script output goes to log
+    else
+        echo
+        printf "${BOLD}${CYAN}──────────────────────────────────────────────────────${RESET}\n"
+        printf "${BOLD}  [%d/%d] %s${RESET}\n" "$CURRENT" "$TOTAL" "$desc"
+        printf "${BOLD}${CYAN}──────────────────────────────────────────────────────${RESET}\n"
+    fi
 
     SCRIPT_PATH="$BUILD_SCRIPTS/$script"
     if [ ! -f "$SCRIPT_PATH" ]; then
-        echo "${YELLOW}  [~] Script not found, skipping: $script${RESET}"
-        SKIPPED=$((SKIPPED + 1))
+        if ! $VERBOSE; then
+            draw_progress "$CURRENT" "$TOTAL" "$name" "~ script not found, skipped"
+            echo
+        else
+            printf "${YELLOW}  [~] Script not found, skipping: %s${RESET}\n" "$script"
+        fi
+        SKIPPED=$(( SKIPPED + 1 ))
         continue
     fi
 
     t_start="$(date +%s)"
 
-    # Run with or without sudo
-    if [ "$sudo_needed" = "yes" ]; then
-        echo "  ${YELLOW}[!] This stage requires root. Running with sudo...${RESET}"
-        sudo bash "$SCRIPT_PATH"
+    # Run script — in quiet mode pipe output to log file only
+    if $VERBOSE; then
+        if [ "$sudo_needed" = "yes" ]; then
+            printf "  ${YELLOW}[!] This stage requires root. Running with sudo...${RESET}\n"
+            sudo bash "$SCRIPT_PATH"
+        else
+            bash "$SCRIPT_PATH"
+        fi
     else
-        bash "$SCRIPT_PATH"
+        {
+            echo "===== STAGE: $name [$CURRENT/$TOTAL] =====" 
+            echo "Script: $SCRIPT_PATH"
+            echo "Started: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            echo
+        } >> "$LOG_FILE"
+
+        if [ "$sudo_needed" = "yes" ]; then
+            sudo bash "$SCRIPT_PATH" >> "$LOG_FILE" 2>&1
+        else
+            bash "$SCRIPT_PATH" >> "$LOG_FILE" 2>&1
+        fi
     fi
 
     t_end="$(date +%s)"
-    elapsed=$((t_end - t_start))
+    elapsed=$(( t_end - t_start ))
 
     mark_done "$name"
-    RAN=$((RAN + 1))
+    RAN=$(( RAN + 1 ))
 
-    # If this stage modifies sysroot, track it
-    if [ "$name" != "host-deps" ] && [ "$name" != "download" ] && [ "$name" != "bootstrap" ] && [ "$name" != "disk" ]; then
+    if [ "$name" != "host-deps" ] && [ "$name" != "download" ] && \
+       [ "$name" != "bootstrap" ] && [ "$name" != "disk" ]; then
         SYSROOT_CHANGED=true
     fi
 
-    echo
-    printf "  ${GREEN}[✓] %-20s completed in %ds${RESET}\n" "$name" "$elapsed"
+    if ! $VERBOSE; then
+        # Overwrite progress line with completed status
+        draw_progress "$CURRENT" "$TOTAL" "$name" "✓ done in ${elapsed}s"
+        printf "\n"
+    else
+        printf "\n  ${GREEN}[✓] %-20s completed in %ds${RESET}\n" "$name" "$elapsed"
+    fi
 done
 
 # ---------------------------------------------------------------------------
@@ -345,24 +408,28 @@ done
 # ---------------------------------------------------------------------------
 
 T_GLOBAL_END="$(date +%s)"
-T_ELAPSED=$((T_GLOBAL_END - T_GLOBAL_START))
+T_ELAPSED=$(( T_GLOBAL_END - T_GLOBAL_START ))
 
 echo
-echo "${BOLD}${CYAN}════════════════════════════════════════════════════${RESET}"
-echo "${BOLD}${GREEN}  KratosOS Build Complete!${RESET}"
-echo "${BOLD}${CYAN}════════════════════════════════════════════════════${RESET}"
+printf "${BOLD}${CYAN}════════════════════════════════════════════════════${RESET}\n"
+printf "${BOLD}${GREEN}  KratosOS Build Complete!${RESET}\n"
+printf "${BOLD}${CYAN}════════════════════════════════════════════════════${RESET}\n"
 echo
-echo "  Stages run:     $RAN"
-echo "  Stages skipped: $SKIPPED (already built)"
-echo "  Total time:     ${T_ELAPSED}s ($(( T_ELAPSED/60 ))m $(( T_ELAPSED%60 ))s)"
+printf "  Stages run:     %s\n"     "$RAN"
+printf "  Stages skipped: %s\n"     "$SKIPPED"
+printf "  Total time:     %ds (%dm %ds)\n" \
+    "$T_ELAPSED" "$(( T_ELAPSED/60 ))" "$(( T_ELAPSED%60 ))"
 echo
-echo "  Image: $BUILD_DIR/images/kratosos.img"
+printf "  Image: %s\n" "$BUILD_DIR/images/kratosos.img"
+if ! $VERBOSE; then
+    printf "  Full log: %s\n" "$LOG_FILE"
+fi
 echo
 echo "  Test with QEMU + OVMF:"
 echo
 echo "    qemu-system-x86_64 \\"
 echo "      -m 512M \\"
-echo "      -drive file=\"$BUILD_DIR/images/kratosos.img\",format=raw,if=virtio \\"
+printf "      -drive file=\"%s\",format=raw,if=virtio \\\\\n" "$BUILD_DIR/images/kratosos.img"
 echo "      -bios /usr/share/ovmf/OVMF.fd \\"
 echo "      -nographic"
 echo
