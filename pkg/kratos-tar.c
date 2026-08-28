@@ -113,7 +113,7 @@ int kratos_is_safe_relpath(const char *rel_path)
     return 1;
 }
 
-static int is_safe_symlink_target(const char *linkname)
+static int is_safe_symlink_target(const char *clean_rel, const char *linkname)
 {
     if (!linkname || linkname[0] == '\0') return 0;
 
@@ -122,20 +122,51 @@ static int is_safe_symlink_target(const char *linkname)
      * on the real filesystem instead of inside the extraction root. */
     if (linkname[0] == '/' || linkname[0] == '\\') return 0;
 
-    /* Reject traversal out of bounds */
-    if (strcmp(linkname, "..") == 0 ||
-        strncmp(linkname, "../", 3) == 0 ||
-        strstr(linkname, "/../") != NULL ||
-        strstr(linkname, "/..") != NULL) {
-        return 0;
-    }
-
     /* Reject control characters */
     for (const char *p = linkname; *p; p++) {
         if ((unsigned char)*p < 32) return 0;
     }
 
-    return 1;
+    /* Calculate base directory depth of clean_rel */
+    int depth = 0;
+    char rel_copy[PATH_MAX];
+    strncpy(rel_copy, clean_rel, sizeof(rel_copy) - 1);
+    rel_copy[sizeof(rel_copy) - 1] = '\0';
+
+    char *last_slash = strrchr(rel_copy, '/');
+    if (last_slash) {
+        *last_slash = '\0';
+        char *saveptr_rel = NULL;
+        char *tok = strtok_r(rel_copy, "/", &saveptr_rel);
+        while (tok) {
+            if (strcmp(tok, ".") != 0 && strlen(tok) > 0) {
+                depth++;
+            }
+            tok = strtok_r(NULL, "/", &saveptr_rel);
+        }
+    }
+
+    /* Trace linkname relative navigation */
+    char link_copy[PATH_MAX];
+    strncpy(link_copy, linkname, sizeof(link_copy) - 1);
+    link_copy[sizeof(link_copy) - 1] = '\0';
+
+    char *saveptr_link = NULL;
+    char *tok = strtok_r(link_copy, "/\\", &saveptr_link);
+    while (tok) {
+        if (strcmp(tok, "..") == 0) {
+            depth--;
+            if (depth < 0) {
+                /* Target attempts to escape dest_dir root */
+                return 0;
+            }
+        } else if (strcmp(tok, ".") != 0 && strlen(tok) > 0) {
+            depth++;
+        }
+        tok = strtok_r(NULL, "/\\", &saveptr_link);
+    }
+
+    return (depth >= 0);
 }
 
 static int make_parent_dirs(const char *filepath)
@@ -253,7 +284,7 @@ int kratos_tar_extract_fd(int fd, const char *dest_dir, kratos_tar_entry_cb cb, 
             mkdir(target_path, (entry.mode ? (entry.mode & 0777) : 0755));
         } else if (entry.typeflag == '2') {
             /* Symlink */
-            if (!is_safe_symlink_target(entry.linkname)) {
+            if (!is_safe_symlink_target(clean_rel, entry.linkname)) {
                 return KRATOS_TAR_ERR_SYMLINK_ESCAPE;
             }
             make_parent_dirs(target_path);
