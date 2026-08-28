@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# host-deps/fedora.sh — Host dependency installer for Fedora Linux.
+#
+# Sourced by install-host-deps.sh. Requires dnf and root.
+#
+# Package name mapping notes vs Arch:
+#   Arch base-devel      → Fedora "Development Tools" group + gcc + gcc-c++
+#   Arch libelf          → Fedora elfutils-libelf-devel  (provides gelf.h)
+#   Arch pkgconf         → Fedora pkgconf-pkg-config
+#   Arch python          → Fedora python3
+#   Arch udev            → Fedora systemd-udev
+#   Arch ninja           → Fedora ninja-build
+#   Arch qemu-system-x86 → Fedora qemu-system-x86-core
+#   Arch qemu-user +
+#        qemu-user-static-binfmt → Fedora qemu-user-static  (binfmt included)
+#   Arch edk2-ovmf       → Fedora edk2-ovmf  (same name)
+#   Arch squashfs-tools  → Fedora squashfs-tools  (same name)
+#   mbedTLS              → NOT listed (built from source by install-packages.sh)
+
+FEDORA_GROUPS=(
+    "Development Tools"
+)
+
+FEDORA_PACKAGES=(
+    # Explicit compiler packages (also pulled by group, but be explicit)
+    gcc
+    gcc-c++
+    make
+
+    # Parser generators
+    bison
+    flex
+
+    # Misc GNU build requirements
+    bc
+    m4
+    gawk
+    sed
+    autoconf
+    automake
+    libtool
+    gperf
+    texinfo
+
+    # Crypto / signing — kernel certs, module signing
+    openssl
+    openssl-devel
+
+    # ELF introspection — provides gelf.h (equivalent of Arch's libelf)
+    elfutils-libelf-devel
+
+    # Source fetch / decompress
+    rsync
+    curl
+    xz
+    bzip2
+    gzip
+    git
+    cpio
+
+    # Disk image utilities
+    parted
+    dosfstools
+    e2fsprogs
+    util-linux
+    systemd-udev
+
+    # Bootloader + ISO
+    grub2-tools
+    xorriso
+    mtools
+    squashfs-tools
+
+    # Build helpers
+    cmake
+    ninja-build
+    meson
+    pkgconf-pkg-config
+
+    # Python (kernel Kconfig / tooling scripts)
+    python3
+
+    # QEMU — full system emulator
+    qemu-system-x86-core
+
+    # QEMU — user-mode + binfmt (combined on Fedora)
+    qemu-user-static
+
+    # OVMF UEFI firmware for QEMU UEFI boot testing
+    edk2-ovmf
+)
+
+install_fedora_deps() {
+    echo "[+] Installing Fedora Development Tools group..."
+    dnf group install -y "${FEDORA_GROUPS[@]}"
+
+    echo "[+] Installing individual packages..."
+    dnf install -y "${FEDORA_PACKAGES[@]}"
+}
