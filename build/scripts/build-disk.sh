@@ -454,6 +454,25 @@ echo "[Step 9] Installing GRUB EFI bootloader..."
 
 echo "[✓] GRUB installed."
 
+# Ensure /boot/grub/x86_64-efi and /boot/grub2/x86_64-efi are both populated
+# (On Fedora, grub2-install writes to /boot/grub2; on Arch to /boot/grub)
+if [ -d "$MNT_ROOT/boot/grub2/x86_64-efi" ] && [ ! -d "$MNT_ROOT/boot/grub/x86_64-efi" ]; then
+    echo "[+] Mirroring /boot/grub2/x86_64-efi to /boot/grub/x86_64-efi..."
+    mkdir -p "$MNT_ROOT/boot/grub"
+    cp -a "$MNT_ROOT/boot/grub2/x86_64-efi" "$MNT_ROOT/boot/grub/"
+elif [ -d "$MNT_ROOT/boot/grub/x86_64-efi" ] && [ ! -d "$MNT_ROOT/boot/grub2/x86_64-efi" ]; then
+    mkdir -p "$MNT_ROOT/boot/grub2"
+    cp -a "$MNT_ROOT/boot/grub/x86_64-efi" "$MNT_ROOT/boot/grub2/"
+fi
+
+if [ ! -d "$MNT_ROOT/boot/grub/x86_64-efi" ] && [ -d "$SYSROOT/usr/lib/grub/x86_64-efi" ]; then
+    echo "[+] Copying sysroot GRUB modules to /boot/grub/x86_64-efi..."
+    mkdir -p "$MNT_ROOT/boot/grub"
+    cp -a "$SYSROOT/usr/lib/grub/x86_64-efi" "$MNT_ROOT/boot/grub/"
+    mkdir -p "$MNT_ROOT/boot/grub2"
+    cp -a "$SYSROOT/usr/lib/grub/x86_64-efi" "$MNT_ROOT/boot/grub2/"
+fi
+
 # ------------------------------------------------------------
 # Step 10: Detect root filesystem UUID
 # ------------------------------------------------------------
@@ -558,6 +577,13 @@ GRUB_EOF
 fi
 
 echo "[✓] grub.cfg written."
+
+# Mirror branding and grub.cfg to /boot/grub2/
+mkdir -p "$MNT_ROOT/boot/grub2/branding"
+if [ -f "$KRATOS_ROOT/Branding/KratosOS.png" ]; then
+    cp "$KRATOS_ROOT/Branding/KratosOS.png" "$MNT_ROOT/boot/grub2/branding/KratosOS.png"
+fi
+cp -f "$MNT_ROOT/boot/grub/grub.cfg" "$MNT_ROOT/boot/grub2/grub.cfg"
 
 # ------------------------------------------------------------
 # Step 11b: Self-check — verify the UUID we just wrote into
