@@ -39,6 +39,7 @@ export KRATOS_JOBS ?= $(shell nproc)
         diffutils tar gzip xz bzip2 file-cmd \
         kernel grub etc init pkg disk image iso live-iso \
         mbedtls ca-certs fetch xorg xfce calamares \
+        check-host host-deps \
         clean distclean stamps-clean
 
 # ─────────────────────────────────────────────
@@ -48,13 +49,18 @@ help:
 	@echo ""
 	@echo "  KratosOS Build System"
 	@echo "  ─────────────────────────────────────────"
-	@echo "  make all            Full build — all phases (incremental)"
-	@echo "  make all CLEAN=1    Full rebuild — wipe stamps first"
+	@echo "  make all             Full build — all phases (incremental, quiet)"
+	@echo "  make all CLEAN=1     Full rebuild — wipe stamps first"
+	@echo "  make all VERBOSE=1   Full build with verbose script output"
+	@echo ""
+	@echo "  Host setup:"
+	@echo "  make check-host      Check host tool compatibility (no root)"
+	@echo "  make host-deps       Install host dependencies (requires sudo)"
 	@echo ""
 	@echo "  Phase targets:"
-	@echo "  make phase1         Phase 1: toolchain bootstrap"
-	@echo "  make phase2         Phase 2: userspace base"
-	@echo "  make phase3         Phase 3: kernel + GRUB + init + disk"
+	@echo "  make phase1          Phase 1: toolchain bootstrap"
+	@echo "  make phase2          Phase 2: userspace base"
+	@echo "  make phase3          Phase 3: kernel + GRUB + init + disk"
 	@echo ""
 	@echo "  Phase 1 individual stages:"
 	@echo "  make linux-headers  make binutils     make gcc-pass1"
@@ -72,20 +78,24 @@ help:
 	@echo "  make pkg       make disk    make iso"
 	@echo ""
 	@echo "  Utilities:"
-	@echo "  make test           Run automated test suite (security, pkg, json, crypt)"
-	@echo "  make verify         Run Phase 1 toolchain verification"
-	@echo "  make verify-phase2  Run Phase 2 userspace verification"
-	@echo "  make download       Download all source tarballs"
-	@echo "  make stamps-clean   Clear all incremental build stamps"
+	@echo "  make test            Run automated test suite (security, pkg, json, crypt)"
+	@echo "  make verify          Run Phase 1 toolchain verification"
+	@echo "  make verify-phase2   Run Phase 2 userspace verification"
+	@echo "  make download        Download all source tarballs"
+	@echo "  make stamps-clean    Clear all incremental build stamps"
 	@echo ""
 	@echo "  Cleanup:"
-	@echo "  make clean          Remove build artifacts (keep downloads + stamps)"
-	@echo "  make distclean      Remove everything including downloads and stamps"
+	@echo "  make clean           Remove build artifacts (keep downloads + stamps)"
+	@echo "  make distclean       Remove everything including downloads and stamps"
 	@echo ""
 	@echo "  Options:"
-	@echo "  KRATOS_JOBS=N       Parallel make jobs (default: nproc=$(shell nproc))"
-	@echo "  CLEAN=1             Wipe all stamps before building (with make all)"
+	@echo "  KRATOS_JOBS=N        Parallel make jobs (default: nproc=$(shell nproc))"
+	@echo "  CLEAN=1              Wipe all stamps before building (with make all)"
+	@echo "  VERBOSE=1            Show full script output instead of progress bar"
 	@echo ""
+	@echo "  In quiet mode (default), full output is saved to build/build.log"
+	@echo ""
+
 
 # ─────────────────────────────────────────────
 # Test suite
@@ -123,13 +133,35 @@ test:
 	@echo ""
 
 # ─────────────────────────────────────────────
+# Host setup
+# ─────────────────────────────────────────────
+check-host:
+	@bash build/scripts/check-host-deps.sh
+
+host-deps:
+	@if [ "$$(id -u)" -ne 0 ]; then \
+	    echo "[+] host-deps requires root — invoking sudo..."; \
+	    sudo bash build/scripts/install-host-deps.sh; \
+	else \
+	    bash build/scripts/install-host-deps.sh; \
+	fi
+
+# ─────────────────────────────────────────────
 # Full build — all phases in order (incremental)
 # ─────────────────────────────────────────────
 all:
 ifeq ($(CLEAN),1)
+ifeq ($(VERBOSE),1)
+	@bash build.sh --clean --verbose
+else
 	@bash build.sh --clean
+endif
+else
+ifeq ($(VERBOSE),1)
+	@bash build.sh --verbose
 else
 	@bash build.sh
+endif
 endif
 
 # ─────────────────────────────────────────────
@@ -143,6 +175,7 @@ verify:
 
 download:
 	@bash $(SCRIPTS)/download.sh
+
 
 # Phase 1 individual stages
 linux-headers:

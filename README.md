@@ -172,20 +172,80 @@ kratos remove package-name
 
 ## 🚀 Quick Start & Building
 
-### Prerequisites (Host System)
+### Host Requirements
 
-- Linux host (x86_64)
-- `gcc`, `g++`, `make`, `bison`, `flex`, `texinfo`, `gawk`, `wget`, `qemu-system-x86_64`
+KratosOS can be built on any Linux x86_64 host. The build system requires the following tools; the host distribution doesn't matter — only the resulting commands do.
 
-### Full Build (Incremental)
+#### 1. Install host dependencies
 
 ```bash
-# Build the entire OS from scratch (all phases)
+# Automatic install (detects your distro):
+sudo ./build/scripts/install-host-deps.sh
+
+# Or via make:
+make host-deps
+```
+
+Supported package managers:
+
+| Distribution | Package Manager |
+|---|---|
+| Arch / Manjaro / EndeavourOS | `pacman` |
+| Fedora | `dnf` |
+| Debian / Ubuntu *(Phase 2, not yet fully tested)* | `apt` |
+
+#### 2. Verify host compatibility
+
+```bash
+# Check all required tools are present:
+./build/scripts/check-host-deps.sh
+
+# Or via make / build.sh:
+make check-host
+./build.sh --check-host
+```
+
+Expected output on a ready host:
+
+```
+KratosOS Host Compatibility Check
+==================================
+  Host OS:      Fedora Linux 44
+  Architecture: x86_64
+
+  Command                       Status
+  -------                       ------
+  [✓] bash        [✓] gcc         [✓] g++
+  [✓] make        [✓] bison       [✓] flex
+  ...
+  [✓] qemu-system-x86_64
+
+  [✓] Host is compatible with KratosOS build system.
+```
+
+#### 3. Build
+
+```bash
+# Full build — all phases, incremental, quiet progress bar:
 make all
 
-# Run automated unit and security tests
-make test
+# Full verbose output (legacy behaviour):
+make all VERBOSE=1
+
+# Rebuild everything from scratch:
+make all CLEAN=1
 ```
+
+Build output in quiet mode (default) shows a live progress bar:
+
+```
+  KratosOS — Full Build  (41 stages)
+  Jobs: 16  |  Stamps: build/.stamps
+
+  [████████████░░░░░░░░░░░░] 12/41   29%  gcc-pass2  GCC pass 2 (C + C++ + libstdc++)
+```
+
+Full script output is always saved to `build/build.log`.
 
 ### Individual Build Targets
 
