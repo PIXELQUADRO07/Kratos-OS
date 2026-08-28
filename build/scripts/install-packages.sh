@@ -91,13 +91,28 @@ if [ ! -f "$SYSROOT/etc/kratos/repos.d/00-official.conf" ]; then
     bash "$SCRIPT_DIR/create-etc-skeleton.sh"
 fi
 
-# 3. Update repository index
-echo "[+] Updating package database..."
-"$HOST_KPM" update
+# 3. Auto-detect local KratosOS-Packages repository or update via network
+LOCAL_PACKAGES_REPO=""
+for candidate in \
+    "$KRATOS_ROOT/../KratosOS-Packages/repository/x86_64/stable" \
+    "/home/ghost/Github/KratosOS-Packages/repository/x86_64/stable"; do
+    if [ -d "$candidate/packages" ] && [ -f "$candidate/index.json" ]; then
+        LOCAL_PACKAGES_REPO="$candidate"
+        break
+    fi
+done
+
+if [ -n "$LOCAL_PACKAGES_REPO" ]; then
+    echo "[+] Using local KratosOS-Packages repository: $LOCAL_PACKAGES_REPO"
+    mkdir -p "$SYSROOT/var/lib/kratos/repo-cache/kratos-official/packages"
+    cp -f "$LOCAL_PACKAGES_REPO/index.json" "$SYSROOT/var/lib/kratos/repo-cache/kratos-official/index.json"
+    cp -u "$LOCAL_PACKAGES_REPO/packages/"*.kpkg "$SYSROOT/var/lib/kratos/repo-cache/kratos-official/packages/" 2>/dev/null || true
+else
+    echo "[+] Updating package database from remote..."
+    "$HOST_KPM" update || true
+fi
 
 # 4. Define packages to install
-# These are the essential packages for a working XFCE desktop environment.
-# Note: if these are not in the repo, the script will warn/fail.
 PACKAGES=(
     "networking"
     "utils"
@@ -116,6 +131,17 @@ PACKAGES=(
     "atk"
     "gdk-pixbuf"
     "gtk+"
+    "fribidi"
+    "harfbuzz"
+    "libpng"
+    "libjpeg-turbo"
+    "sqlite"
+    "vim"
+    "wget"
+    "sudo"
+)
+
+OPTIONAL_PACKAGES=(
     "dbus"
     "libdrm"
     "mesa"
@@ -144,8 +170,8 @@ PACKAGES=(
     "xfce4-terminal"
 )
 
-echo "[+] Installing target packages..."
-REQUIRED_PKGS="xorg-server xinit xfce4-session"
+echo "[+] Installing core repository packages..."
+REQUIRED_PKGS="networking utils"
 for pkg in "${PACKAGES[@]}"; do
     echo "    -> Installing $pkg..."
     # --force to overwrite existing files (e.g. from etc skeleton)
@@ -155,6 +181,13 @@ for pkg in "${PACKAGES[@]}"; do
             exit 1
         fi
         echo "    [!] Warning: Failed to install $pkg (might be missing in repo)"
+    fi
+done
+
+echo "[+] Checking optional desktop packages..."
+for pkg in "${OPTIONAL_PACKAGES[@]}"; do
+    if "$HOST_KPM" install --force "$pkg" 2>/dev/null; then
+        echo "    -> Installed optional package: $pkg"
     fi
 done
 
