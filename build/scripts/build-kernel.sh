@@ -52,11 +52,13 @@ else
     echo "[~] Linux $VERSION already extracted."
 fi
 
-# ── Clean source tree if an in-source build was previously done ───────────────
-if [ -f "$SOURCE_DIR/include/config/auto.conf" ] || [ -f "$SOURCE_DIR/.config" ]; then
-    echo "[+] Cleaning in-source artifacts in kernel source tree..."
-    make -C "$SOURCE_DIR" ARCH=x86_64 mrproper 2>/dev/null || true
-fi
+# ── Clean source tree for out-of-tree build ──────────────────────────────────
+# Linux Kbuild requires an entirely clean source tree when using O= (out-of-tree).
+# Leftover artifacts from headers_install (scripts/basic/fixdep, etc.) or prior
+# in-tree builds will cause Kbuild to abort.
+echo "[+] Ensuring clean source tree for out-of-tree kernel build..."
+make -C "$SOURCE_DIR" ARCH=x86_64 mrproper 2>/dev/null || true
+
 
 # ── Prepare output directory ──────────────────────────────────────────
 mkdir -p "$KBUILD_DIR"

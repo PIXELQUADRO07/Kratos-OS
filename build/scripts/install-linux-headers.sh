@@ -47,8 +47,12 @@ cd "$SOURCE_DIR"
 make ARCH=x86_64 headers_install \
     INSTALL_HDR_PATH="$KRATOS_SYSROOT/usr"
 
+# Clean any host artifacts (e.g. fixdep) generated during headers_install
+make ARCH=x86_64 mrproper 2>/dev/null || true
+
 echo
 echo "[+] Linux headers installed successfully."
 echo
 echo "Headers:"
 echo "  $KRATOS_SYSROOT/usr/include"
+
