@@ -133,7 +133,6 @@ REQUIRED_TOOLS=(
     truncate parted losetup
     mkfs.fat mkfs.ext4
     mount umount
-    grub-install
     blkid
 )
 
@@ -144,7 +143,13 @@ for tool in "${REQUIRED_TOOLS[@]}"; do
     fi
 done
 
-echo "[✓] Host tools OK."
+GRUB_INSTALL_BIN="$(command -v grub-install 2>/dev/null || command -v grub2-install 2>/dev/null || true)"
+if [ -z "$GRUB_INSTALL_BIN" ]; then
+    echo "[!] Required host tool not found: grub-install (or grub2-install)"
+    exit 1
+fi
+
+echo "[✓] Host tools OK ($GRUB_INSTALL_BIN found)."
 echo
 
 # ------------------------------------------------------------
@@ -436,7 +441,7 @@ echo "[✓] ESP mounted at $MNT_ROOT/boot/efi"
 echo
 echo "[Step 9] Installing GRUB EFI bootloader..."
 
-grub-install \
+"$GRUB_INSTALL_BIN" \
     --target=x86_64-efi \
     --efi-directory="$MNT_ROOT/boot/efi" \
     --boot-directory="$MNT_ROOT/boot" \

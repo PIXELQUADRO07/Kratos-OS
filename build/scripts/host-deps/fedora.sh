@@ -67,6 +67,7 @@ FEDORA_PACKAGES=(
 
     # Bootloader + ISO
     grub2-tools
+    grub2-tools-extra
     xorriso
     mtools
     squashfs-tools

@@ -24,7 +24,7 @@ HOST_COMMANDS=(
     parted mkfs.fat mkfs.ext4 losetup blkid
 
     # Bootloader + ISO
-    grub-install grub-mkrescue xorriso mksquashfs mtools
+    xorriso mksquashfs mtools
 
     # Build helpers
     cmake ninja python3
@@ -75,6 +75,35 @@ run_checks() {
     for cmd in "${HOST_COMMANDS[@]}"; do
         require_cmd "$cmd"
     done
+
+    # grub-install (or grub2-install on Fedora/RHEL/openSUSE)
+    local grub_install_ok=false
+    for g in grub-install grub2-install; do
+        if command -v "$g" > /dev/null 2>&1; then
+            printf "  ${GREEN:-}[✓]${RESET:-} grub-install  (%s)\n" "$g"
+            grub_install_ok=true
+            break
+        fi
+    done
+    if ! $grub_install_ok; then
+        printf "  ${RED:-}[✗]${RESET:-} grub-install  (grub-install or grub2-install)\n"
+        _MISSING_CMDS+=("grub-install")
+    fi
+
+    # grub-mkrescue (or grub2-mkrescue on Fedora/RHEL/openSUSE)
+    local grub_mkrescue_ok=false
+    for g in grub-mkrescue grub2-mkrescue; do
+        if command -v "$g" > /dev/null 2>&1; then
+            printf "  ${GREEN:-}[✓]${RESET:-} grub-mkrescue (%s)\n" "$g"
+            grub_mkrescue_ok=true
+            break
+        fi
+    done
+    if ! $grub_mkrescue_ok; then
+        printf "  ${RED:-}[✗]${RESET:-} grub-mkrescue (grub-mkrescue or grub2-mkrescue)\n"
+        _MISSING_CMDS+=("grub-mkrescue")
+    fi
+
 
     # qemu-user: accept either qemu-x86_64-static or qemu-x86_64
     local qemu_user_ok=false

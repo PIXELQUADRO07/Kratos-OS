@@ -40,12 +40,13 @@ if [ ! -d "$SYSROOT" ] || [ ! -f "$SYSROOT/sbin/init" ]; then
     exit 1
 fi
 
-if ! command -v grub-mkrescue &>/dev/null || ! command -v xorriso &>/dev/null; then
-    echo "[!] Error: 'grub-mkrescue' or 'xorriso' utility not found."
+GRUB_MKRESCUE_BIN="$(command -v grub-mkrescue 2>/dev/null || command -v grub2-mkrescue 2>/dev/null || true)"
+if [ -z "$GRUB_MKRESCUE_BIN" ] || ! command -v xorriso &>/dev/null; then
+    echo "[!] Error: 'grub-mkrescue' (or 'grub2-mkrescue') or 'xorriso' utility not found."
     echo "    Install missing host dependencies via:"
     echo "      Arch Linux:    sudo pacman -S --needed grub xorriso"
     echo "      Debian/Ubuntu: sudo apt install grub-common xorriso mtools"
-    echo "      Fedora:        sudo dnf install grub2-tools xorriso mtools"
+    echo "      Fedora:        sudo dnf install grub2-tools-extra xorriso mtools"
     exit 1
 fi
 
@@ -386,8 +387,8 @@ echo "[✓] Live grub.cfg written."
 # ------------------------------------------------------------
 # Step 6: Build ISO via grub-mkrescue
 # ------------------------------------------------------------
-echo "[Step 6] Invoking grub-mkrescue..."
-grub-mkrescue -o "$ISO_OUT" "$ISO_ROOT" 2>&1 | sed 's/^/    /'
+echo "[Step 6] Invoking grub-mkrescue ($GRUB_MKRESCUE_BIN)..."
+"$GRUB_MKRESCUE_BIN" -o "$ISO_OUT" "$ISO_ROOT" 2>&1 | sed 's/^/    /'
 
 # ------------------------------------------------------------
 # Step 7: Cleanup
