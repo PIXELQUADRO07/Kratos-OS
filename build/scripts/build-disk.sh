@@ -448,6 +448,7 @@ echo "[Step 9] Installing GRUB EFI bootloader..."
     --removable \
     --no-nvram \
     --recheck \
+    --force \
     --modules="part_gpt ext2 linux normal echo search search_fs_uuid gfxterm png font all_video gfxmenu" \
     2>&1 | sed 's/^/    /'
 
