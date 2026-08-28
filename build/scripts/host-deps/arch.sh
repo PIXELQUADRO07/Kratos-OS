@@ -28,6 +28,13 @@ ARCH_PACKAGES=(
     # Crypto / signing — kernel module signing, certs
     openssl
 
+    # GCC math & compression libs
+    gmp
+    mpfr
+    libmpc
+    zlib
+    zstd
+
     # ELF introspection — tools/objtool (ORC unwind tables), provides gelf.h
     libelf
 

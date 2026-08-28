@@ -39,6 +39,13 @@ DEBIAN_PACKAGES=(
     gperf
     texinfo
 
+    # GCC math & compression libs
+    libgmp-dev
+    libmpfr-dev
+    libmpc-dev
+    zlib1g-dev
+    libzstd-dev
+
     # Crypto / signing
     libssl-dev
 

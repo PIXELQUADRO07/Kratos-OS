@@ -42,6 +42,13 @@ FEDORA_PACKAGES=(
     gperf
     texinfo
 
+    # GCC & Toolchain building libraries
+    gmp-devel
+    mpfr-devel
+    libmpc-devel
+    zlib-devel
+    zstd-devel
+
     # Crypto / signing — kernel certs, module signing
     openssl
     openssl-devel
