@@ -188,13 +188,14 @@ stage_needs_rebuild() {
 # only printed when verbose mode is off.
 # ---------------------------------------------------------------------------
 
-BAR_WIDTH=24
+BAR_WIDTH=20
 
 draw_progress() {
     local current="$1"
     local total="$2"
     local name="$3"
-    local desc="$4"
+    local status_text="$4"
+    local state="${5:-running}"  # running | done | failed | skipped
 
     local pct=$(( current * 100 / total ))
     local filled=$(( current * BAR_WIDTH / total ))
@@ -205,14 +206,22 @@ draw_progress() {
     for (( i=0; i<filled; i++ )); do bar+="█"; done
     for (( i=0; i<empty;  i++ )); do bar+="░"; done
 
-    # Truncate desc to fit terminal width nicely
-    local max_desc=38
-    if [ ${#desc} -gt $max_desc ]; then
-        desc="${desc:0:$((max_desc-1))}…"
+    local color="$CYAN"
+    local status_formatted="$status_text"
+    if [ "$state" = "done" ]; then
+        color="$GREEN"
+        status_formatted="${GREEN}${status_text}${RESET}"
+    elif [ "$state" = "failed" ]; then
+        color="$RED"
+        status_formatted="${BOLD}${RED}${status_text}${RESET}"
+    elif [ "$state" = "skipped" ]; then
+        color="$CYAN"
+        status_formatted="${DIM}${status_text}${RESET}"
     fi
 
-    printf "\r${CYAN}[%s]${RESET} ${BOLD}%3d/%d${RESET}  %3d%%  ${YELLOW}%-20s${RESET}  %s" \
-        "$bar" "$current" "$total" "$pct" "$name" "$desc"
+    # \r\033[K erases the entire current line before printing
+    printf "\r\033[K ${color}[%s]${RESET} ${BOLD}%2d/%d${RESET} ${color}%3d%%${RESET}  ${YELLOW}%-16s${RESET}  %s" \
+        "$bar" "$current" "$total" "$pct" "$name" "$status_formatted"
 }
 
 # ---------------------------------------------------------------------------
@@ -326,7 +335,7 @@ for entry in "${STAGES[@]}"; do
     if is_done "$name" && ! $force_rebuild; then
         ts="$(cat "$(stamp_file "$name")")"
         if ! $VERBOSE; then
-            draw_progress "$CURRENT" "$TOTAL" "$name" "✓ already built"
+            draw_progress "$CURRENT" "$TOTAL" "$name" "✓ already built" "skipped"
             printf "\n"
         else
             printf "  ${GREEN}[✓]${RESET} ${DIM}%-20s already built (%s)${RESET}\n" "$name" "$ts"
@@ -337,7 +346,7 @@ for entry in "${STAGES[@]}"; do
 
     # --- Draw progress line (building) ---
     if ! $VERBOSE; then
-        draw_progress "$CURRENT" "$TOTAL" "$name" "$desc"
+        draw_progress "$CURRENT" "$TOTAL" "$name" "$desc" "running"
         # Leave cursor on same line; script output goes to log
     else
         echo
@@ -349,8 +358,8 @@ for entry in "${STAGES[@]}"; do
     SCRIPT_PATH="$BUILD_SCRIPTS/$script"
     if [ ! -f "$SCRIPT_PATH" ]; then
         if ! $VERBOSE; then
-            draw_progress "$CURRENT" "$TOTAL" "$name" "~ script not found, skipped"
-            echo
+            draw_progress "$CURRENT" "$TOTAL" "$name" "~ script not found, skipped" "skipped"
+            printf "\n"
         else
             printf "${YELLOW}  [~] Script not found, skipping: %s${RESET}\n" "$script"
         fi
@@ -394,7 +403,7 @@ for entry in "${STAGES[@]}"; do
 
     if [ $STAGE_RC -ne 0 ]; then
         if ! $VERBOSE; then
-            draw_progress "$CURRENT" "$TOTAL" "$name" "✗ FAILED (exit $STAGE_RC)"
+            draw_progress "$CURRENT" "$TOTAL" "$name" "✗ FAILED (exit $STAGE_RC)" "failed"
             printf "\n\n"
             printf "${BOLD}${RED}  [!] Stage '%s' failed (exit code: %d).${RESET}\n" "$name" "$STAGE_RC"
             printf "${DIM}  Log extract from %s:${RESET}\n" "$LOG_FILE"
@@ -418,7 +427,7 @@ for entry in "${STAGES[@]}"; do
 
     if ! $VERBOSE; then
         # Overwrite progress line with completed status
-        draw_progress "$CURRENT" "$TOTAL" "$name" "✓ done in ${elapsed}s"
+        draw_progress "$CURRENT" "$TOTAL" "$name" "✓ done in ${elapsed}s" "done"
         printf "\n"
     else
         printf "\n  ${GREEN}[✓] %-20s completed in %ds${RESET}\n" "$name" "$elapsed"
