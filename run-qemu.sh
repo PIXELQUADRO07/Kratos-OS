@@ -109,6 +109,10 @@ echo "  QEMU:   $QEMU_VER"
 
 # OVMF firmware
 OVMF_CANDIDATES=(
+    /usr/share/edk2/ovmf/OVMF_CODE.fd
+    /usr/share/OVMF/OVMF_CODE.fd
+    /usr/share/edk2/ovmf/OVMF.stateless.fd
+    /usr/share/edk2/ovmf/OVMF.fd
     /usr/share/edk2/x64/OVMF.4m.fd
     /usr/share/edk2/x64/OVMF_CODE.4m.fd
     /usr/share/edk2/x64/OVMF.fd
