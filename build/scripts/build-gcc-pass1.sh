@@ -43,6 +43,19 @@ else
     echo "[+] GCC sources already extracted."
 fi
 
+# ---------------------------------------------------------------------------
+# Download GCC prerequisites (gmp, mpfr, mpc) into the source tree
+# ---------------------------------------------------------------------------
+echo "[+] Checking GCC prerequisites (gmp, mpfr, mpc)..."
+cd "$SOURCE_DIR"
+if [ ! -d gmp ] || [ ! -d mpfr ] || [ ! -d mpc ]; then
+    echo "[+] Downloading GCC prerequisites via download_prerequisites..."
+    ./contrib/download_prerequisites --no-isl
+    rm -rf gettext isl
+else
+    echo "[=] Prerequisites already present."
+fi
+
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
