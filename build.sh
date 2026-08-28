@@ -359,14 +359,15 @@ for entry in "${STAGES[@]}"; do
     fi
 
     t_start="$(date +%s)"
-
-    # Run script — in quiet mode pipe output to log file only
+    set +e
     if $VERBOSE; then
         if [ "$sudo_needed" = "yes" ]; then
             printf "  ${YELLOW}[!] This stage requires root. Running with sudo...${RESET}\n"
             sudo bash "$SCRIPT_PATH"
+            STAGE_RC=$?
         else
             bash "$SCRIPT_PATH"
+            STAGE_RC=$?
         fi
     else
         {
@@ -376,15 +377,36 @@ for entry in "${STAGES[@]}"; do
             echo
         } >> "$LOG_FILE"
 
+        STAGE_LOG_START=$(wc -l < "$LOG_FILE")
+
         if [ "$sudo_needed" = "yes" ]; then
             sudo bash "$SCRIPT_PATH" >> "$LOG_FILE" 2>&1
+            STAGE_RC=$?
         else
             bash "$SCRIPT_PATH" >> "$LOG_FILE" 2>&1
+            STAGE_RC=$?
         fi
     fi
+    set -e
 
     t_end="$(date +%s)"
     elapsed=$(( t_end - t_start ))
+
+    if [ $STAGE_RC -ne 0 ]; then
+        if ! $VERBOSE; then
+            draw_progress "$CURRENT" "$TOTAL" "$name" "✗ FAILED (exit $STAGE_RC)"
+            printf "\n\n"
+            printf "${BOLD}${RED}  [!] Stage '%s' failed (exit code: %d).${RESET}\n" "$name" "$STAGE_RC"
+            printf "${DIM}  Log extract from %s:${RESET}\n" "$LOG_FILE"
+            echo "──────────────────────────────────────────────────────────────"
+            tail -n +"$((STAGE_LOG_START + 1))" "$LOG_FILE" | tail -n 25
+            echo "──────────────────────────────────────────────────────────────"
+            echo
+        else
+            printf "\n  ${RED}[✗] %-20s FAILED (exit code: %d)${RESET}\n\n" "$name" "$STAGE_RC"
+        fi
+        exit $STAGE_RC
+    fi
 
     mark_done "$name"
     RAN=$(( RAN + 1 ))
