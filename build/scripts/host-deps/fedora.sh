@@ -85,8 +85,11 @@ FEDORA_PACKAGES=(
     meson
     pkgconf-pkg-config
 
-    # Python (kernel Kconfig / tooling scripts)
+    # Python (kernel Kconfig / tooling scripts / Mesa code generator)
     python3
+    python3-mako
+    python3-pyyaml
+    python3-pip
 
     # QEMU — full system emulator
     qemu-system-x86-core

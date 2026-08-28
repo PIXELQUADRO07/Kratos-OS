@@ -66,8 +66,11 @@ ARCH_PACKAGES=(
     meson
     pkgconf
 
-    # Python (kernel Kconfig scripts)
+    # Python (kernel Kconfig / Mesa code generator)
     python
+    python-mako
+    python-yaml
+    python-pip
 
     # QEMU — full system + user-mode emulator
     qemu-system-x86

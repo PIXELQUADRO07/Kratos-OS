@@ -81,8 +81,11 @@ DEBIAN_PACKAGES=(
     meson
     pkgconf
 
-    # Python
+    # Python (kernel Kconfig / Mesa code generator)
     python3
+    python3-mako
+    python3-yaml
+    python3-pip
 
     # QEMU — full system emulator
     qemu-system-x86
