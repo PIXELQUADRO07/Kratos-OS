@@ -1,7 +1,7 @@
 /* su.c — KratosOS Native Switch User Utility (/bin/su)
  *
  * Usage:
- *   su [-] [username]
+ *   su [-] [-c command] [username]
  */
 
 #define _GNU_SOURCE
@@ -42,11 +42,20 @@ static void get_password(char *buf, size_t size)
 int main(int argc, char *argv[])
 {
     const char *target_user = "root";
+    const char *command_str = NULL;
     int login_shell = 0;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-") == 0 || strcmp(argv[i], "-l") == 0 || strcmp(argv[i], "--login") == 0) {
             login_shell = 1;
+        } else if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--command") == 0) {
+            if (i + 1 < argc) {
+                command_str = argv[++i];
+            }
+        } else if (strncmp(argv[i], "--command=", 10) == 0) {
+            command_str = argv[i] + 10;
+        } else if (strncmp(argv[i], "-c", 2) == 0 && strlen(argv[i]) > 2) {
+            command_str = argv[i] + 2;
         } else if (argv[i][0] != '-') {
             target_user = argv[i];
         }
@@ -116,7 +125,7 @@ int main(int argc, char *argv[])
         setenv("HOME", pw->pw_dir, 1);
     }
 
-    const char *shell = pw->pw_shell[0] ? pw->pw_shell : "/bin/bash";
+    const char *shell = (pw->pw_shell && pw->pw_shell[0]) ? pw->pw_shell : "/bin/bash";
     char shell_arg0[64];
     if (login_shell) {
         snprintf(shell_arg0, sizeof(shell_arg0), "-%s", (strrchr(shell, '/') ? strrchr(shell, '/') + 1 : shell));
@@ -124,7 +133,12 @@ int main(int argc, char *argv[])
         snprintf(shell_arg0, sizeof(shell_arg0), "%s", (strrchr(shell, '/') ? strrchr(shell, '/') + 1 : shell));
     }
 
-    execl(shell, shell_arg0, (char *)NULL);
+    if (command_str) {
+        execl(shell, shell_arg0, "-c", command_str, (char *)NULL);
+    } else {
+        execl(shell, shell_arg0, (char *)NULL);
+    }
+
     perror("su: exec shell failed");
     return 1;
 }
