@@ -24,19 +24,25 @@ mkdir -p "$SYSROOT/etc/xdg/xfce4/xfconf/xfce-perchannel-xml"
 mkdir -p "$SYSROOT/usr/share/applications"
 mkdir -p "$SYSROOT/usr/share/desktop-directories"
 mkdir -p "$SYSROOT/root/Desktop"
+mkdir -p "$SYSROOT/home/kratos-live/Desktop"
+mkdir -p "$SYSROOT/etc/skel/Desktop"
 
 # 2. Install desktop shortcut for Live installer
 if [ -f "$KRATOS_ROOT/config/live/kratosos-live.desktop" ]; then
     echo "[+] Installing Live Installer desktop entry..."
-    cp "$KRATOS_ROOT/config/live/kratosos-live.desktop" "$SYSROOT/etc/live/kratosos-live.desktop"
-    cp "$KRATOS_ROOT/config/live/kratosos-live.desktop" "$SYSROOT/root/Desktop/kratosos-live.desktop"
-    chmod +x "$SYSROOT/root/Desktop/kratosos-live.desktop"
+    cp -f "$KRATOS_ROOT/config/live/kratosos-live.desktop" "$SYSROOT/etc/live/kratosos-live.desktop"
+    cp -f "$KRATOS_ROOT/config/live/kratosos-live.desktop" "$SYSROOT/root/Desktop/kratosos-live.desktop"
+    cp -f "$KRATOS_ROOT/config/live/kratosos-live.desktop" "$SYSROOT/home/kratos-live/Desktop/kratosos-live.desktop"
+    cp -f "$KRATOS_ROOT/config/live/kratosos-live.desktop" "$SYSROOT/etc/skel/Desktop/kratosos-live.desktop"
+    chmod +x "$SYSROOT/root/Desktop/kratosos-live.desktop" 2>/dev/null || true
+    chmod +x "$SYSROOT/home/kratos-live/Desktop/kratosos-live.desktop" 2>/dev/null || true
+    chmod +x "$SYSROOT/etc/skel/Desktop/kratosos-live.desktop" 2>/dev/null || true
 fi
 
 # 3. Create default wallpaper directory and copy Branding assets
 mkdir -p "$SYSROOT/usr/share/backgrounds/xfce"
 if [ -f "$KRATOS_ROOT/Branding/KratosOS.png" ]; then
-    cp "$KRATOS_ROOT/Branding/KratosOS.png" "$SYSROOT/usr/share/backgrounds/xfce/kratosos-logo.png"
+    cp -f "$KRATOS_ROOT/Branding/KratosOS.png" "$SYSROOT/usr/share/backgrounds/xfce/kratosos-logo.png"
 fi
 
 echo "[✓] XFCE desktop environment configured successfully."

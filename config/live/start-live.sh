@@ -10,7 +10,7 @@ LIVE_HOME="/home/kratos-live"
 LIVE_UID=1000
 
 # 1. Hardware Wait Loop (Parrot OS style)
-# Real hardware can be slower than QEMU at initializing DRM drivers.
+# Real hardware / VirtualBox can be slower at initializing DRM/KMS drivers.
 echo "[Live] Waiting for graphics device..."
 READY=0
 for i in $(seq 1 15); do
@@ -23,10 +23,20 @@ for i in $(seq 1 15); do
 done
 
 if [ "$READY" -eq 0 ]; then
-    echo "[Live] Warning: no graphics device detected after 15s. X might fail."
+    echo "[Live] Warning: no graphics device detected after 15s. X might fall back to VESA/FBDEV."
 fi
 
-# 2. Ensure /run/dbus directory and system dbus are available
+# 2. Configure system permissions and directories for X11 & D-Bus
+chmod 1777 /tmp 2>/dev/null || true
+mkdir -p /var/log /var/lib/xkb /etc/X11
+chmod 777 /var/log /var/lib/xkb 2>/dev/null || true
+chmod 4755 /usr/bin/Xorg 2>/dev/null || true
+
+cat > /etc/X11/Xwrapper.config << 'EOF'
+allowed_users = anybody
+needs_root_rights = yes
+EOF
+
 mkdir -p /run/dbus /run/user/0 "/run/user/$LIVE_UID"
 chown 18:18 /run/dbus 2>/dev/null || true
 
@@ -54,14 +64,21 @@ if command -v dbus-daemon >/dev/null 2>&1 && [ ! -e /run/dbus/system_bus_socket 
     sleep 1
 fi
 
-# 3. Setup session home environment
+# 3. Setup session home environment and synchronize xinitrc across all profiles
 echo "[Live] Preparing $SESSION_USER desktop..."
+for dest in /etc/X11/xinit/xinitrc /root/.xinitrc "$SESSION_HOME/.xinitrc" /etc/skel/.xinitrc; do
+    mkdir -p "$(dirname "$dest")"
+    cp -f /etc/live/xinitrc "$dest" 2>/dev/null || true
+    chmod +x "$dest" 2>/dev/null || true
+done
+
 if [ -f /etc/live/kratosos-live.desktop ]; then
-    cp /etc/live/kratosos-live.desktop "$SESSION_HOME/Desktop/"
-    chmod +x "$SESSION_HOME/Desktop/kratosos-live.desktop"
+    cp -f /etc/live/kratosos-live.desktop "$SESSION_HOME/Desktop/" 2>/dev/null || true
+    chmod +x "$SESSION_HOME/Desktop/kratosos-live.desktop" 2>/dev/null || true
+    cp -f /etc/live/kratosos-live.desktop "/root/Desktop/" 2>/dev/null || true
+    chmod +x "/root/Desktop/kratosos-live.desktop" 2>/dev/null || true
 fi
-cp /etc/live/xinitrc "$SESSION_HOME/.xinitrc" 2>/dev/null || true
-chmod +x "$SESSION_HOME/.xinitrc" 2>/dev/null || true
+
 chown -R "$SESSION_USER:$SESSION_USER" "$SESSION_HOME" 2>/dev/null || true
 
 # 4. Launch X11 GUI on VT7 (this script is already backgrounded by rc.d)
@@ -79,12 +96,22 @@ if command -v startx >/dev/null 2>&1; then
 
     STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11; exec startx /etc/live/xinitrc -- vt7 -logverbose 6"
 
-    # Foreground startx: 99-live already launched us in the background.
-    if [ "$SESSION_USER" = "root" ]; then
-        eval "$STARTX_CMD" >>/var/log/Xorg.start.log 2>&1
-        STARTX_RC=$?
-    else
+    STARTX_RC=1
+    if [ "$SESSION_USER" != "root" ]; then
         su - "$SESSION_USER" -c "$STARTX_CMD" >>/var/log/Xorg.start.log 2>&1
+        STARTX_RC=$?
+    fi
+
+    # Fallback to root X session if unprivileged startx failed or if root session was selected
+    if [ "$STARTX_RC" -ne 0 ]; then
+        echo "[Live] Starting/falling back to root X session..." >> /var/log/Xorg.start.log
+        SESSION_USER="root"
+        SESSION_HOME="/root"
+        SESSION_RUNTIME="/run/user/0"
+        mkdir -p "$SESSION_HOME" "$SESSION_HOME/Desktop" "$SESSION_RUNTIME"
+        chmod 700 "$SESSION_RUNTIME"
+        STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11; exec startx /etc/live/xinitrc -- vt7 -logverbose 6"
+        eval "$STARTX_CMD" >>/var/log/Xorg.start.log 2>&1
         STARTX_RC=$?
     fi
 

@@ -56,17 +56,45 @@ mkdir -p "$SYSROOT/etc/X11/xinit"
 mkdir -p "$SYSROOT/usr/share/X11/xkb"
 mkdir -p "$SYSROOT/var/lib/xkb"
 mkdir -p "$SYSROOT/etc/live"
+mkdir -p "$SYSROOT/etc/skel"
+mkdir -p "$SYSROOT/root"
+mkdir -p "$SYSROOT/home/kratos-live"
+mkdir -p "$SYSROOT/var/log"
 
-# 2. Copy live X11 configurations
+# Fix directory permissions
+chmod 1777 "$SYSROOT/tmp" 2>/dev/null || true
+chmod 777 "$SYSROOT/var/lib/xkb" 2>/dev/null || true
+chmod 777 "$SYSROOT/var/log" 2>/dev/null || true
+
+# 2. Configure Xorg SUID bit and Xwrapper for rootless / seatless execution
+if [ -f "$SYSROOT/usr/bin/Xorg" ]; then
+    chmod 4755 "$SYSROOT/usr/bin/Xorg"
+fi
+
+cat > "$SYSROOT/etc/X11/Xwrapper.config" << 'EOF'
+allowed_users = anybody
+needs_root_rights = yes
+EOF
+
+# 3. Copy live X11 configurations
 if [ -f "$KRATOS_ROOT/config/live/xorg.conf" ]; then
     echo "[+] Installing /etc/X11/xorg.conf..."
     cp "$KRATOS_ROOT/config/live/xorg.conf" "$SYSROOT/etc/X11/xorg.conf"
 fi
 
 if [ -f "$KRATOS_ROOT/config/live/xinitrc" ]; then
-    echo "[+] Installing /etc/live/xinitrc..."
+    echo "[+] Installing /etc/live/xinitrc and default user xinitrc scripts..."
     cp "$KRATOS_ROOT/config/live/xinitrc" "$SYSROOT/etc/live/xinitrc"
     chmod +x "$SYSROOT/etc/live/xinitrc"
+    
+    # Also overwrite the default 3-xterm xinitrc so startx always starts XFCE
+    cp "$KRATOS_ROOT/config/live/xinitrc" "$SYSROOT/etc/X11/xinit/xinitrc"
+    chmod +x "$SYSROOT/etc/X11/xinit/xinitrc"
+    
+    cp "$KRATOS_ROOT/config/live/xinitrc" "$SYSROOT/etc/skel/.xinitrc"
+    cp "$KRATOS_ROOT/config/live/xinitrc" "$SYSROOT/root/.xinitrc"
+    cp "$KRATOS_ROOT/config/live/xinitrc" "$SYSROOT/home/kratos-live/.xinitrc"
+    chmod +x "$SYSROOT/etc/skel/.xinitrc" "$SYSROOT/root/.xinitrc" "$SYSROOT/home/kratos-live/.xinitrc"
 fi
 
 if [ -f "$KRATOS_ROOT/config/live/start-live.sh" ]; then
@@ -75,7 +103,7 @@ if [ -f "$KRATOS_ROOT/config/live/start-live.sh" ]; then
     chmod +x "$SYSROOT/etc/live/start-live.sh"
 fi
 
-# 3. Add Live session rc.d service to launch live environment on boot
+# 4. Add Live session rc.d service to launch live environment on boot
 mkdir -p "$SYSROOT/etc/rc.d"
 cat > "$SYSROOT/etc/rc.d/99-live" <<'EOF'
 #!/bin/bash
