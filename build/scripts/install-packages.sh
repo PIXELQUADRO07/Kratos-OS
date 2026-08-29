@@ -147,6 +147,7 @@ OPTIONAL_PACKAGES=(
     "mesa"
     "xorg-server"
     "xinit"
+    "xauth"
     "xkbcomp"
     "libinput"
     "xf86-input-libinput"
