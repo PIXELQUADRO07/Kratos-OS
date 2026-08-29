@@ -22,10 +22,6 @@ echo "========================================"
 echo "  Sysroot: $SYSROOT"
 echo
 
-# 0. Compile kratos-vtswitch — see kratos-vtswitch.c for why this exists:
-#    Xorg cannot switch to its own VT when run as a non-root user without
-#    systemd-logind (both true here), so start-live.sh needs a root-side
-#    helper to do it instead.
 if [ ! -f "$CC" ]; then
     echo "[!] Cross-compiler not found: $CC"
     exit 1

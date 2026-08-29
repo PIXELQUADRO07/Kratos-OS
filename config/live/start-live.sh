@@ -28,7 +28,7 @@ fi
 
 # 2. Configure system permissions and directories for X11 & D-Bus
 chmod 1777 /tmp 2>/dev/null || true
-mkdir -p /var/log /var/lib/xkb /etc/X11
+mkdir -p /var/log /var/lib/xkb /etc/X11 /etc/X11/xorg.conf.d
 chmod 777 /var/log /var/lib/xkb 2>/dev/null || true
 chmod 4755 /usr/bin/Xorg 2>/dev/null || true
 
@@ -81,20 +81,13 @@ fi
 
 chown -R "$SESSION_USER:$SESSION_USER" "$SESSION_HOME" 2>/dev/null || true
 
-# 4. Launch X11 GUI on VT7 (this script is already backgrounded by rc.d)
+# 4. Launch X11 GUI
 if command -v startx >/dev/null 2>&1; then
-    HAVE_VTSWITCH=0
-    if command -v kratos-vtswitch >/dev/null 2>&1; then
-        HAVE_VTSWITCH=1
-        echo "[Live] Switching to VT7 before starting X..."
-        kratos-vtswitch 7 || echo "[Live] Warning: could not switch to VT7."
-    fi
-
     echo "[Live] Starting graphical XFCE session as $SESSION_USER..."
     mkdir -p /var/log
     echo "[Live] Invoking startx..." >> /var/log/Xorg.start.log
 
-    STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11; exec startx /etc/live/xinitrc -- vt7 -logverbose 6"
+    STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11; exec startx /etc/live/xinitrc -- -logverbose 6"
 
     STARTX_RC=1
     if [ "$SESSION_USER" != "root" ]; then
@@ -110,17 +103,13 @@ if command -v startx >/dev/null 2>&1; then
         SESSION_RUNTIME="/run/user/0"
         mkdir -p "$SESSION_HOME" "$SESSION_HOME/Desktop" "$SESSION_RUNTIME"
         chmod 700 "$SESSION_RUNTIME"
-        STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11; exec startx /etc/live/xinitrc -- vt7 -logverbose 6"
+        STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11; exec startx /etc/live/xinitrc -- -logverbose 6"
         eval "$STARTX_CMD" >>/var/log/Xorg.start.log 2>&1
         STARTX_RC=$?
     fi
 
     if [ "$STARTX_RC" -ne 0 ]; then
         echo "[Live] ERROR: startx exited $STARTX_RC. Checking logs..."
-        if [ "$HAVE_VTSWITCH" -eq 1 ]; then
-            echo "[Live] Switching back to VT1..."
-            kratos-vtswitch 1 || true
-        fi
         for log in /var/log/Xorg.0.log /var/log/Xorg.start.log; do
             if [ -f "$log" ]; then
                 echo "[Live] --- $log ---"
