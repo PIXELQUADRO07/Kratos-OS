@@ -87,7 +87,12 @@ if command -v startx >/dev/null 2>&1; then
     mkdir -p /var/log
     echo "[Live] Invoking startx..." >> /var/log/Xorg.start.log
 
-    STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11; exec startx /etc/live/xinitrc -- -logverbose 6"
+    TARGET_VT=7
+    if [ -x /sbin/kratos-vtswitch ]; then
+        /sbin/kratos-vtswitch "$TARGET_VT" || echo "[Live] vtswitch failed, X might stay invisible" >> /var/log/Xorg.start.log
+    fi
+
+    STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11; exec startx /etc/live/xinitrc -- vt$TARGET_VT -novtswitch -logverbose 6"
 
     STARTX_RC=1
     if [ "$SESSION_USER" != "root" ]; then
@@ -103,7 +108,7 @@ if command -v startx >/dev/null 2>&1; then
         SESSION_RUNTIME="/run/user/0"
         mkdir -p "$SESSION_HOME" "$SESSION_HOME/Desktop" "$SESSION_RUNTIME"
         chmod 700 "$SESSION_RUNTIME"
-        STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11; exec startx /etc/live/xinitrc -- -logverbose 6"
+        STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11; exec startx /etc/live/xinitrc -- vt$TARGET_VT -novtswitch -logverbose 6"
         eval "$STARTX_CMD" >>/var/log/Xorg.start.log 2>&1
         STARTX_RC=$?
     fi
