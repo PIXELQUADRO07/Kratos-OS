@@ -1,7 +1,6 @@
 #!/bin/bash
 # /etc/live/start-live.sh — Live Environment Initialization and Graphical Boot
 #
-# Inspired by Parrot OS / Debian Live (live-config) workflows.
 
 echo "[Live] Initializing KratosOS Live Environment..."
 
@@ -58,6 +57,16 @@ fi
 
 export XDG_RUNTIME_DIR="$SESSION_RUNTIME"
 
+if command -v udevd >/dev/null 2>&1 && command -v udevadm >/dev/null 2>&1; then
+    echo "[Live] Starting udev device enumeration..."
+    mkdir -p /run/udev
+    if [ ! -S /run/udev/control ]; then
+        udevd --daemon >/var/log/udevd.log 2>&1 || true
+    fi
+    udevadm trigger --action=add >/dev/null 2>&1 || true
+    udevadm settle >/dev/null 2>&1 || true
+fi
+
 if command -v dbus-daemon >/dev/null 2>&1 && [ ! -e /run/dbus/system_bus_socket ]; then
     echo "[Live] Starting system D-Bus daemon..."
     dbus-daemon --system --fork 2>/dev/null || true
@@ -92,10 +101,19 @@ if command -v startx >/dev/null 2>&1; then
         /sbin/kratos-vtswitch "$TARGET_VT" || echo "[Live] vtswitch failed, X might stay invisible" >> /var/log/Xorg.start.log
     fi
 
-    STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11; exec startx /etc/live/xinitrc -- vt$TARGET_VT -novtswitch -logverbose 6"
+    STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11; exec startx /etc/live/xinitrc -- vt$TARGET_VT -novtswitch -keeptty -logverbose 6"
+    TARGET_TTY="/dev/tty$TARGET_VT"
 
     STARTX_RC=1
-    if [ "$SESSION_USER" != "root" ]; then
+    if [ -c "$TARGET_TTY" ] && command -v setsid >/dev/null 2>&1; then
+        if [ "$SESSION_USER" != "root" ]; then
+            setsid --ctty --wait su - "$SESSION_USER" -c "$STARTX_CMD" <"$TARGET_TTY" >>/var/log/Xorg.start.log 2>&1
+        else
+            setsid --ctty --wait /bin/bash -c "$STARTX_CMD" <"$TARGET_TTY" >>/var/log/Xorg.start.log 2>&1
+        fi
+        STARTX_RC=$?
+    elif [ "$SESSION_USER" != "root" ]; then
+        echo "[Live] Cannot establish controlling TTY $TARGET_TTY" >> /var/log/Xorg.start.log
         su - "$SESSION_USER" -c "$STARTX_CMD" >>/var/log/Xorg.start.log 2>&1
         STARTX_RC=$?
     fi
@@ -108,8 +126,12 @@ if command -v startx >/dev/null 2>&1; then
         SESSION_RUNTIME="/run/user/0"
         mkdir -p "$SESSION_HOME" "$SESSION_HOME/Desktop" "$SESSION_RUNTIME"
         chmod 700 "$SESSION_RUNTIME"
-        STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11; exec startx /etc/live/xinitrc -- vt$TARGET_VT -novtswitch -logverbose 6"
-        eval "$STARTX_CMD" >>/var/log/Xorg.start.log 2>&1
+        STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11; exec startx /etc/live/xinitrc -- vt$TARGET_VT -novtswitch -keeptty -logverbose 6"
+        if [ -c "$TARGET_TTY" ] && command -v setsid >/dev/null 2>&1; then
+            setsid --ctty --wait /bin/bash -c "$STARTX_CMD" <"$TARGET_TTY" >>/var/log/Xorg.start.log 2>&1
+        else
+            eval "$STARTX_CMD" >>/var/log/Xorg.start.log 2>&1
+        fi
         STARTX_RC=$?
     fi
 

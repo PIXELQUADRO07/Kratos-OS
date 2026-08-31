@@ -45,4 +45,17 @@ if [ -f "$KRATOS_ROOT/Branding/KratosOS.png" ]; then
     cp -f "$KRATOS_ROOT/Branding/KratosOS.png" "$SYSROOT/usr/share/backgrounds/xfce/kratosos-logo.png"
 fi
 
+# Keep the default panel limited to plugins shipped in the base image.
+PANEL_CONFIG="$SYSROOT/etc/xdg/xfce4/panel/default.xml"
+if [ -f "$PANEL_CONFIG" ]; then
+    sed -i \
+        -e '/<value type="int" value="8"\/>/d' \
+        -e '/<value type="int" value="9"\/>/d' \
+        -e '/<value type="int" value="10"\/>/d' \
+        -e '/<property name="plugin-9" type="string" value="power-manager-plugin"\/>/d' \
+        -e '/<property name="plugin-10" type="string" value="notification-plugin"\/>/d' \
+        "$PANEL_CONFIG"
+    perl -0pi -e 's/\n    <property name="plugin-8" type="string" value="pulseaudio">.*?\n    <property name="plugin-9"/\n    <property name="plugin-9"/s' "$PANEL_CONFIG"
+fi
+
 echo "[✓] XFCE desktop environment configured successfully."

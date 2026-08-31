@@ -140,7 +140,7 @@ if ! command -v mksquashfs &>/dev/null; then
 fi
 
 echo "  Creating SquashFS image (this may take a moment)..."
-mksquashfs "$SYSROOT" "$SQUASHFS_OUT" -noappend -comp zstd -e boot
+mksquashfs "$SYSROOT" "$SQUASHFS_OUT" -noappend -all-root -comp zstd -e boot
 
 echo "  Creating minimal bootstrap initramfs..."
 BOOTSTRAP_DIR="$KRATOS_WORK/bootstrap_initramfs"

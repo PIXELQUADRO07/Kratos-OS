@@ -34,10 +34,16 @@ fi
 ) &
 
 # 6. Start XFCE Desktop Session
-if command -v xfce4-session >/dev/null 2>&1; then
-    exec xfce4-session
-elif command -v startxfce4 >/dev/null 2>&1; then
-    exec startxfce4
+if command -v startxfce4 >/dev/null 2>&1; then
+    startxfce4
+    SESSION_RC=$?
+    echo "[Live] startxfce4 exited $SESSION_RC; starting xterm fallback" >&2
+    exec xterm
+elif command -v xfce4-session >/dev/null 2>&1; then
+    xfce4-session
+    SESSION_RC=$?
+    echo "[Live] xfce4-session exited $SESSION_RC; starting xterm fallback" >&2
+    exec xterm
 elif command -v xfwm4 >/dev/null 2>&1; then
     xfsettingsd 2>/dev/null &
     xfwm4 --daemon 2>/dev/null || xfwm4 &
