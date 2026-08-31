@@ -187,8 +187,10 @@ done
 
 echo "[+] Checking optional desktop packages..."
 for pkg in "${OPTIONAL_PACKAGES[@]}"; do
-    if "$HOST_KPM" install --force "$pkg" 2>/dev/null; then
+    if "$HOST_KPM" install --force "$pkg"; then
         echo "    -> Installed optional package: $pkg"
+    else
+        echo "    [!] Warning: Failed to install optional package $pkg (missing or broken recipe)"
     fi
 done
 

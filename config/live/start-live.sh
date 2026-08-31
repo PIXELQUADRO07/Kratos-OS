@@ -73,6 +73,12 @@ if command -v dbus-daemon >/dev/null 2>&1 && [ ! -e /run/dbus/system_bus_socket 
     sleep 1
 fi
 
+if command -v gdk-pixbuf-query-loaders >/dev/null 2>&1; then
+    echo "[Live] Updating gdk-pixbuf loader cache..."
+    gdk-pixbuf-query-loaders --update-cache >/var/log/gdk-pixbuf-query-loaders.log 2>&1 || \
+        echo "[Live] Warning: could not update gdk-pixbuf loader cache"
+fi
+
 # 3. Setup session home environment and synchronize xinitrc across all profiles
 echo "[Live] Preparing $SESSION_USER desktop..."
 for dest in /etc/X11/xinit/xinitrc /root/.xinitrc "$SESSION_HOME/.xinitrc" /etc/skel/.xinitrc; do
