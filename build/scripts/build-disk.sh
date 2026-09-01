@@ -26,7 +26,7 @@ SYSROOT="$KRATOS_SYSROOT"
 IMAGE_DIR="$KRATOS_ROOT/build/images"
 IMAGE="$IMAGE_DIR/kratosos.img"
 
-IMAGE_SIZE_MB=4096
+IMAGE_SIZE_MB=6144
 ESP_SIZE_MB=256
 
 # ------------------------------------------------------------

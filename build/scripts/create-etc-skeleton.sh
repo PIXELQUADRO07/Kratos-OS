@@ -164,6 +164,7 @@ cat > "$ETC/shells" <<'EOF'
 EOF
 
 echo "[+] Creating /etc/sudoers..."
+rm -f "$ETC/sudoers"
 cat > "$ETC/sudoers" <<'EOF'
 root ALL=(ALL:ALL) ALL
 %wheel ALL=(ALL:ALL) NOPASSWD: ALL

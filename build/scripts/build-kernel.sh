@@ -84,6 +84,9 @@ fi
 # ── Tweak and resolve config ──────────────────────────────────────────
 echo "[+] Applying KratosOS kernel configuration tweaks..."
 
+# Ensure .config is writable (may be read-only from previous build)
+chmod +w "$KBUILD_DIR/.config" 2>/dev/null || true
+
 # Use scripts/config from the source tree.
 kconfig() {
     "$SOURCE_DIR/scripts/config" --file "$KBUILD_DIR/.config" "$@"
