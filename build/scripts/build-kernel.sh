@@ -157,6 +157,15 @@ kconfig --module DRM_MGAG200
 kconfig --module DRM_QXL
 kconfig --module DRM_VMWGFX
 
+# Audio support (Issue #4 hidden issue): Enable ALSA and HDA Intel codec driver
+# Required for PulseAudio and sound card initialization
+kconfig --enable SOUND
+kconfig --enable SND
+kconfig --module SND_HDA_INTEL
+kconfig --module SND_HDA_GENERIC
+kconfig --module SND_HDA_CODEC_HDMI
+kconfig --enable SND_HDA_INTEL_DETECT_DMIC
+
 # Resolve any new symbols and dependencies
 "${KMAKE[@]}" olddefconfig
 

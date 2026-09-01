@@ -22,12 +22,21 @@ export XDG_DATA_DIRS="/usr/share:/usr/local/share:${XDG_DATA_DIRS:-/usr/share}"
 export NO_GAIL=1
 export NO_AT_BRIDGE=1
 export GTK_A11Y=none
-export XFCE_PANEL_RESTART_ATTEMPTS=0
 export LD_LIBRARY_PATH="/usr/lib:/usr/local/lib:${LD_LIBRARY_PATH:-}"
 export GTK_THEME=Adwaita
 export XCURSOR_THEME=Adwaita
 
-# 3c. Clear previous session state for a clean Live boot
+# 3c. DRI/AIGLX workaround (Issue #4: DRI/AIGLX broken with absolute sysroot paths)
+# Temporary workaround: point to /usr/lib/dri explicitly
+export LIBGL_DRIVERS_PATH=/usr/lib/dri
+
+# 3d. at-spi-bus-launcher crash-loop protection (Issue: hidden #2)
+# Use in-memory GSettings backend to avoid potential I/O issues
+# that can trigger trap int3 in libglib during accessibility startup
+export GSETTINGS_BACKEND=memory
+export ATSPI_CLOSE_ON_EXIT=1
+
+# 3d. Clear previous session state for a clean Live boot
 rm -rf "$USER_HOME/.cache/sessions"/* 2>/dev/null || true
 
 if [ -z "$GDK_PIXBUF_MODULE_FILE" ]; then
@@ -46,17 +55,22 @@ fi
 
 if command -v dbus-run-session >/dev/null 2>&1; then
     exec dbus-run-session -- bash -c "
-        # 4a. Start PulseAudio daemon in background
+        # 4a. Load X resources (xrdb fallback if xrdb not found)
+        if command -v xrdb >/dev/null 2>&1; then
+            [ -f ~/.Xresources ] && xrdb -merge ~/.Xresources
+        fi
+
+        # 4b. Start PulseAudio daemon in background
         if command -v pulseaudio >/dev/null 2>&1; then
             pulseaudio --start --exit-idle-time=-1 2>/dev/null
         fi
 
-        # 4b. Start Polkit Authentication Agent
+        # 4c. Start Polkit Authentication Agent
         if [ -x /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 ]; then
             /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 &
         fi
 
-        # 4c. Launch the full session manager
+        # 4d. Launch the full session manager
         if command -v xfce4-session >/dev/null 2>&1; then
             exec xfce4-session
         elif command -v startxfce4 >/dev/null 2>&1; then

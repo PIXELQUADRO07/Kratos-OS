@@ -84,5 +84,20 @@ for d in intel-ucode amd-ucode rtl_nic; do
     fi
 done
 
+# 5. Audio firmware (Issue #4 hidden issue: ALSA/HDA codec firmware)
+echo "    - Audio (ALSA/HDA) firmware..."
+for d in amdtee ast2400 ast2500 ast2600 cirrus cxgb4 dpaa2 iwlwifi mediatek qed qat; do
+    if [ -d "$FW_SRC/$d" ]; then
+        mkdir -p "$FIRMWARE_DIR/$d"
+        cp -r "$FW_SRC/$d/"* "$FIRMWARE_DIR/$d/" 2>/dev/null || true
+    fi
+done
+
+# HDA codec-specific firmware (most common for Intel/AMD systems)
+if [ -d "$FW_SRC/hda" ]; then
+    mkdir -p "$FIRMWARE_DIR/hda"
+    cp -r "$FW_SRC/hda/"* "$FIRMWARE_DIR/hda/" 2>/dev/null || true
+fi
+
 echo "[✓] Firmware installed successfully."
 echo "    Total /lib/firmware size: $(du -sh "$FIRMWARE_DIR" | cut -f1)"
