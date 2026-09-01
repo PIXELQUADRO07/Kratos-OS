@@ -273,8 +273,11 @@ fi
 echo "[✓] Loop device: $LOOPDEV"
 
 # Partition scan as a separate step so a missing p1 node cannot
-# abort the whole attach.
+# abort the whole attach. Force the kernel to reread partition table.
 losetup --partscan "$LOOPDEV" 2>/dev/null || true
+if command -v partprobe >/dev/null 2>&1; then
+    partprobe "$LOOPDEV" 2>/dev/null || true
+fi
 if command -v partx >/dev/null 2>&1; then
     partx --add "$LOOPDEV" 2>/dev/null || true
 fi
@@ -289,6 +292,9 @@ ROOT_DEV="${LOOPDEV}p2"
 if command -v udevadm >/dev/null 2>&1; then
     udevadm settle 2>/dev/null || true
 fi
+
+# Give the kernel a moment to settle after partition table changes
+sleep 1
 
 # Poll until both partition block devices appear (max 10s).
 WAIT=0
