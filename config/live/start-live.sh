@@ -75,8 +75,28 @@ fi
 
 if command -v gdk-pixbuf-query-loaders >/dev/null 2>&1; then
     echo "[Live] Updating gdk-pixbuf loader cache..."
-    gdk-pixbuf-query-loaders --update-cache >/var/log/gdk-pixbuf-query-loaders.log 2>&1 || \
-        echo "[Live] Warning: could not update gdk-pixbuf loader cache"
+
+    GDK_PIXBUF_LIBDIR=""
+    for d in /usr/lib64/gdk-pixbuf-2.0/* /usr/lib/gdk-pixbuf-2.0/*; do
+        if [ -d "$d" ] && [ -d "$d/loaders" ]; then
+            GDK_PIXBUF_LIBDIR="$d"
+            break
+        fi
+    done
+
+    if [ -n "$GDK_PIXBUF_LIBDIR" ]; then
+        export GDK_PIXBUF_MODULEDIR="$GDK_PIXBUF_LIBDIR/loaders"
+        export GDK_PIXBUF_MODULE_FILE="$GDK_PIXBUF_LIBDIR/loaders.cache"
+        mkdir -p "$GDK_PIXBUF_MODULEDIR" 2>/dev/null || true
+
+        if ! gdk-pixbuf-query-loaders > "$GDK_PIXBUF_MODULE_FILE" 2>/var/log/gdk-pixbuf-query-loaders.log; then
+            echo "[Live] Warning: could not regenerate gdk-pixbuf loader cache" >> /var/log/gdk-pixbuf-query-loaders.log 2>&1 || true
+        fi
+    else
+        if ! gdk-pixbuf-query-loaders --update-cache >/var/log/gdk-pixbuf-query-loaders.log 2>&1; then
+            echo "[Live] Warning: could not update gdk-pixbuf loader cache" >> /var/log/gdk-pixbuf-query-loaders.log 2>&1 || true
+        fi
+    fi
 fi
 
 # 3. Setup session home environment and synchronize xinitrc across all profiles
