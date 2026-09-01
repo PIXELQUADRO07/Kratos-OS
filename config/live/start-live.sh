@@ -92,6 +92,24 @@ if command -v gdk-pixbuf-query-loaders >/dev/null 2>&1; then
         if ! gdk-pixbuf-query-loaders > "$GDK_PIXBUF_MODULE_FILE" 2>/var/log/gdk-pixbuf-query-loaders.log; then
             echo "[Live] Warning: could not regenerate gdk-pixbuf loader cache" >> /var/log/gdk-pixbuf-query-loaders.log 2>&1 || true
         fi
+
+        # Fix relative paths in loaders.cache if gdk-pixbuf-query-loaders produced them
+        # We ensure they are absolute by prepending /usr/ to paths starting with lib/
+        if [ -f "$GDK_PIXBUF_MODULE_FILE" ]; then
+            sed -i 's|^"lib/|"\/usr\/lib/|g' "$GDK_PIXBUF_MODULE_FILE"
+        fi
+
+        # Persist variable for su - and other shells
+        echo "GDK_PIXBUF_MODULE_FILE=\"$GDK_PIXBUF_MODULE_FILE\"" >> /etc/environment
+        echo "GDK_PIXBUF_MODULEDIR=\"$GDK_PIXBUF_MODULEDIR\"" >> /etc/environment
+        echo "GTK_A11Y=none" >> /etc/environment
+        echo "NO_AT_BRIDGE=1" >> /etc/environment
+        {
+            echo "export GDK_PIXBUF_MODULE_FILE=\"$GDK_PIXBUF_MODULE_FILE\""
+            echo "export GDK_PIXBUF_MODULEDIR=\"$GDK_PIXBUF_MODULEDIR\""
+            echo "export GTK_A11Y=none"
+            echo "export NO_AT_BRIDGE=1"
+        } > /etc/profile.d/gdk-pixbuf.sh
     else
         if ! gdk-pixbuf-query-loaders --update-cache >/var/log/gdk-pixbuf-query-loaders.log 2>&1; then
             echo "[Live] Warning: could not update gdk-pixbuf loader cache" >> /var/log/gdk-pixbuf-query-loaders.log 2>&1 || true
@@ -127,7 +145,7 @@ if command -v startx >/dev/null 2>&1; then
         /sbin/kratos-vtswitch "$TARGET_VT" || echo "[Live] vtswitch failed, X might stay invisible" >> /var/log/Xorg.start.log
     fi
 
-    STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11; exec startx /etc/live/xinitrc -- vt$TARGET_VT -novtswitch -keeptty -logverbose 6"
+    STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11 GDK_PIXBUF_MODULE_FILE=$GDK_PIXBUF_MODULE_FILE GDK_PIXBUF_MODULEDIR=$GDK_PIXBUF_MODULEDIR; exec startx /etc/live/xinitrc -- vt$TARGET_VT -novtswitch -keeptty -logverbose 6"
     TARGET_TTY="/dev/tty$TARGET_VT"
 
     STARTX_RC=1
@@ -152,7 +170,7 @@ if command -v startx >/dev/null 2>&1; then
         SESSION_RUNTIME="/run/user/0"
         mkdir -p "$SESSION_HOME" "$SESSION_HOME/Desktop" "$SESSION_RUNTIME"
         chmod 700 "$SESSION_RUNTIME"
-        STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11; exec startx /etc/live/xinitrc -- vt$TARGET_VT -novtswitch -keeptty -logverbose 6"
+        STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11 GDK_PIXBUF_MODULE_FILE=$GDK_PIXBUF_MODULE_FILE GDK_PIXBUF_MODULEDIR=$GDK_PIXBUF_MODULEDIR; exec startx /etc/live/xinitrc -- vt$TARGET_VT -novtswitch -keeptty -logverbose 6"
         if [ -c "$TARGET_TTY" ] && command -v setsid >/dev/null 2>&1; then
             setsid --ctty --wait /bin/bash -c "$STARTX_CMD" <"$TARGET_TTY" >>/var/log/Xorg.start.log 2>&1
         else

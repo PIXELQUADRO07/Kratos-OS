@@ -1,7 +1,7 @@
 #!/bin/sh
 # /etc/live/xinitrc — Live Session X11 startup script for KratosOS
 
-# 1. Set default X11 cursor to standard pointer
+# 1. Set default X11 cursor to standard pointer (crucial fallback)
 xsetroot -cursor_name left_ptr 2>/dev/null || true
 
 # 2. Setup user desktop environment directories
@@ -14,42 +14,68 @@ if [ -d "$USER_HOME" ]; then
     fi
 fi
 
-# 3. Populate XDG base directories for XFCE themes, icons, and menus
+# 3. Populate XDG base directories
 export XDG_CONFIG_DIRS="/etc/xdg:${XDG_CONFIG_DIRS:-/etc/xdg}"
 export XDG_DATA_DIRS="/usr/share:/usr/local/share:${XDG_DATA_DIRS:-/usr/share}"
 
-# 4. Start D-Bus session if available
-if command -v dbus-launch >/dev/null 2>&1 && [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
-    eval "$(dbus-launch --sh-syntax --exit-with-session)"
+# 3b. Pixbuf and environment stability
+export NO_GAIL=1
+export NO_AT_BRIDGE=1
+export GTK_A11Y=none
+export XFCE_PANEL_RESTART_ATTEMPTS=0
+export LD_LIBRARY_PATH="/usr/lib:/usr/local/lib:${LD_LIBRARY_PATH:-}"
+export GTK_THEME=Adwaita
+export XCURSOR_THEME=Adwaita
+
+# 3c. Clear previous session state for a clean Live boot
+rm -rf "$USER_HOME/.cache/sessions"/* 2>/dev/null || true
+
+if [ -z "$GDK_PIXBUF_MODULE_FILE" ]; then
+    for d in /usr/lib/gdk-pixbuf-2.0/* /usr/lib64/gdk-pixbuf-2.0/*; do
+        if [ -f "$d/loaders.cache" ]; then
+            export GDK_PIXBUF_MODULE_FILE="$d/loaders.cache"
+            export GDK_PIXBUF_MODULEDIR="$(dirname "$d")/loaders"
+            break
+        fi
+    done
 fi
 
-# 5. Show welcome notification on desktop readiness
-(
-    sleep 3
-    if command -v notify-send >/dev/null 2>&1; then
-        notify-send "KratosOS Live Session" \
-            "Welcome to KratosOS! Double-click 'Install KratosOS' on the Desktop when you are ready to install." \
-            -i system-software-install -t 15000 2>/dev/null || true
-    fi
-) &
+# 4. Start the session
+# We use dbus-run-session to ensure a clean, private bus for XFCE.
+# We launch xfce4-session directly for better control.
 
-# 6. Start XFCE Desktop Session
-if command -v startxfce4 >/dev/null 2>&1; then
-    startxfce4
-    SESSION_RC=$?
-    echo "[Live] startxfce4 exited $SESSION_RC; starting xterm fallback" >&2
-    exec xterm
-elif command -v xfce4-session >/dev/null 2>&1; then
-    xfce4-session
-    SESSION_RC=$?
-    echo "[Live] xfce4-session exited $SESSION_RC; starting xterm fallback" >&2
-    exec xterm
-elif command -v xfwm4 >/dev/null 2>&1; then
-    xfsettingsd 2>/dev/null &
-    xfwm4 --daemon 2>/dev/null || xfwm4 &
-    xfdesktop &
-    xfce4-panel &
-    exec xfce4-terminal
+if command -v dbus-run-session >/dev/null 2>&1; then
+    exec dbus-run-session -- bash -c "
+        # 4a. Start PulseAudio daemon in background
+        if command -v pulseaudio >/dev/null 2>&1; then
+            pulseaudio --start --exit-idle-time=-1 2>/dev/null
+        fi
+
+        # 4b. Start Polkit Authentication Agent
+        if [ -x /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 ]; then
+            /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 &
+        fi
+
+        # 4c. Launch the full session manager
+        if command -v xfce4-session >/dev/null 2>&1; then
+            exec xfce4-session
+        elif command -v startxfce4 >/dev/null 2>&1; then
+            exec startxfce4
+        else
+            # Manual fallback
+            xfsettingsd --daemon
+            xfwm4 --compositor=off --daemon
+            xfdesktop --daemon
+            exec xfce4-panel
+        fi
+    "
 else
-    exec xterm
+    # Fallback without dbus-run-session
+    xfsettingsd --daemon
+    xfwm4 --compositor=off --daemon
+    xfdesktop --daemon
+    exec xfce4-panel
 fi
+
+# Emergency fallback to xterm
+exec xterm

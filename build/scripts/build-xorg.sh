@@ -99,6 +99,53 @@ if [ -f "$KRATOS_ROOT/config/live/start-live.sh" ]; then
     chmod +x "$SYSROOT/etc/live/start-live.sh"
 fi
 
+# 3b. Fix gdk-pixbuf, Mime database and GSettings in sysroot
+echo "[+] Performing graphical stack fixups in sysroot..."
+
+# Force GDK Pixbuf loaders cache fixup
+SEARCH_PATHS=""
+for d in "$SYSROOT/usr/lib" "$SYSROOT/usr/lib64"; do
+    [ -d "$d" ] && SEARCH_PATHS="$SEARCH_PATHS $d"
+done
+
+if [ -n "$SEARCH_PATHS" ]; then
+    find $SEARCH_PATHS -name "loaders.cache" 2>/dev/null | while read -r cache; do
+        if grep -q '^"lib/' "$cache"; then
+            echo "  -> Fixing relative paths in $cache"
+            sed -i 's|^"lib/|"\/usr\/lib/|g' "$cache"
+        fi
+    done
+fi
+
+# Update Mime database (requires host update-mime-database or using cross-tools)
+# We try to use the one from sysroot via a simple wrapper if possible, or just warn
+if [ -x "$SYSROOT/usr/bin/update-mime-database" ]; then
+    echo "[+] Updating Shared Mime Info database..."
+    # We use LD_LIBRARY_PATH to let the sysroot binary run on host if it's compatible,
+    # but since it's likely cross-compiled, we might need a host-native version.
+    # For now, we assume the host has it as it's a common build dependency.
+    if command -v update-mime-database >/dev/null 2>&1; then
+        update-mime-database "$SYSROOT/usr/share/mime" >/dev/null 2>&1 || true
+    fi
+fi
+
+if [ -d "$SYSROOT/usr/share/glib-2.0/schemas" ]; then
+    echo "[+] Compiling GSettings schemas..."
+    if command -v glib-compile-schemas >/dev/null 2>&1; then
+        glib-compile-schemas "$SYSROOT/usr/share/glib-2.0/schemas" >/dev/null 2>&1 || true
+    fi
+fi
+
+# Update Icon Caches
+echo "[+] Updating icon caches..."
+for themedir in "$SYSROOT/usr/share/icons"/*; do
+    if [ -d "$themedir" ] && [ -f "$themedir/index.theme" ]; then
+        if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+            gtk-update-icon-cache -f -t "$themedir" >/dev/null 2>&1 || true
+        fi
+    fi
+done
+
 # 4. Add Live session rc.d service to launch live environment on boot
 mkdir -p "$SYSROOT/etc/rc.d"
 cat > "$SYSROOT/etc/rc.d/99-live" <<'EOF'
