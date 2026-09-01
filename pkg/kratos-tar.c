@@ -256,7 +256,7 @@ int kratos_tar_extract_fd(int fd, const char *dest_dir, kratos_tar_entry_cb cb, 
         kratos_tar_entry_t entry;
         memset(&entry, 0, sizeof(entry));
         snprintf(entry.name, sizeof(entry.name), "%s", clean_rel);
-        snprintf(entry.linkname, sizeof(entry.linkname), "%s", hdr.linkname);
+        snprintf(entry.linkname, sizeof(entry.linkname), "%.100s", hdr.linkname);
         entry.mode = (mode_t)parse_octal(hdr.mode, sizeof(hdr.mode));
         entry.uid  = (uid_t)parse_octal(hdr.uid, sizeof(hdr.uid));
         entry.gid  = (gid_t)parse_octal(hdr.gid, sizeof(hdr.gid));
