@@ -145,7 +145,7 @@ if command -v startx >/dev/null 2>&1; then
         /sbin/kratos-vtswitch "$TARGET_VT" || echo "[Live] vtswitch failed, X might stay invisible" >> /var/log/Xorg.start.log
     fi
 
-    STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11 GDK_PIXBUF_MODULE_FILE=$GDK_PIXBUF_MODULE_FILE GDK_PIXBUF_MODULEDIR=$GDK_PIXBUF_MODULEDIR; exec startx /etc/live/xinitrc -- vt$TARGET_VT -novtswitch -keeptty -logverbose 6"
+    STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11 GDK_PIXBUF_MODULE_FILE=$GDK_PIXBUF_MODULE_FILE GDK_PIXBUF_MODULEDIR=$GDK_PIXBUF_MODULEDIR LIBGL_DRIVERS_PATH=/usr/lib/dri; exec startx /etc/live/xinitrc -- vt$TARGET_VT -novtswitch -keeptty -logverbose 6"
     TARGET_TTY="/dev/tty$TARGET_VT"
 
     STARTX_RC=1
@@ -170,7 +170,7 @@ if command -v startx >/dev/null 2>&1; then
         SESSION_RUNTIME="/run/user/0"
         mkdir -p "$SESSION_HOME" "$SESSION_HOME/Desktop" "$SESSION_RUNTIME"
         chmod 700 "$SESSION_RUNTIME"
-        STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11 GDK_PIXBUF_MODULE_FILE=$GDK_PIXBUF_MODULE_FILE GDK_PIXBUF_MODULEDIR=$GDK_PIXBUF_MODULEDIR; exec startx /etc/live/xinitrc -- vt$TARGET_VT -novtswitch -keeptty -logverbose 6"
+        STARTX_CMD="export HOME=$SESSION_HOME USER=$SESSION_USER LOGNAME=$SESSION_USER XDG_RUNTIME_DIR=$SESSION_RUNTIME XDG_SESSION_TYPE=x11 GDK_PIXBUF_MODULE_FILE=$GDK_PIXBUF_MODULE_FILE GDK_PIXBUF_MODULEDIR=$GDK_PIXBUF_MODULEDIR LIBGL_DRIVERS_PATH=/usr/lib/dri; exec startx /etc/live/xinitrc -- vt$TARGET_VT -novtswitch -keeptty -logverbose 6"
         if [ -c "$TARGET_TTY" ] && command -v setsid >/dev/null 2>&1; then
             setsid --ctty --wait /bin/bash -c "$STARTX_CMD" <"$TARGET_TTY" >>/var/log/Xorg.start.log 2>&1
         else
