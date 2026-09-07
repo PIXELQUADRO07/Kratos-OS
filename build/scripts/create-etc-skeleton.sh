@@ -194,9 +194,9 @@ echo "[+] Creating /etc/os-release..."
 cat > "$ETC/os-release" <<'EOF'
 NAME="KratosOS"
 ID=kratos
-VERSION="0.7.8.2"
-VERSION_ID="0.7.8.2"
-PRETTY_NAME="KratosOS 0.7.8.2"
+VERSION="0.9.1"
+VERSION_ID="0.9.1"
+PRETTY_NAME="KratosOS 0.9.1"
 HOME_URL="https://kratosos.org"
 EOF
 
@@ -214,7 +214,7 @@ cat > "$ETC/issue" <<'EOF'
 |                                                                            |
 .--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..
 
-  KratosOS 0.7.8.2 (GNU/Linux \r)
+  KratosOS 0.9.1 (GNU/Linux \r)
   Kernel \v on \m (\l)
 
 EOF
@@ -470,7 +470,7 @@ EOF
 
 cat > "$SYSROOT/var/lib/kratos/db/packages/kpm" <<EOF
 name=kpm
-version=0.7.8
+version=0.9.1
 release=1
 arch=x86_64
 description=Kratos Package Manager (Base System)
