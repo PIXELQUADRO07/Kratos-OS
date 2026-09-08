@@ -154,7 +154,7 @@ static int remove_user_from_all_groups(const char *username)
                 if (strcmp(mtok, username) == 0) {
                     removed_here = 1;
                 } else {
-                    if (!first) strcat(rebuilt, ",");
+                    if (!first) strncat(rebuilt, ",", sizeof(rebuilt) - strlen(rebuilt) - 1);
                     strncat(rebuilt, mtok, sizeof(rebuilt) - strlen(rebuilt) - 1);
                     first = 0;
                 }
