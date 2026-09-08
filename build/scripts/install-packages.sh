@@ -165,7 +165,6 @@ OPTIONAL_PACKAGES=(
     "desktop-file-utils"
     "hicolor-icon-theme"
     "at-spi2-core"
-    "dbus-glib"
     "polkit"
     "polkit-gnome"
     "libcanberra"
@@ -173,12 +172,10 @@ OPTIONAL_PACKAGES=(
     "libcroco"
     "libxpresent"
     "pulseaudio"
-    "libpulse"
+    "libgudev"
     "upower"
-    "accountsservice"
     "libnotify"
     "startup-notification"
-    "gvfs"
     "libxfce4util"
     "xfconf"
     "libxfce4ui"
@@ -194,6 +191,7 @@ OPTIONAL_PACKAGES=(
     "xfwm4"
     "xfdesktop"
     "xfce4-panel"
+    "xfce4-whiskermenu-plugin"
     "thunar"
     "vte3"
     "xfce4-terminal"
@@ -221,6 +219,12 @@ for pkg in "${OPTIONAL_PACKAGES[@]}"; do
         echo "    [!] Warning: Failed to install optional package $pkg (missing or broken recipe)"
     fi
 done
+
+# 5. Pre-generate fontconfig cache
+if command -v fc-cache >/dev/null 2>&1; then
+    echo "[+] Updating fontconfig cache in sysroot..."
+    fc-cache -s -f -y "$SYSROOT" 2>/dev/null || true
+fi
 
 echo
 echo "[✓] Package injection complete."
