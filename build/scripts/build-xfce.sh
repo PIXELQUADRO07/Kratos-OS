@@ -47,19 +47,36 @@ fi
 
 # Ensure XFCE panel config only contains essential plugins
 # We'll generate a fresh default.xml with a known good set of plugins
+MENU_PLUGIN="applicationsmenu"
+if [ -f "$SYSROOT/usr/share/xfce4/panel/plugins/whiskermenu.desktop" ]; then
+    MENU_PLUGIN="whiskermenu"
+fi
+
 PANEL_CONFIG="$SYSROOT/etc/xdg/xfce4/panel/default.xml"
-cat > "$PANEL_CONFIG" <<'EOF'
+rm -f "$PANEL_CONFIG"
+cat > "$PANEL_CONFIG" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <channel name="xfce4-panel" version="1.0">
   <property name="panels" type="array">
-    <value type="int" value="0"/>
+    <value type="int" value="1"/>
   </property>
-  <property name="plugins" type="array">
-    <value type="int" value="1"/> <!-- whisker menu -->
-    <value type="int" value="2"/> <!-- window buttons -->
-    <value type="int" value="3"/> <!-- tasklist -->
-    <value type="int" value="4"/> <!-- clock -->
-    <value type="int" value="5"/> <!-- notification area -->
+  <property name="panel-1" type="empty">
+    <property name="position" type="string" value="p=8;x=0;y=0"/>
+    <property name="length" type="uint" value="100"/>
+    <property name="position-locked" type="bool" value="true"/>
+    <property name="size" type="uint" value="30"/>
+    <property name="plugin-ids" type="array">
+      <value type="int" value="1"/>
+      <value type="int" value="2"/>
+      <value type="int" value="3"/>
+      <value type="int" value="4"/>
+    </property>
+  </property>
+  <property name="plugins" type="empty">
+    <property name="plugin-1" type="string" value="${MENU_PLUGIN}"/>
+    <property name="plugin-2" type="string" value="tasklist"/>
+    <property name="plugin-3" type="string" value="systray"/>
+    <property name="plugin-4" type="string" value="clock"/>
   </property>
 </channel>
 EOF
@@ -68,30 +85,37 @@ EOF
 XFCONF_DIR="$SYSROOT/etc/xdg/xfce4/xfconf/xfce-perchannel-xml"
 mkdir -p "$XFCONF_DIR"
 
-cat > "$XFCONF_DIR/xfce4-panel.xml" <<'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<channel name="xfce4-panel" version="1.0"/>
-EOF
+# Keep xfce4-panel.xml synchronized with default.xml
+rm -f "$XFCONF_DIR/xfce4-panel.xml"
+cp -f "$PANEL_CONFIG" "$XFCONF_DIR/xfce4-panel.xml"
 
+rm -f "$XFCONF_DIR/xfce4-desktop.xml"
 cat > "$XFCONF_DIR/xfce4-desktop.xml" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <channel name="xfce4-desktop" version="1.0"/>
 EOF
 
+rm -f "$XFCONF_DIR/xfce4-xsettings.xml"
 cat > "$XFCONF_DIR/xfce4-xsettings.xml" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <channel name="xfce4-xsettings" version="1.0"/>
 EOF
 
+rm -f "$XFCONF_DIR/xfwm4.xml"
 cat > "$XFCONF_DIR/xfwm4.xml" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
-<channel name="xfwm4" version="1.0"/>
+<channel name="xfwm4" version="1.0">
+  <property name="general" type="empty">
+    <property name="use_compositing" type="bool" value="false"/>
+  </property>
+</channel>
 EOF
 
 # 4. Set default wallpaper and desktop settings via Xfconf
 DESKTOP_CONFIG="$SYSROOT/etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml"
 echo "[+] Configuring default XFCE desktop settings..."
 mkdir -p "$(dirname "$DESKTOP_CONFIG")"
+rm -f "$DESKTOP_CONFIG"
 cat > "$DESKTOP_CONFIG" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <channel name="xfce4-desktop" version="1.0">
@@ -114,5 +138,17 @@ cat > "$DESKTOP_CONFIG" <<'EOF'
   </property>
 </channel>
 EOF
+
+# 5. Populate user profiles with initial XFCE/xfconf configuration
+for profile_dir in "$SYSROOT/etc/skel" "$SYSROOT/home/kratos-live" "$SYSROOT/root"; do
+    mkdir -p "$profile_dir/.config/xfce4/xfconf/xfce-perchannel-xml"
+    cp -rf "$XFCONF_DIR"/* "$profile_dir/.config/xfce4/xfconf/xfce-perchannel-xml/" 2>/dev/null || true
+done
+
+# 6. Pre-generate fontconfig cache in sysroot for fast GTK/XFCE startup
+if command -v fc-cache >/dev/null 2>&1; then
+    echo "[+] Pre-generating fontconfig cache in sysroot..."
+    fc-cache -s -f -y "$SYSROOT" 2>/dev/null || true
+fi
 
 echo "[✓] XFCE desktop environment configured successfully."
