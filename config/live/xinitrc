@@ -66,11 +66,25 @@ if command -v dbus-run-session >/dev/null 2>&1; then
         fi
 
         # 4c. Start Polkit Authentication Agent
-        if [ -x /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 ]; then
-            /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 &
+        for agent in \
+            /usr/libexec/polkit-gnome-authentication-agent-1 \
+            /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 \
+            /usr/lib/polkit-1-gnome/polkit-gnome-authentication-agent-1; do
+            if [ -x "$agent" ]; then
+                "$agent" &
+                break
+            fi
+        done
+
+        # 4d. Ensure compositor is disabled in xfconf before session launch
+        if command -v xfconf-query >/dev/null 2>&1; then
+            xfconf-query -c xfwm4 -p /general/use_compositing -s false --create -t bool 2>/dev/null || true
         fi
 
-        # 4d. Launch the full session manager
+        # Allow local root access to Xauthority for installer (sudo calamares)
+        [ -f "$USER_HOME/.Xauthority" ] && chmod 644 "$USER_HOME/.Xauthority" 2>/dev/null || true
+
+        # Launch the full session manager
         if command -v xfce4-session >/dev/null 2>&1; then
             exec xfce4-session
         elif command -v startxfce4 >/dev/null 2>&1; then
@@ -79,15 +93,16 @@ if command -v dbus-run-session >/dev/null 2>&1; then
             # Manual fallback
             xfsettingsd --daemon
             xfwm4 --compositor=off --daemon
-            xfdesktop --daemon
+            xfdesktop &
             exec xfce4-panel
         fi
     "
 else
     # Fallback without dbus-run-session
+    [ -f "$USER_HOME/.Xauthority" ] && chmod 644 "$USER_HOME/.Xauthority" 2>/dev/null || true
     xfsettingsd --daemon
     xfwm4 --compositor=off --daemon
-    xfdesktop --daemon
+    xfdesktop &
     exec xfce4-panel
 fi
 

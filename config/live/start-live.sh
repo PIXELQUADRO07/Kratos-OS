@@ -68,6 +68,15 @@ if command -v udevd >/dev/null 2>&1 && command -v udevadm >/dev/null 2>&1; then
 fi
 
 if command -v dbus-daemon >/dev/null 2>&1 && [ ! -e /run/dbus/system_bus_socket ]; then
+    echo "[Live] Ensuring machine-id for D-Bus..."
+    mkdir -p /var/lib/dbus
+    if command -v dbus-uuidgen >/dev/null 2>&1; then
+        dbus-uuidgen --ensure=/var/lib/dbus/machine-id 2>/dev/null || true
+    fi
+    if [ -f /var/lib/dbus/machine-id ] && [ ! -f /etc/machine-id ]; then
+        ln -sf /var/lib/dbus/machine-id /etc/machine-id 2>/dev/null || true
+    fi
+
     echo "[Live] Starting system D-Bus daemon..."
     dbus-daemon --system --fork 2>/dev/null || true
     sleep 1
@@ -156,15 +165,19 @@ if command -v startx >/dev/null 2>&1; then
             setsid --ctty --wait /bin/bash -c "$STARTX_CMD" <"$TARGET_TTY" >>/var/log/Xorg.start.log 2>&1
         fi
         STARTX_RC=$?
-    elif [ "$SESSION_USER" != "root" ]; then
+    else
         echo "[Live] Cannot establish controlling TTY $TARGET_TTY" >> /var/log/Xorg.start.log
-        su - "$SESSION_USER" -c "$STARTX_CMD" >>/var/log/Xorg.start.log 2>&1
+        if [ "$SESSION_USER" != "root" ]; then
+            su - "$SESSION_USER" -c "$STARTX_CMD" >>/var/log/Xorg.start.log 2>&1
+        else
+            eval "$STARTX_CMD" >>/var/log/Xorg.start.log 2>&1
+        fi
         STARTX_RC=$?
     fi
 
-    # Fallback to root X session if unprivileged startx failed or if root session was selected
-    if [ "$STARTX_RC" -ne 0 ]; then
-        echo "[Live] Starting/falling back to root X session..." >> /var/log/Xorg.start.log
+    # Fallback to root X session if unprivileged startx failed
+    if [ "$STARTX_RC" -ne 0 ] && [ "$SESSION_USER" != "root" ]; then
+        echo "[Live] Unprivileged startx failed, falling back to root X session..." >> /var/log/Xorg.start.log
         SESSION_USER="root"
         SESSION_HOME="/root"
         SESSION_RUNTIME="/run/user/0"

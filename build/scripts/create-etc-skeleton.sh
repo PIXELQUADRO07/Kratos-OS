@@ -166,6 +166,7 @@ EOF
 echo "[+] Creating /etc/sudoers..."
 rm -f "$ETC/sudoers"
 cat > "$ETC/sudoers" <<'EOF'
+Defaults env_keep += "DISPLAY XAUTHORITY"
 root ALL=(ALL:ALL) ALL
 %wheel ALL=(ALL:ALL) NOPASSWD: ALL
 kratos-live ALL=(ALL:ALL) NOPASSWD: ALL
