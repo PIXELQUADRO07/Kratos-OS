@@ -33,7 +33,7 @@ export LIBGL_DRIVERS_PATH=/usr/lib/dri
 # 3d. at-spi-bus-launcher crash-loop protection (Issue: hidden #2)
 # Use in-memory GSettings backend to avoid potential I/O issues
 # that can trigger trap int3 in libglib during accessibility startup
-export GSETTINGS_BACKEND=memory
+# export GSETTINGS_BACKEND=memory  # removed per fix
 export ATSPI_CLOSE_ON_EXIT=1
 
 # 3d. Clear previous session state for a clean Live boot

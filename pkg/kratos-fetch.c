@@ -201,11 +201,24 @@ static int tls_connect(tls_ctx_t *ctx, const char *host, const char *port)
         return -1;
     }
 
-    /* Load CA certificates */
-    ret = mbedtls_x509_crt_parse_file(&ctx->cacert, CA_BUNDLE_PATH);
+    /* Load CA certificates with fallback */
+    const char *ca_path = NULL;
+    const char *env_path = getenv("SSL_CERT_FILE");
+    if (env_path && *env_path) {
+        ca_path = env_path;
+    } else if (access("/etc/ssl/certs/ca-certificates.crt", R_OK) == 0) {
+        ca_path = "/etc/ssl/certs/ca-certificates.crt";
+    } else if (access("/etc/pki/tls/certs/ca-bundle.crt", R_OK) == 0) {
+        ca_path = "/etc/pki/tls/certs/ca-bundle.crt";
+    } else if (access("/etc/ssl/ca-bundle.crt", R_OK) == 0) {
+        ca_path = "/etc/ssl/ca-bundle.crt";
+    } else {
+        fprintf(stderr, "[kratos-fetch] Error: No CA bundle found. Set SSL_CERT_FILE env var.\n");
+        return -1;
+    }
+    ret = mbedtls_x509_crt_parse_file(&ctx->cacert, ca_path);
     if (ret < 0) {
-        fprintf(stderr, "[kratos-fetch] Error: Failed to load CA bundle %s (-0x%04x)\n",
-                CA_BUNDLE_PATH, -ret);
+        fprintf(stderr, "[kratos-fetch] Error: Failed to load CA bundle %s (-0x%04x)\n", ca_path, -ret);
         return -1;
     }
 

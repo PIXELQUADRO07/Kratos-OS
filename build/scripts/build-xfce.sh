@@ -45,19 +45,48 @@ if [ -f "$KRATOS_ROOT/Branding/KratosOS.png" ]; then
     cp -f "$KRATOS_ROOT/Branding/KratosOS.png" "$SYSROOT/usr/share/backgrounds/xfce/kratosos-logo.png"
 fi
 
-# Keep the default panel limited to plugins shipped in the base image.
+# Ensure XFCE panel config only contains essential plugins
+# We'll generate a fresh default.xml with a known good set of plugins
 PANEL_CONFIG="$SYSROOT/etc/xdg/xfce4/panel/default.xml"
-if [ -f "$PANEL_CONFIG" ]; then
-    echo "[+] Pruning non-existent plugins from XFCE panel config..."
-    # Remove plugins that might not be installed or cause issues in Live
-    # (8: pulseaudio, 9: power-manager, 10: notification)
-    for p in 8 9 10 11 12; do
-        sed -i "/<value type=\"int\" value=\"$p\"\/>/d" "$PANEL_CONFIG"
-        sed -i "/<property name=\"plugin-$p\"/d" "$PANEL_CONFIG"
-    done
-    # Ensure the plugin list property itself doesn't have trailing commas or is malformed
-    # (This is a simplified approach, a better one would be a proper XML parser)
-fi
+cat > "$PANEL_CONFIG" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfce4-panel" version="1.0">
+  <property name="panels" type="array">
+    <value type="int" value="0"/>
+  </property>
+  <property name="plugins" type="array">
+    <value type="int" value="1"/> <!-- whisker menu -->
+    <value type="int" value="2"/> <!-- window buttons -->
+    <value type="int" value="3"/> <!-- tasklist -->
+    <value type="int" value="4"/> <!-- clock -->
+    <value type="int" value="5"/> <!-- notification area -->
+  </property>
+</channel>
+EOF
+
+# Create minimal Xfconf channel files required for a functional session
+XFCONF_DIR="$SYSROOT/etc/xdg/xfce4/xfconf/xfce-perchannel-xml"
+mkdir -p "$XFCONF_DIR"
+
+cat > "$XFCONF_DIR/xfce4-panel.xml" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfce4-panel" version="1.0"/>
+EOF
+
+cat > "$XFCONF_DIR/xfce4-desktop.xml" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfce4-desktop" version="1.0"/>
+EOF
+
+cat > "$XFCONF_DIR/xfce4-xsettings.xml" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfce4-xsettings" version="1.0"/>
+EOF
+
+cat > "$XFCONF_DIR/xfwm4.xml" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfwm4" version="1.0"/>
+EOF
 
 # 4. Set default wallpaper and desktop settings via Xfconf
 DESKTOP_CONFIG="$SYSROOT/etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml"

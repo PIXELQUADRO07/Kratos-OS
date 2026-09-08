@@ -487,6 +487,21 @@ int main(int argc, char *argv[])
     }
 
     if (ready_fd >= 0) {
+        // Drain any pending netlink messages to ensure symlinks are created before signalling READY
+        int flags = fcntl(sock, F_GETFL, 0);
+        fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+        struct msghdr msg;
+        struct iovec iov;
+        char buf[UEVENT_BUFFER_SIZE];
+        memset(&msg, 0, sizeof(msg));
+        iov.iov_base = buf;
+        iov.iov_len = sizeof(buf);
+        msg.msg_iov = &iov;
+        msg.msg_iovlen = 1;
+        while (recvmsg(sock, &msg, 0) > 0) {
+            /* discard */
+        }
+        fcntl(sock, F_SETFL, flags);
         if (write(ready_fd, "READY\n", 6) < 0) {}
         close(ready_fd);
         ready_fd = -1;

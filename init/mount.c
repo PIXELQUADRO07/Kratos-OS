@@ -38,7 +38,7 @@ void mount_vfs(void)
     mkdir("/run/shm", 1777);
 
     mkdir("/tmp", 1777);
-    try_mount("tmpfs",    "/tmp",      "tmpfs",    MS_NOSUID | MS_NODEV,             "mode=1777,size=128m");
+    try_mount("tmpfs",    "/tmp",      "tmpfs",    MS_NOSUID | MS_NODEV,             "mode=1777,size=50%");
 }
 
 static const char *resolve_dev_spec(const char *spec, char *buf, size_t buflen)

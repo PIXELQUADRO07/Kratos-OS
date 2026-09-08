@@ -426,14 +426,14 @@ fi
 # 4. Update shared library cache
 if [ -x /sbin/ldconfig ]; then
     echo "[rc.sysinit] Updating shared library cache..."
+    # Ensure /dev/pts exists and mount it (ignore errors if already mounted)
+    mkdir -p /dev/pts && mount -t devpts devpts /dev/pts -o gid=5,mode=620 2>/dev/null || true
+    
+    # Clean up temporary files but preserve the live switch marker
+    rm -rf /run/* /tmp/* && rm -f /run/kratos-live-switched && touch /run/kratos-live-switched
+
     ldconfig
 fi
-
-# 5. Clean up temporary files from previous boot
-echo "[rc.sysinit] Cleaning /tmp and /run..."
-rm -rf /run/* /tmp/*
-mkdir -p /run/lock /run/user /run/shm
-chmod 1777 /tmp /run/shm
 
 # 4. Initialize random seed (if possible)
 [ -f /var/lib/urandom/seed ] && cat /var/lib/urandom/seed > /dev/urandom

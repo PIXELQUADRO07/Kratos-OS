@@ -12,6 +12,7 @@
 #include <sys/ioctl.h>
 #include <sys/sysmacros.h>
 #include <linux/loop.h>
+#include <glob.h>
 
 #define LIVE_SWITCHED_MARK "/run/kratos-live-switched"
 #define LIVE_SQUASHFS      "/mnt/iso/live/rootfs.squashfs"
@@ -131,29 +132,33 @@ static int setup_loop_device(const char *file, char *loop_dev_out)
 
 static int try_mount_iso(void)
 {
-    static const char *devs[] = {
-        "/dev/sr0", "/dev/sr1",
-        "/dev/vda", "/dev/vdb", "/dev/vdc",
-        "/dev/nvme0n1", "/dev/nvme0n1p1",
-        "/dev/mmcblk0", "/dev/mmcblk0p1",
-        "/dev/sda", "/dev/sdb", "/dev/sdc", "/dev/sdd",
+    const char *types[] = { "iso9660", "vfat", "ext4", NULL };
+    const char *patterns[] = {
+        "/dev/sr*",
+        "/dev/sd*",
+        "/dev/vd*",
+        "/dev/nvme*n*",
+        "/dev/mmcblk*",
         NULL
     };
-    static const char *types[] = { "iso9660", "vfat", "ext4", NULL };
-
-    for (int i = 0; devs[i]; i++) {
-        if (access(devs[i], F_OK) != 0)
-            continue;
-        for (int j = 0; types[j]; j++) {
-            if (mount(devs[i], "/mnt/iso", types[j], MS_RDONLY, NULL) == 0) {
-                if (access(LIVE_SQUASHFS, F_OK) == 0) {
-                    fprintf(stderr, "[live] ISO mounted from %s (%s)\n",
-                            devs[i], types[j]);
-                    return 0;
+    glob_t gl;
+    for (int p = 0; patterns[p]; ++p) {
+        if (glob(patterns[p], GLOB_NOSORT, NULL, &gl) != 0) continue;
+        for (size_t i = 0; i < gl.gl_pathc; ++i) {
+            const char *dev = gl.gl_pathv[i];
+            if (access(dev, F_OK) != 0) continue;
+            for (int t = 0; types[t]; ++t) {
+                if (mount(dev, "/mnt/iso", types[t], MS_RDONLY, NULL) == 0) {
+                    if (access(LIVE_SQUASHFS, F_OK) == 0) {
+                        fprintf(stderr, "[live] ISO mounted from %s (%s)\n", dev, types[t]);
+                        globfree(&gl);
+                        return 0;
+                    }
+                    umount("/mnt/iso");
                 }
-                umount("/mnt/iso");
             }
         }
+        globfree(&gl);
     }
     return -1;
 }
