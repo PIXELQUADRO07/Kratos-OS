@@ -14,9 +14,12 @@ if [ -d "$USER_HOME" ]; then
     fi
 fi
 
-# 3. Populate XDG base directories
+# 3. Populate XDG base directories and session environment
 export XDG_CONFIG_DIRS="/etc/xdg:${XDG_CONFIG_DIRS:-/etc/xdg}"
 export XDG_DATA_DIRS="/usr/share:/usr/local/share:${XDG_DATA_DIRS:-/usr/share}"
+export XDG_MENU_PREFIX="xfce-"
+export DESKTOP_SESSION="xfce"
+export XDG_CURRENT_DESKTOP="XFCE"
 
 # 3b. Pixbuf and environment stability
 export NO_GAIL=1
@@ -27,13 +30,7 @@ export GTK_THEME=Adwaita
 export XCURSOR_THEME=Adwaita
 
 # 3c. DRI/AIGLX workaround (Issue #4: DRI/AIGLX broken with absolute sysroot paths)
-# Temporary workaround: point to /usr/lib/dri explicitly
 export LIBGL_DRIVERS_PATH=/usr/lib/dri
-
-# 3d. at-spi-bus-launcher crash-loop protection (Issue: hidden #2)
-# Use in-memory GSettings backend to avoid potential I/O issues
-# that can trigger trap int3 in libglib during accessibility startup
-# export GSETTINGS_BACKEND=memory  # removed per fix
 export ATSPI_CLOSE_ON_EXIT=1
 
 # 3d. Clear previous session state for a clean Live boot
@@ -49,62 +46,79 @@ if [ -z "$GDK_PIXBUF_MODULE_FILE" ]; then
     done
 fi
 
-# 4. Start the session
-# We use dbus-run-session to ensure a clean, private bus for XFCE.
-# We launch xfce4-session directly for better control.
+# 4. Ensure D-Bus session bus is active; wrap whole script if needed
+if [ -z "$DBUS_SESSION_BUS_ADDRESS" ] && command -v dbus-run-session >/dev/null 2>&1; then
+    exec dbus-run-session -- /bin/sh "$0" "$@"
+fi
 
-if command -v dbus-run-session >/dev/null 2>&1; then
-    exec dbus-run-session -- bash -c "
-        # 4a. Load X resources (xrdb fallback if xrdb not found)
-        if command -v xrdb >/dev/null 2>&1; then
-            [ -f ~/.Xresources ] && xrdb -merge ~/.Xresources
-        fi
+# 4a. Update D-Bus activation environment so spawned child processes inherit it
+if command -v dbus-update-activation-environment >/dev/null 2>&1; then
+    dbus-update-activation-environment --systemd \
+        DISPLAY \
+        XAUTHORITY \
+        XDG_CURRENT_DESKTOP \
+        XDG_MENU_PREFIX \
+        DESKTOP_SESSION \
+        XDG_DATA_DIRS \
+        XDG_CONFIG_DIRS \
+        GTK_THEME \
+        2>/dev/null || \
+    dbus-update-activation-environment \
+        DISPLAY \
+        XAUTHORITY \
+        XDG_CURRENT_DESKTOP \
+        XDG_MENU_PREFIX \
+        DESKTOP_SESSION \
+        XDG_DATA_DIRS \
+        XDG_CONFIG_DIRS \
+        GTK_THEME \
+        2>/dev/null || true
+fi
 
-        # 4b. Start PulseAudio daemon in background
-        if command -v pulseaudio >/dev/null 2>&1; then
-            pulseaudio --start --exit-idle-time=-1 2>/dev/null
-        fi
+# 4b. Load X resources
+if command -v xrdb >/dev/null 2>&1; then
+    [ -f /etc/xdg/xfce4/Xft.xrdb ] && xrdb -merge /etc/xdg/xfce4/Xft.xrdb 2>/dev/null || true
+    [ -f "$USER_HOME/.Xresources" ] && xrdb -merge "$USER_HOME/.Xresources" 2>/dev/null || true
+fi
 
-        # 4c. Start Polkit Authentication Agent
-        for agent in \
-            /usr/libexec/polkit-gnome-authentication-agent-1 \
-            /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 \
-            /usr/lib/polkit-1-gnome/polkit-gnome-authentication-agent-1; do
-            if [ -x "$agent" ]; then
-                "$agent" &
-                break
-            fi
-        done
+# 4c. Start PulseAudio daemon in background
+if command -v pulseaudio >/dev/null 2>&1; then
+    pulseaudio --start --exit-idle-time=-1 2>/dev/null || true
+fi
 
-        # 4d. Ensure compositor is disabled in xfconf before session launch
-        if command -v xfconf-query >/dev/null 2>&1; then
-            xfconf-query -c xfwm4 -p /general/use_compositing -s false --create -t bool 2>/dev/null || true
-        fi
+# 4d. Start Polkit Authentication Agent
+for agent in \
+    /usr/libexec/polkit-gnome-authentication-agent-1 \
+    /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 \
+    /usr/lib/polkit-1-gnome/polkit-gnome-authentication-agent-1; do
+    if [ -x "$agent" ]; then
+        "$agent" &
+        break
+    fi
+done
 
-        # Allow local root access to Xauthority for installer (sudo calamares)
-        [ -f "$USER_HOME/.Xauthority" ] && chmod 644 "$USER_HOME/.Xauthority" 2>/dev/null || true
+# 4e. Ensure compositor is disabled in xfconf before session launch
+if command -v xfconf-query >/dev/null 2>&1; then
+    xfconf-query -c xfwm4 -p /general/use_compositing -s false --create -t bool 2>/dev/null || true
+fi
 
-        # Launch the full session manager
-        if command -v xfce4-session >/dev/null 2>&1; then
-            exec xfce4-session
-        elif command -v startxfce4 >/dev/null 2>&1; then
-            exec startxfce4
-        else
-            # Manual fallback
-            xfsettingsd --daemon
-            xfwm4 --compositor=off --daemon
-            xfdesktop &
-            exec xfce4-panel
-        fi
-    "
+# Allow local root access to Xauthority for installer (sudo calamares)
+[ -f "$USER_HOME/.Xauthority" ] && chmod 644 "$USER_HOME/.Xauthority" 2>/dev/null || true
+
+# 5. Launch the session
+if command -v xfce4-session >/dev/null 2>&1; then
+    exec xfce4-session
+elif command -v startxfce4 >/dev/null 2>&1; then
+    exec startxfce4
 else
-    # Fallback without dbus-run-session
-    [ -f "$USER_HOME/.Xauthority" ] && chmod 644 "$USER_HOME/.Xauthority" 2>/dev/null || true
-    xfsettingsd --daemon
-    xfwm4 --compositor=off --daemon
+    # Manual fallback
+    xfsettingsd --daemon 2>/dev/null || true
+    xfwm4 --compositor=off --daemon 2>/dev/null || true
     xfdesktop &
     exec xfce4-panel
 fi
 
 # Emergency fallback to xterm
-exec xterm
+if command -v xterm >/dev/null 2>&1; then
+    exec xterm
+fi
