@@ -1,8 +1,9 @@
 # KratosOS
 
-<p align="center">
-  <img width="400" height="400" alt="KratosOS Logo" src="https://github.com/user-attachments/assets/c82503fe-3256-4bf6-b5ae-f0a4d458f300" />
-</p>
+<div align="center">
+  <img width="682" height="695" alt="Logo" src="https://github.com/user-attachments/assets/e9da0311-e670-4e15-a11e-892adddc634e" />
+
+</div>   
 
 <p align="center">
   <b>An independent GNU/Linux distribution built from the ground up.</b>
