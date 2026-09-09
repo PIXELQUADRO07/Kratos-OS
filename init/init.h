@@ -41,7 +41,6 @@ void set_hostname(void);
 void run_sysinit(void);
 void run_services(void);
 void setup_signal_handlers(void);
-void setup_live_session(void);
 void reap_zombies(void);
 void check_and_respawn_ttys(void);
 void shutdown_system(int cmd);

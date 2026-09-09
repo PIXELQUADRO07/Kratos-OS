@@ -58,7 +58,6 @@ echo "[+] Compiling /sbin/init (modular PID 1)..."
     "$KRATOS_ROOT/init/services.c" \
     "$KRATOS_ROOT/init/signals.c" \
     "$KRATOS_ROOT/init/tty.c" \
-    "$KRATOS_ROOT/init/live.c" \
     -fPIE -pie \
     -Wl,-z,relro,-z,now
 echo "[✓] init compiled."

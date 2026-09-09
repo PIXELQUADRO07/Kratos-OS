@@ -82,19 +82,27 @@ if [ -f "$KRATOS_ROOT/config/live/xinitrc" ]; then
     echo "[+] Installing /etc/live/xinitrc and default user xinitrc scripts..."
     cp "$KRATOS_ROOT/config/live/xinitrc" "$SYSROOT/etc/live/xinitrc"
     chmod +x "$SYSROOT/etc/live/xinitrc"
+    LIVE_CONF_DIR="$KRATOS_ROOT/config/live-new"
+    [ -d "$LIVE_CONF_DIR" ] || LIVE_CONF_DIR="$KRATOS_ROOT/config/live"
     
     # Also overwrite the default 3-xterm xinitrc so startx always starts XFCE
-    cp "$KRATOS_ROOT/config/live/xinitrc" "$SYSROOT/etc/X11/xinit/xinitrc"
+    cp "$LIVE_CONF_DIR/xinitrc" "$SYSROOT/etc/X11/xinit/xinitrc"
     chmod +x "$SYSROOT/etc/X11/xinit/xinitrc"
     
-    cp "$KRATOS_ROOT/config/live/xinitrc" "$SYSROOT/etc/skel/.xinitrc"
-    cp "$KRATOS_ROOT/config/live/xinitrc" "$SYSROOT/root/.xinitrc"
-    cp "$KRATOS_ROOT/config/live/xinitrc" "$SYSROOT/home/kratos-live/.xinitrc"
+    cp "$LIVE_CONF_DIR/xinitrc" "$SYSROOT/etc/skel/.xinitrc"
+    cp "$LIVE_CONF_DIR/xinitrc" "$SYSROOT/root/.xinitrc"
+    cp "$LIVE_CONF_DIR/xinitrc" "$SYSROOT/home/kratos-live/.xinitrc"
     chmod +x "$SYSROOT/etc/skel/.xinitrc" "$SYSROOT/root/.xinitrc" "$SYSROOT/home/kratos-live/.xinitrc"
 fi
 
-if [ -f "$KRATOS_ROOT/config/live/start-live.sh" ]; then
+if [ -f "$KRATOS_ROOT/config/live-new/start-live.sh" ]; then
     echo "[+] Installing /etc/live/start-live.sh..."
+    mkdir -p "$SYSROOT/etc/live"
+    cp "$KRATOS_ROOT/config/live-new/start-live.sh" "$SYSROOT/etc/live/start-live.sh"
+    chmod +x "$SYSROOT/etc/live/start-live.sh"
+elif [ -f "$KRATOS_ROOT/config/live/start-live.sh" ]; then
+    echo "[+] Installing /etc/live/start-live.sh..."
+    mkdir -p "$SYSROOT/etc/live"
     cp "$KRATOS_ROOT/config/live/start-live.sh" "$SYSROOT/etc/live/start-live.sh"
     chmod +x "$SYSROOT/etc/live/start-live.sh"
 fi
@@ -146,8 +154,9 @@ for themedir in "$SYSROOT/usr/share/icons"/*; do
     fi
 done
 
-# 4. Add Live session rc.d service to launch live environment on boot
+# 4. Add Live session rc.d service (Enabled for Live Graphical Boot)
 mkdir -p "$SYSROOT/etc/rc.d"
+rm -f "$SYSROOT/etc/rc.d/99-live.disabled"
 cat > "$SYSROOT/etc/rc.d/99-live" <<'EOF'
 #!/bin/bash
 # /etc/rc.d/99-live — Launch Live graphical session if in Live boot mode

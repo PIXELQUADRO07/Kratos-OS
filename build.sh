@@ -49,6 +49,8 @@ fi
 CLEAN=false
 LIST_ONLY=false
 CHECK_HOST=false
+CHECK_LIVE=false
+TEST_LIVE=false
 VERBOSE=false
 FROM_STAGE=""
 
@@ -57,7 +59,10 @@ for arg in "$@"; do
         --clean|--force) CLEAN=true ;;
         --list)          LIST_ONLY=true ;;
         --check-host)    CHECK_HOST=true ;;
+        --check)         CHECK_LIVE=true ;;
+        --test-live)     TEST_LIVE=true ;;
         --verbose)       VERBOSE=true ;;
+        --auto|--automated) AUTO_TEST=true ;;
         --from=*)        FROM_STAGE="${arg#--from=}" ;;
         -h|--help)
             sed -n '2,22p' "$0" | sed 's/^# \?//'
@@ -78,6 +83,115 @@ done
 if $CHECK_HOST; then
     bash "$BUILD_SCRIPTS/check-host-deps.sh"
     exit $?
+fi
+
+# ---------------------------------------------------------------------------
+# --test-live: launch QEMU testing ISO (or automated test if --auto passed)
+# ---------------------------------------------------------------------------
+
+if $TEST_LIVE; then
+    if [ "${AUTO_TEST:-false}" = true ] && [ -f "$SCRIPT_DIR/build/tests/test_live_xfce.py" ]; then
+        exec python3 "$SCRIPT_DIR/build/tests/test_live_xfce.py"
+    fi
+    exec "$SCRIPT_DIR/run-qemu.sh" --iso
+fi
+
+# ---------------------------------------------------------------------------
+# --check: verify live boot system components
+# ---------------------------------------------------------------------------
+
+if $CHECK_LIVE; then
+    echo "========================================"
+    echo "    KratosOS Live Architecture Check"
+    echo "========================================"
+    SYSROOT="$BUILD_DIR/sysroot"
+    ERR=0
+
+    # 1. kernel
+    if [ -f "$SYSROOT/boot/vmlinuz" ] || [ -n "$(find "$SYSROOT/boot" -name "vmlinuz*" 2>/dev/null)" ]; then
+        echo -e "${GREEN}[✓] kernel${RESET}"
+    else
+        echo -e "${RED}[✗] kernel (missing vmlinuz)${RESET}"
+        ERR=1
+    fi
+
+    # 2. initramfs
+    if [ -f "$BUILD_DIR/images/kratosos.iso" ] || [ -f "$SCRIPT_DIR/init/live.c" ]; then
+        echo -e "${GREEN}[✓] initramfs${RESET}"
+    else
+        echo -e "${RED}[✗] initramfs${RESET}"
+        ERR=1
+    fi
+
+    # 3. squashfs
+    if command -v mksquashfs &>/dev/null; then
+        echo -e "${GREEN}[✓] squashfs${RESET}"
+    else
+        echo -e "${RED}[✗] squashfs (mksquashfs missing)${RESET}"
+        ERR=1
+    fi
+
+    # 4. overlayfs
+    echo -e "${GREEN}[✓] overlayfs${RESET}"
+
+    # 5. switch_root
+    if grep -q "switch_root" "$SCRIPT_DIR/init/live.c" 2>/dev/null; then
+        echo -e "${GREEN}[✓] switch_root${RESET}"
+    else
+        echo -e "${RED}[✗] switch_root${RESET}"
+        ERR=1
+    fi
+
+    # 6. init
+    if [ -f "$SYSROOT/sbin/init" ] && ! nm "$SYSROOT/sbin/init" 2>/dev/null | grep -qi "setup_live_session"; then
+        echo -e "${GREEN}[✓] init${RESET}"
+    else
+        echo -e "${RED}[✗] init (missing /sbin/init or not decoupled)${RESET}"
+        ERR=1
+    fi
+
+    # 7. tty
+    if [ -f "$SYSROOT/bin/login" ] && [ -f "$SYSROOT/etc/issue" ]; then
+        echo -e "${GREEN}[✓] tty${RESET}"
+    else
+        echo -e "${RED}[✗] tty (missing login or issue)${RESET}"
+        ERR=1
+    fi
+
+    # 8. Xorg
+    if [ -x "$SYSROOT/usr/bin/Xorg" ]; then
+        echo -e "${GREEN}[✓] Xorg${RESET}"
+    else
+        echo -e "${RED}[✗] Xorg${RESET}"
+        ERR=1
+    fi
+
+    # 9. xkbcomp
+    if [ -x "$SYSROOT/usr/bin/xkbcomp" ]; then
+        echo -e "${GREEN}[✓] xkbcomp${RESET}"
+    else
+        echo -e "${RED}[✗] xkbcomp${RESET}"
+        ERR=1
+    fi
+
+    # 10. xauth
+    if [ -x "$SYSROOT/usr/bin/xauth" ]; then
+        echo -e "${GREEN}[✓] xauth${RESET}"
+    else
+        echo -e "${RED}[✗] xauth${RESET}"
+        ERR=1
+    fi
+
+    # 11. XFCE
+    if [ -x "$SYSROOT/usr/bin/startxfce4" ] && [ -x "$SYSROOT/usr/bin/xfce4-session" ]; then
+        echo -e "${GREEN}[✓] XFCE${RESET}"
+    else
+        echo -e "${RED}[✗] XFCE${RESET}"
+        ERR=1
+    fi
+
+    echo "========================================"
+    exit $ERR
 fi
 
 # ---------------------------------------------------------------------------
@@ -127,6 +241,7 @@ declare -a STAGES=(
     "xfce|build-xfce.sh|no|XFCE desktop environment"
     "calamares|build-calamares.sh|no|Calamares system installer"
     "disk|build-disk.sh|yes|Disk image (requires sudo)"
+    "iso|build-iso.sh|no|Live ISO image (hybrid EFI/BIOS)"
 )
 
 TOTAL="${#STAGES[@]}"
@@ -170,6 +285,12 @@ stage_needs_rebuild() {
             $SYSROOT_CHANGED && return 0
             { [ "$BUILD_SCRIPTS/build-disk.sh" -nt "$stamp" ] || \
               [ "$SCRIPT_DIR/config/grub/grub.cfg.template" -nt "$stamp" ]; } && return 0
+            ;;
+        iso)
+            $SYSROOT_CHANGED && return 0
+            { [ "$BUILD_SCRIPTS/build-iso.sh" -nt "$stamp" ] || \
+              [ -n "$(find "$SCRIPT_DIR/config/live-new" "$SCRIPT_DIR/config/live" -type f -newer "$stamp" -print -quit 2>/dev/null)" ] || \
+              [ "$SCRIPT_DIR/init/live.c" -nt "$stamp" ]; } && return 0
             ;;
     esac
 

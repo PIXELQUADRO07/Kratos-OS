@@ -109,6 +109,9 @@ void run_services(void)
     for (int i = 0; i < n; i++) {
         struct dirent *entry = namelist[i];
         if (entry->d_name[0] == '.') { free(entry); continue; }
+        size_t nlen = strlen(entry->d_name);
+        if (nlen > 9 && strcmp(entry->d_name + nlen - 9, ".disabled") == 0) { free(entry); continue; }
+        if (nlen > 4 && strcmp(entry->d_name + nlen - 4, ".bak") == 0) { free(entry); continue; }
         char path[384];
         snprintf(path, sizeof(path), "/etc/rc.d/%s", entry->d_name);
         if (access(path, X_OK) == 0) {
