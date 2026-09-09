@@ -140,6 +140,18 @@ kconfig --enable DRM_FBDEV_EMULATION
 kconfig --enable DRM_SIMPLEDRM
 kconfig --enable DRM_VIRTIO_GPU
 kconfig --enable DRM_BOCHS
+kconfig --enable DRM_VMWGFX
+kconfig --enable DRM_VBOXVIDEO
+kconfig --enable DRM_QXL
+
+# Virtualization Guest Drivers (VirtualBox & VMware integration)
+kconfig --enable VIRT_DRIVERS
+kconfig --enable VBOXGUEST
+kconfig --enable VBOXSF_FS
+kconfig --enable VMWARE_BALLOON
+kconfig --enable VMWARE_VMCI
+kconfig --enable VMXNET3
+
 kconfig --enable VT
 kconfig --enable UNIX98_PTYS
 kconfig --enable FRAMEBUFFER_CONSOLE
@@ -157,8 +169,6 @@ kconfig --module DRM_RADEON
 kconfig --module DRM_NOUVEAU
 kconfig --module DRM_AST
 kconfig --module DRM_MGAG200
-kconfig --module DRM_QXL
-kconfig --module DRM_VMWGFX
 
 # Audio support (Issue #4 hidden issue): Enable ALSA and HDA Intel codec driver
 # Required for PulseAudio and sound card initialization

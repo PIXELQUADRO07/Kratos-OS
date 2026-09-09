@@ -78,6 +78,11 @@ if [ -f "$KRATOS_ROOT/config/live/xorg.conf" ]; then
     cp "$KRATOS_ROOT/config/live/xorg.conf" "$SYSROOT/etc/X11/xorg.conf"
 fi
 
+if [ -d "$KRATOS_ROOT/config/live-new/xorg.conf.d" ]; then
+    echo "[+] Installing /etc/X11/xorg.conf.d snippets..."
+    cp -r "$KRATOS_ROOT/config/live-new/xorg.conf.d/"* "$SYSROOT/etc/X11/xorg.conf.d/"
+fi
+
 if [ -f "$KRATOS_ROOT/config/live/xinitrc" ]; then
     echo "[+] Installing /etc/live/xinitrc and default user xinitrc scripts..."
     cp "$KRATOS_ROOT/config/live/xinitrc" "$SYSROOT/etc/live/xinitrc"

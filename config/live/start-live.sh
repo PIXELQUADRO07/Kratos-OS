@@ -8,8 +8,12 @@ LIVE_USER="kratos-live"
 LIVE_HOME="/home/kratos-live"
 LIVE_UID=1000
 
-# 1. Hardware Wait Loop (Parrot OS style)
-# Real hardware / VirtualBox can be slower at initializing DRM/KMS drivers.
+# 1. Hardware Initialization & Wait Loop
+# Explicitly probe virtualization and standard KMS drivers if loadable
+for mod in vboxguest vboxvideo vmwgfx qxl bochs_drm virtio_gpu; do
+    modprobe -q "$mod" 2>/dev/null || true
+done
+
 echo "[Live] Waiting for graphics device..."
 READY=0
 for i in $(seq 1 15); do
@@ -32,6 +36,7 @@ chmod 1777 /tmp/.ICE-unix /tmp/.X11-unix 2>/dev/null || true
 mkdir -p /var/log /var/lib/xkb /etc/X11 /etc/X11/xorg.conf.d
 chmod 777 /var/log /var/lib/xkb 2>/dev/null || true
 chmod 4755 /usr/bin/Xorg 2>/dev/null || true
+chmod 666 /dev/dri/card* /dev/dri/renderD* /dev/fb* 2>/dev/null || true
 
 cat > /etc/X11/Xwrapper.config << 'EOF'
 allowed_users = anybody
