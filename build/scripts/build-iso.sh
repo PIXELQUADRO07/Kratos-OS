@@ -53,18 +53,18 @@ fi
 # ------------------------------------------------------------
 # Step 1: Sync latest Live, Desktop and Calamares configurations
 # ------------------------------------------------------------
-echo "[Step 1] Syncing latest Live, Desktop and Calamares configurations..."
-if [ -x "$SCRIPT_DIR/install-packages.sh" ]; then
+echo "[Step 1] Checking Live, Desktop and Calamares configurations..."
+if [ ! -f "$KRATOS_ROOT/build/.stamps/inject-pkgs.done" ] && [ -x "$SCRIPT_DIR/install-packages.sh" ]; then
     echo "  -> Injecting binary packages..."
     bash "$SCRIPT_DIR/install-packages.sh"
 fi
-if [ -x "$SCRIPT_DIR/build-xorg.sh" ]; then
+if [ ! -f "$KRATOS_ROOT/build/.stamps/xorg.done" ] && [ -x "$SCRIPT_DIR/build-xorg.sh" ]; then
     bash "$SCRIPT_DIR/build-xorg.sh"
 fi
-if [ -x "$SCRIPT_DIR/build-xfce.sh" ]; then
+if [ ! -f "$KRATOS_ROOT/build/.stamps/xfce.done" ] && [ -x "$SCRIPT_DIR/build-xfce.sh" ]; then
     bash "$SCRIPT_DIR/build-xfce.sh"
 fi
-if [ -x "$SCRIPT_DIR/build-calamares.sh" ]; then
+if [ ! -f "$KRATOS_ROOT/build/.stamps/calamares.done" ] && [ -x "$SCRIPT_DIR/build-calamares.sh" ]; then
     bash "$SCRIPT_DIR/build-calamares.sh"
 fi
 
@@ -145,14 +145,21 @@ mksquashfs "$SYSROOT" "$SQUASHFS_OUT" -noappend -all-root -comp zstd -e boot
 echo "  Creating minimal bootstrap initramfs..."
 BOOTSTRAP_DIR="$KRATOS_WORK/bootstrap_initramfs"
 rm -rf "$BOOTSTRAP_DIR"
-# Mirror the sysroot structure: /lib64 -> usr/lib
-mkdir -p "$BOOTSTRAP_DIR"/{bin,sbin,etc,usr/lib,lib,dev,proc,sys,mnt,run}
-ln -sf usr/lib "$BOOTSTRAP_DIR/lib64"
+mkdir -p "$BOOTSTRAP_DIR"/{bin,sbin,dev,proc,sys,run,mnt/media,mnt/rofs,mnt/cow,mnt/newroot}
 
-# Copy essential binaries
-cp -v "$SYSROOT/sbin/init" "$BOOTSTRAP_DIR/sbin/init"
-cp -v "$SYSROOT/bin/bash" "$BOOTSTRAP_DIR/bin/bash"
-ln -sf bash "$BOOTSTRAP_DIR/bin/sh"
+CC="$KRATOS_TOOLS/bin/$TARGET-gcc"
+STRIP="$KRATOS_TOOLS/bin/$TARGET-strip"
+
+echo "  Compiling static live /init binary..."
+"$CC" --sysroot="$SYSROOT" -static -O2 -Wall -Wextra -std=gnu11 \
+    -o "$BOOTSTRAP_DIR/init" "$KRATOS_ROOT/init/live.c"
+"$STRIP" "$BOOTSTRAP_DIR/init"
+
+# Copy bash as emergency shell
+if [ -f "$SYSROOT/bin/bash" ]; then
+    cp -v "$SYSROOT/bin/bash" "$BOOTSTRAP_DIR/bin/bash"
+    ln -sf bash "$BOOTSTRAP_DIR/bin/sh"
+fi
 
 # Copy real ELF DT_NEEDED libraries (skip GNU ld scripts like libdl.so).
 copy_so_file() {
@@ -218,30 +225,13 @@ copy_needed_libs() {
     done < <(readelf -d "$bin" 2>/dev/null | sed -n 's/.*Shared library: \[\(.*\)\]/\1/p' || true)
 }
 
-echo "  Resolving ELF dependencies for init and bash..."
-copy_needed_libs "$SYSROOT/sbin/init"
-copy_needed_libs "$SYSROOT/bin/bash"
-
-# Extra runtime libs often required by PIE + stack-protector init and bash.
-shopt -s nullglob
-for extra in \
-    "$SYSROOT/usr/lib/"libgcc_s.so* \
-    "$SYSROOT/lib/"libgcc_s.so* \
-    "$SYSROOT/usr/lib/"libssp.so* \
-    "$SYSROOT/usr/lib/"libreadline.so* \
-    "$SYSROOT/usr/lib/"libtinfo.so* \
-    "$SYSROOT/usr/lib/"libncursesw.so* \
-    "$SYSROOT/usr/lib/"libc.so.6 \
-    "$SYSROOT/usr/lib/"libm.so.6 \
-    "$SYSROOT/usr/lib/"libdl.so.2 \
-    "$SYSROOT/usr/lib/"libpthread.so.0 \
-    "$KRATOS_TOOLS/"*/lib/libgcc_s.so* \
-    "$KRATOS_TOOLS/"*/lib64/libgcc_s.so*
-do
-    copy_so_file "$extra" "$BOOTSTRAP_DIR/usr/lib"
-done
-shopt -u nullglob
-
+if [ -f "$BOOTSTRAP_DIR/bin/bash" ]; then
+    copy_needed_libs "$BOOTSTRAP_DIR/bin/bash"
+    # Ensure lib64 symlink if dynamic loader is under /lib64
+    if [ -d "$BOOTSTRAP_DIR/usr/lib" ] && [ ! -e "$BOOTSTRAP_DIR/lib64" ]; then
+        ln -sf usr/lib "$BOOTSTRAP_DIR/lib64"
+    fi
+fi
 rm -f "$DEPS_SEEN"
 
 # Copy only live-boot modules (if built as modules). Skip the full tree.
@@ -280,7 +270,6 @@ fi
 
 (
     cd "$BOOTSTRAP_DIR"
-    ln -sf sbin/init init
     find . -print0 | cpio --null -ov --format=newc | gzip -9 > "$INITRAMFS_OUT"
 )
 rm -rf "$BOOTSTRAP_DIR"
@@ -324,7 +313,7 @@ menuentry "KratosOS Live Session (XFCE)" {
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel..."
-    linux /boot/vmlinuz rw rdinit=/sbin/init console=ttyS0,115200 console=tty0 loglevel=7 kratos.live
+    linux /boot/vmlinuz rw rdinit=/init console=tty0 console=ttyS0,115200 loglevel=7 kratos.live
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS Live Environment..."
@@ -338,7 +327,7 @@ menuentry "KratosOS Live (Safe Graphics / Nomodeset)" {
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel (Safe Graphics)..."
-    linux /boot/vmlinuz rw rdinit=/sbin/init console=tty0 console=ttyS0,115200 nomodeset loglevel=3 kratos.live quiet
+    linux /boot/vmlinuz rw rdinit=/init console=tty0 console=ttyS0,115200 nomodeset loglevel=3 kratos.live quiet
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS..."
@@ -352,7 +341,7 @@ menuentry "KratosOS Live (Debug Mode - Verbose)" {
     insmod ext2
     insmod linux
     echo "Loading Linux Kernel (Debug)..."
-    linux /boot/vmlinuz rw rdinit=/sbin/init console=tty0 console=ttyS0,115200 loglevel=7 ignore_loglevel earlycon=efifb earlyprintk=efi kratos.live
+    linux /boot/vmlinuz rw rdinit=/init console=tty0 console=ttyS0,115200 loglevel=7 ignore_loglevel earlycon=efifb earlyprintk=efi kratos.live
     echo "Loading Live Ramdisk..."
     initrd /boot/initramfs.cpio.gz
     echo "Booting KratosOS (debug)..."

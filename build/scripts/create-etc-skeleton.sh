@@ -458,6 +458,28 @@ fi
 EOF
 chmod +x "$ETC/rc.d/10-network"
 
+echo "[+] Creating /etc/rc.d/20-dbus..."
+cat > "$ETC/rc.d/20-dbus" <<'EOF'
+#!/bin/sh
+# /etc/rc.d/20-dbus — Start D-Bus system message bus daemon
+
+if [ -x /usr/bin/dbus-daemon ]; then
+    mkdir -p /run/dbus /var/lib/dbus
+    chown 18:18 /run/dbus 2>/dev/null || true
+    if command -v dbus-uuidgen >/dev/null 2>&1; then
+        dbus-uuidgen --ensure=/var/lib/dbus/machine-id 2>/dev/null || true
+    fi
+    if [ -f /var/lib/dbus/machine-id ] && [ ! -f /etc/machine-id ]; then
+        ln -sf /var/lib/dbus/machine-id /etc/machine-id 2>/dev/null || true
+    fi
+    if [ ! -e /run/dbus/system_bus_socket ]; then
+        echo "[rc.d] Starting D-Bus system daemon..."
+        /usr/bin/dbus-daemon --system --fork 2>/dev/null || true
+    fi
+fi
+EOF
+chmod +x "$ETC/rc.d/20-dbus"
+
 echo "[+] Pre-registering base system packages in KPM database..."
 # This ensures that packages depending on glibc or kpm find them as "installed"
 mkdir -p "$SYSROOT/var/lib/kratos/db/packages"

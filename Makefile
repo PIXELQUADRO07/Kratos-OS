@@ -39,7 +39,7 @@ export KRATOS_JOBS ?= $(shell nproc)
         diffutils tar gzip xz bzip2 file-cmd \
         kernel grub etc init pkg disk image iso live-iso \
         mbedtls ca-certs fetch xorg xfce calamares \
-        check-host host-deps \
+        check-host host-deps check test-live \
         clean distclean stamps-clean
 
 # ─────────────────────────────────────────────
@@ -302,6 +302,12 @@ disk image:
 
 iso live-iso:
 	@bash $(SCRIPTS)/build-iso.sh
+
+check:
+	@bash ./build.sh --check
+
+test-live:
+	@bash ./build.sh --test-live
 
 # ─────────────────────────────────────────────
 # Incremental stamps

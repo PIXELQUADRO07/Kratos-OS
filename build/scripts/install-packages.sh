@@ -194,6 +194,7 @@ OPTIONAL_PACKAGES=(
     "xfconf"
     "libxfce4ui"
     "libxfce4windowing"
+    "libdisplay-info"
     "libwnck3"
     "garcon"
     "exo"

@@ -60,9 +60,6 @@ int main(void)
     setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1);
     setenv("TERM", "linux", 0); // Default to linux, can be overridden by TTY spawn
 
-    /* Handle Live Session (SquashFS + OverlayFS) if requested */
-    setup_live_session();
-
     fprintf(stderr, "\n[init] KratosOS starting... (%s)\n", kratos_build_marker);
 
     if (getpid() != 1) {

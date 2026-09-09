@@ -1,0 +1,3 @@
+#!/bin/sh
+# Minimal .xinitrc — Launch XFCE inside a proper D-Bus user session
+exec dbus-run-session -- startxfce4
