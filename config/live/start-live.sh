@@ -105,8 +105,22 @@ if command -v gdk-pixbuf-query-loaders >/dev/null 2>&1; then
         export GDK_PIXBUF_MODULE_FILE="$GDK_PIXBUF_LIBDIR/loaders.cache"
         mkdir -p "$GDK_PIXBUF_MODULEDIR" 2>/dev/null || true
 
-        if ! gdk-pixbuf-query-loaders > "$GDK_PIXBUF_MODULE_FILE" 2>/var/log/gdk-pixbuf-query-loaders.log; then
-            echo "[Live] Warning: could not regenerate gdk-pixbuf loader cache" >> /var/log/gdk-pixbuf-query-loaders.log 2>&1 || true
+        # Only regenerate if missing or doesn't have svg loader
+        if [ ! -f "$GDK_PIXBUF_MODULE_FILE" ] || ! grep -q "libpixbufloader-svg.so" "$GDK_PIXBUF_MODULE_FILE"; then
+            if ! gdk-pixbuf-query-loaders > "$GDK_PIXBUF_MODULE_FILE" 2>/var/log/gdk-pixbuf-query-loaders.log; then
+                echo "[Live] Warning: could not regenerate gdk-pixbuf loader cache" >> /var/log/gdk-pixbuf-query-loaders.log 2>&1 || true
+            fi
+            if [ -f "$GDK_PIXBUF_MODULEDIR/libpixbufloader-svg.so" ] && ! grep -q "libpixbufloader-svg.so" "$GDK_PIXBUF_MODULE_FILE"; then
+                cat >> "$GDK_PIXBUF_MODULE_FILE" << 'EOF_SVG'
+
+"/usr/lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-svg.so"
+"svg" 6 "gdk-pixbuf" "Scalable Vector Graphics" "LGPL"
+"image/svg+xml" "image/svg" "image/svg-xml" "image/vnd.adobe.svg+xml" "text/xml-svg" "image/svg+xml-compressed" ""
+"svg" "svgz" "svg.gz" ""
+" <svg" "*    " 100
+" <!DOCTYPE svg" "*             " 100
+EOF_SVG
+            fi
         fi
 
         # Fix relative paths in loaders.cache if gdk-pixbuf-query-loaders produced them

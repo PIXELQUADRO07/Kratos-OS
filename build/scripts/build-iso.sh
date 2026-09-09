@@ -139,6 +139,28 @@ if ! command -v mksquashfs &>/dev/null; then
     exit 1
 fi
 
+# Ensure correct permissions for critical suid binaries and runtime dirs
+echo "  Sanitizing sysroot permissions and runtime directories..."
+if [ -f "$SYSROOT/usr/lib/polkit-1/polkit-agent-helper-1" ]; then
+    chmod 4755 "$SYSROOT/usr/lib/polkit-1/polkit-agent-helper-1" 2>/dev/null || true
+fi
+if [ -f "$SYSROOT/usr/bin/Xorg" ]; then
+    chmod 4755 "$SYSROOT/usr/bin/Xorg" 2>/dev/null || true
+fi
+if [ -f "$SYSROOT/etc/live/start-live.sh" ]; then
+    chmod +x "$SYSROOT/etc/live/start-live.sh" 2>/dev/null || true
+fi
+if [ -d "$SYSROOT/etc/rc.d" ]; then
+    chmod +x "$SYSROOT/etc/rc.d"/* 2>/dev/null || true
+fi
+if [ -f "$SYSROOT/etc/rc.sysinit" ]; then
+    chmod +x "$SYSROOT/etc/rc.sysinit" 2>/dev/null || true
+fi
+chmod 1777 "$SYSROOT/tmp" 2>/dev/null || true
+mkdir -p "$SYSROOT/tmp/.ICE-unix" "$SYSROOT/tmp/.X11-unix"
+chmod 1777 "$SYSROOT/tmp/.ICE-unix" "$SYSROOT/tmp/.X11-unix" 2>/dev/null || true
+chmod 777 "$SYSROOT/var/log" "$SYSROOT/var/lib/xkb" 2>/dev/null || true
+
 echo "  Creating SquashFS image (this may take a moment)..."
 mksquashfs "$SYSROOT" "$SQUASHFS_OUT" -noappend -all-root -comp zstd -e boot
 

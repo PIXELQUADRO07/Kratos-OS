@@ -43,7 +43,7 @@ def test_live_xfce():
     logged_in = False
     tests_sent = False
 
-    while time.time() - start_time < 90:
+    while time.time() - start_time < 120:
         try:
             data = s.recv(1024).decode('utf-8', errors='ignore')
             if data:
@@ -60,17 +60,31 @@ def test_live_xfce():
                     buf = ""
 
                 if logged_in and not tests_sent and ("#" in buf or "root@" in buf or "~#" in buf or "bash" in buf):
-                    print("\n[+] Logged in! Inspecting desktop processes with ps -e...")
+                    print("\n[+] Logged in! Collecting complete live logs and validating processes...")
                     time.sleep(1)
                     test_commands = [
-                        b"ps -e | grep -E 'Xorg|xfce|xfwm|panel|desktop|dbus'\n",
-                        b"cat /var/log/Xorg.start.log 2>/dev/null || true\n",
+                        b"echo '=== [LOG 1: PROCESS LIST (ps aux)] ==='\n",
+                        b"ps aux\n",
+                        b"echo '=== [LOG 2: /run/boot.log (RC Services)] ==='\n",
+                        b"cat /run/boot.log 2>/dev/null || echo '(boot.log empty or not found)'\n",
+                        b"echo '=== [LOG 3: /var/log/Xorg.start.log (Startx & Session)] ==='\n",
+                        b"cat /var/log/Xorg.start.log 2>/dev/null || echo '(Xorg.start.log not found)'\n",
+                        b"echo '=== [LOG 4: /var/log/Xorg.0.log (Xorg Drivers & Screens)] ==='\n",
+                        b"grep -E 'EE|WW|modeset|bochs|vbox|vmw|card|Output' /var/log/Xorg.0.log 2>/dev/null || cat /var/log/Xorg.0.log\n",
+                        b"echo '=== [LOG 5: /var/log/gdk-pixbuf-query-loaders.log] ==='\n",
+                        b"cat /var/log/gdk-pixbuf-query-loaders.log 2>/dev/null || echo '(no gdk-pixbuf log)'\n",
+                        b"echo '=== [LOG 6: .xsession-errors] ==='\n",
+                        b"cat /home/kratos-live/.xsession-errors /root/.xsession-errors 2>/dev/null || echo '(no .xsession-errors)'\n",
+                        b"echo '=== [LOG 7: GRAPHICS & INPUT DEVICES] ==='\n",
+                        b"ls -la /dev/dri /dev/fb* /dev/input 2>/dev/null\n",
+                        b"echo '=== [LOG 8: KERNEL DRM & HYPERVISOR DMESG] ==='\n",
+                        b"dmesg | grep -E -i 'drm|bochs|vbox|vmw|fb0|modeset|input' | tail -n 30\n",
                         b"printf 'XFCE_VALIDATION_COMPLETED_SUCCESSFULLY\\n'\n",
                         b"poweroff\n"
                     ]
                     for tc in test_commands:
                         s.sendall(tc)
-                        time.sleep(0.8)
+                        time.sleep(1.0)
                     tests_sent = True
                     buf = ""
 
