@@ -127,6 +127,18 @@ if [ -n "$SEARCH_PATHS" ]; then
             echo "  -> Fixing relative paths in $cache"
             sed -i 's|^"lib/|"\/usr\/lib/|g' "$cache"
         fi
+        if ! grep -q 'libpixbufloader-svg.so' "$cache"; then
+            echo "  -> Adding SVG loader to $cache"
+            cat >> "$cache" << 'EOF_SVG'
+"/usr/lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-svg.so"
+"svg" 6 "gdk-pixbuf" "Scalable Vector Graphics" "LGPL"
+"image/svg+xml" "image/svg" "image/svg-xml" "image/vnd.adobe.svg+xml" "text/xml-svg" "image/svg+xml-compressed" ""
+"svg" "svgz" "svg.gz" ""
+" <svg" "*    " 100
+" <!DOCTYPE svg" "*             " 100
+
+EOF_SVG
+        fi
     done
 fi
 

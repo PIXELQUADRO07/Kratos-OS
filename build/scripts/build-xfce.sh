@@ -120,6 +120,26 @@ cat > "$DESKTOP_CONFIG" <<'EOF'
         <property name="image-style" type="int" value="5"/>
         <property name="last-image" type="string" value="/usr/share/backgrounds/xfce/kratosos-logo.png"/>
       </property>
+      <property name="monitorVirtual-1" type="empty">
+        <property name="image-path" type="string" value="/usr/share/backgrounds/xfce/kratosos-logo.png"/>
+        <property name="image-style" type="int" value="5"/>
+        <property name="last-image" type="string" value="/usr/share/backgrounds/xfce/kratosos-logo.png"/>
+      </property>
+      <property name="monitorVirtual1" type="empty">
+        <property name="image-path" type="string" value="/usr/share/backgrounds/xfce/kratosos-logo.png"/>
+        <property name="image-style" type="int" value="5"/>
+        <property name="last-image" type="string" value="/usr/share/backgrounds/xfce/kratosos-logo.png"/>
+      </property>
+      <property name="monitorVGA-1" type="empty">
+        <property name="image-path" type="string" value="/usr/share/backgrounds/xfce/kratosos-logo.png"/>
+        <property name="image-style" type="int" value="5"/>
+        <property name="last-image" type="string" value="/usr/share/backgrounds/xfce/kratosos-logo.png"/>
+      </property>
+      <property name="monitorDefault" type="empty">
+        <property name="image-path" type="string" value="/usr/share/backgrounds/xfce/kratosos-logo.png"/>
+        <property name="image-style" type="int" value="5"/>
+        <property name="last-image" type="string" value="/usr/share/backgrounds/xfce/kratosos-logo.png"/>
+      </property>
     </property>
   </property>
   <property name="desktop-icons" type="empty">
