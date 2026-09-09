@@ -45,10 +45,16 @@ if [ -f "$KRATOS_ROOT/Branding/KratosOS.png" ]; then
     cp -f "$KRATOS_ROOT/Branding/KratosOS.png" "$SYSROOT/usr/share/backgrounds/xfce/kratosos-logo.png"
 fi
 
+# If whiskermenu was installed to /usr/lib64, ensure a copy/symlink exists in /usr/lib
+if [ -f "$SYSROOT/usr/lib64/xfce4/panel/plugins/libwhiskermenu.so" ] && [ ! -f "$SYSROOT/usr/lib/xfce4/panel/plugins/libwhiskermenu.so" ]; then
+    mkdir -p "$SYSROOT/usr/lib/xfce4/panel/plugins"
+    cp -f "$SYSROOT/usr/lib64/xfce4/panel/plugins/libwhiskermenu.so" "$SYSROOT/usr/lib/xfce4/panel/plugins/libwhiskermenu.so" 2>/dev/null || true
+fi
+
 # Ensure XFCE panel config only contains essential plugins
-# We'll generate a fresh default.xml with a known good set of plugins
 MENU_PLUGIN="applicationsmenu"
-if [ -f "$SYSROOT/usr/share/xfce4/panel/plugins/whiskermenu.desktop" ]; then
+if [ -f "$SYSROOT/usr/share/xfce4/panel/plugins/whiskermenu.desktop" ] && \
+   { [ -f "$SYSROOT/usr/lib/xfce4/panel/plugins/libwhiskermenu.so" ] || [ -f "$SYSROOT/usr/lib64/xfce4/panel/plugins/libwhiskermenu.so" ]; }; then
     MENU_PLUGIN="whiskermenu"
 fi
 
@@ -88,18 +94,6 @@ mkdir -p "$XFCONF_DIR"
 # Keep xfce4-panel.xml synchronized with default.xml
 rm -f "$XFCONF_DIR/xfce4-panel.xml"
 cp -f "$PANEL_CONFIG" "$XFCONF_DIR/xfce4-panel.xml"
-
-rm -f "$XFCONF_DIR/xfce4-desktop.xml"
-cat > "$XFCONF_DIR/xfce4-desktop.xml" <<'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<channel name="xfce4-desktop" version="1.0"/>
-EOF
-
-rm -f "$XFCONF_DIR/xfce4-xsettings.xml"
-cat > "$XFCONF_DIR/xfce4-xsettings.xml" <<'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<channel name="xfce4-xsettings" version="1.0"/>
-EOF
 
 rm -f "$XFCONF_DIR/xfwm4.xml"
 cat > "$XFCONF_DIR/xfwm4.xml" <<'EOF'
