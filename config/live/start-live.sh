@@ -27,6 +27,8 @@ fi
 
 # 2. Configure system permissions and directories for X11 & D-Bus
 chmod 1777 /tmp 2>/dev/null || true
+mkdir -p /tmp/.ICE-unix /tmp/.X11-unix
+chmod 1777 /tmp/.ICE-unix /tmp/.X11-unix 2>/dev/null || true
 mkdir -p /var/log /var/lib/xkb /etc/X11 /etc/X11/xorg.conf.d
 chmod 777 /var/log /var/lib/xkb 2>/dev/null || true
 chmod 4755 /usr/bin/Xorg 2>/dev/null || true

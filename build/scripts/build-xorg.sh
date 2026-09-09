@@ -154,9 +154,10 @@ for themedir in "$SYSROOT/usr/share/icons"/*; do
     fi
 done
 
-# 4. Add Live session rc.d service (disabled until Phase 14)
+# 4. Add Live session rc.d service (Enabled for Live Graphical Boot)
 mkdir -p "$SYSROOT/etc/rc.d"
-cat > "$SYSROOT/etc/rc.d/99-live.disabled" <<'EOF'
+rm -f "$SYSROOT/etc/rc.d/99-live.disabled"
+cat > "$SYSROOT/etc/rc.d/99-live" <<'EOF'
 #!/bin/bash
 # /etc/rc.d/99-live — Launch Live graphical session if in Live boot mode
 
@@ -167,6 +168,6 @@ if grep -q "kratos.live" /proc/cmdline; then
     fi
 fi
 EOF
-chmod +x "$SYSROOT/etc/rc.d/99-live.disabled"
+chmod +x "$SYSROOT/etc/rc.d/99-live"
 
 echo "[✓] X11 environment configured successfully."

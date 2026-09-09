@@ -62,6 +62,7 @@ for arg in "$@"; do
         --check)         CHECK_LIVE=true ;;
         --test-live)     TEST_LIVE=true ;;
         --verbose)       VERBOSE=true ;;
+        --auto|--automated) AUTO_TEST=true ;;
         --from=*)        FROM_STAGE="${arg#--from=}" ;;
         -h|--help)
             sed -n '2,22p' "$0" | sed 's/^# \?//'
@@ -85,10 +86,13 @@ if $CHECK_HOST; then
 fi
 
 # ---------------------------------------------------------------------------
-# --test-live: launch QEMU testing ISO
+# --test-live: launch QEMU testing ISO (or automated test if --auto passed)
 # ---------------------------------------------------------------------------
 
 if $TEST_LIVE; then
+    if [ "${AUTO_TEST:-false}" = true ] && [ -f "$SCRIPT_DIR/build/tests/test_live_xfce.py" ]; then
+        exec python3 "$SCRIPT_DIR/build/tests/test_live_xfce.py"
+    fi
     exec "$SCRIPT_DIR/run-qemu.sh" --iso
 fi
 
