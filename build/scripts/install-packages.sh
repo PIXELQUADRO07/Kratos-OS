@@ -137,9 +137,23 @@ PACKAGES=(
     "libjpeg-turbo"
     "librsvg"
     "sqlite"
+    "gcc-libs"
+    "libXinerama"
+    "libXxf86vm"
+    "libXft"
+    "libXpm"
+    "libXaw"
+    "libyaml"
+    "eudev"
+    "libmd"
+    "libxcvt"
+    "libxshmfence"
+    "libcap"
+    "libtool"
     "vim"
     "wget"
     "sudo"
+    "xterm"
 )
 
 OPTIONAL_PACKAGES=(
