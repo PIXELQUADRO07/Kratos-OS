@@ -264,10 +264,6 @@ static int run_dhcp_client(const char *ifname)
     dhcp_packet_t pkt;
     memset(&pkt, 0, sizeof(pkt));
 
-    /* Random transaction ID: used below to verify that the reply we accept
-     * actually answers *our* request, instead of blindly trusting the first
-     * UDP datagram that lands on port 68 (which any host on the LAN segment
-     * could have forged). */
     uint32_t xid;
     if (kratos_random_xid(&xid) != 0) xid = 0x12345678u ^ (uint32_t)getpid();
 
@@ -291,51 +287,35 @@ static int run_dhcp_client(const char *ifname)
     server_sa.sin_port = htons(DHCP_SERVER_PORT);
     server_sa.sin_addr.s_addr = INADDR_BROADCAST;
 
-    sendto(dhcp_sock, &pkt, sizeof(pkt), 0, (struct sockaddr *)&server_sa, sizeof(server_sa));
+    dhcp_packet_t offer_pkt;
+    const size_t header_len = offsetof(dhcp_packet_t, options);
+    ssize_t res = -1;
 
-    /* Receive OFFER / ACK (Timeout 3 sec) */
+    /* Retry DHCP Discover up to 3 times (2 sec timeout per attempt) */
     struct timeval tv;
-    tv.tv_sec = 3;
+    tv.tv_sec = 2;
     tv.tv_usec = 0;
     setsockopt(dhcp_sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
-    /* Zero the receive buffer first: recv() only overwrites the bytes it
-     * actually delivers, so on a short/truncated datagram the remainder of
-     * this stack struct would otherwise still hold whatever was left over
-     * from earlier stack usage — and that garbage would then get parsed
-     * below as if it were real IP/gateway/DNS option data. */
-    dhcp_packet_t offer_pkt;
-    memset(&offer_pkt, 0, sizeof(offer_pkt));
+    for (int attempt = 1; attempt <= 3; attempt++) {
+        printf("[kratos-net] Sending DHCP discover (attempt %d/3) on %s...\n", attempt, ifname);
+        sendto(dhcp_sock, &pkt, sizeof(pkt), 0, (struct sockaddr *)&server_sa, sizeof(server_sa));
 
-    struct sockaddr_in from_sa;
-    socklen_t from_len = sizeof(from_sa);
-    ssize_t res = recvfrom(dhcp_sock, &offer_pkt, sizeof(offer_pkt), 0,
-                            (struct sockaddr *)&from_sa, &from_len);
+        memset(&offer_pkt, 0, sizeof(offer_pkt));
+        struct sockaddr_in from_sa;
+        socklen_t from_len = sizeof(from_sa);
+        res = recvfrom(dhcp_sock, &offer_pkt, sizeof(offer_pkt), 0,
+                       (struct sockaddr *)&from_sa, &from_len);
 
-    /* Minimum bytes needed to safely read up to (and including) the fixed
-     * header + magic cookie, before we touch offer_pkt.options[] at all. */
-    const size_t header_len = offsetof(dhcp_packet_t, options);
-
-    if (res <= 0 || (size_t)res < header_len) {
-        printf("[kratos-net] DHCP timeout on %s. Setting fallback IP 192.168.1.150...\n", ifname);
-        close(dhcp_sock);
-        set_iface_ip(ifname, "192.168.1.150", "255.255.255.0");
-        set_default_gateway(ifname, "192.168.1.1");
-        update_resolv_conf("1.1.1.1", "8.8.8.8");
-        return 0;
+        if (res > 0 && (size_t)res >= header_len && offer_pkt.xid == pkt.xid) {
+            break; /* Valid lease reply received */
+        }
     }
 
-    /* Reject anything that isn't actually answering the request we just
-     * sent: wrong transaction ID means either a stray/unrelated DHCP
-     * packet on the segment or a forged reply, in both cases not something
-     * we should configure the interface from. */
-    if (offer_pkt.xid != pkt.xid) {
-        fprintf(stderr, "[kratos-net] Ignoring DHCP reply with mismatched XID on %s.\n", ifname);
+    if (res <= 0 || (size_t)res < header_len || offer_pkt.xid != pkt.xid) {
+        fprintf(stderr, "[kratos-net] No DHCP response received on %s after 3 attempts.\n", ifname);
         close(dhcp_sock);
-        set_iface_ip(ifname, "192.168.1.150", "255.255.255.0");
-        set_default_gateway(ifname, "192.168.1.1");
-        update_resolv_conf("1.1.1.1", "8.8.8.8");
-        return 0;
+        return -1;
     }
 
     struct in_addr assigned_ip;

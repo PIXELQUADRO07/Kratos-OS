@@ -97,10 +97,11 @@ for agent in \
     fi
 done
 
-# 4e. Ensure compositor is disabled in xfconf before session launch
-if command -v xfconf-query >/dev/null 2>&1; then
-    xfconf-query -c xfwm4 -p /general/use_compositing -s false --create -t bool 2>/dev/null || true
-fi
+# 4e. Prevent GTK from using the broken glamor/OpenGL path (DRI/AIGLX broken in this sysroot),
+#     while leaving xfwm4 XRender compositing fully active.
+#     Without compositing xfwm4 has no offscreen buffer → classic X11 flickering/ghosting on drag.
+#     GDK_GL=disable forces GTK to use its 2D Cairo/XRender fallback — no DRI dependency.
+export GDK_GL=disable
 
 # Allow local root access to Xauthority for installer (sudo calamares)
 [ -f "$USER_HOME/.Xauthority" ] && chmod 644 "$USER_HOME/.Xauthority" 2>/dev/null || true

@@ -73,9 +73,15 @@ needs_root_rights = yes
 EOF
 
 # 3. Copy live X11 configurations
-if [ -f "$KRATOS_ROOT/config/live/xorg.conf" ]; then
-    echo "[+] Installing /etc/X11/xorg.conf..."
-    cp "$KRATOS_ROOT/config/live/xorg.conf" "$SYSROOT/etc/X11/xorg.conf"
+# Prefer config/live-new/ when the file exists there, fall back to config/live/ —
+# same convention already used for start-live.sh and xorg.conf.d below.
+XORG_CONF_SRC=""
+if   [ -f "$KRATOS_ROOT/config/live-new/xorg.conf" ]; then XORG_CONF_SRC="$KRATOS_ROOT/config/live-new/xorg.conf"
+elif [ -f "$KRATOS_ROOT/config/live/xorg.conf"     ]; then XORG_CONF_SRC="$KRATOS_ROOT/config/live/xorg.conf"
+fi
+if [ -n "$XORG_CONF_SRC" ]; then
+    echo "[+] Installing /etc/X11/xorg.conf (from $(dirname "$XORG_CONF_SRC" | xargs basename))..."
+    cp "$XORG_CONF_SRC" "$SYSROOT/etc/X11/xorg.conf"
 fi
 
 if [ -d "$KRATOS_ROOT/config/live-new/xorg.conf.d" ]; then
@@ -83,20 +89,22 @@ if [ -d "$KRATOS_ROOT/config/live-new/xorg.conf.d" ]; then
     cp -r "$KRATOS_ROOT/config/live-new/xorg.conf.d/"* "$SYSROOT/etc/X11/xorg.conf.d/"
 fi
 
-if [ -f "$KRATOS_ROOT/config/live/xinitrc" ]; then
-    echo "[+] Installing /etc/live/xinitrc and default user xinitrc scripts..."
-    cp "$KRATOS_ROOT/config/live/xinitrc" "$SYSROOT/etc/live/xinitrc"
+XINITRC_SRC=""
+if   [ -f "$KRATOS_ROOT/config/live-new/xinitrc" ]; then XINITRC_SRC="$KRATOS_ROOT/config/live-new/xinitrc"
+elif [ -f "$KRATOS_ROOT/config/live/xinitrc"     ]; then XINITRC_SRC="$KRATOS_ROOT/config/live/xinitrc"
+fi
+if [ -n "$XINITRC_SRC" ]; then
+    echo "[+] Installing /etc/live/xinitrc and default user xinitrc scripts (from $(dirname "$XINITRC_SRC" | xargs basename))..."
+    cp "$XINITRC_SRC" "$SYSROOT/etc/live/xinitrc"
     chmod +x "$SYSROOT/etc/live/xinitrc"
-    LIVE_CONF_DIR="$KRATOS_ROOT/config/live-new"
-    [ -d "$LIVE_CONF_DIR" ] || LIVE_CONF_DIR="$KRATOS_ROOT/config/live"
-    
+
     # Also overwrite the default 3-xterm xinitrc so startx always starts XFCE
-    cp "$LIVE_CONF_DIR/xinitrc" "$SYSROOT/etc/X11/xinit/xinitrc"
+    cp "$XINITRC_SRC" "$SYSROOT/etc/X11/xinit/xinitrc"
     chmod +x "$SYSROOT/etc/X11/xinit/xinitrc"
-    
-    cp "$LIVE_CONF_DIR/xinitrc" "$SYSROOT/etc/skel/.xinitrc"
-    cp "$LIVE_CONF_DIR/xinitrc" "$SYSROOT/root/.xinitrc"
-    cp "$LIVE_CONF_DIR/xinitrc" "$SYSROOT/home/kratos-live/.xinitrc"
+
+    cp "$XINITRC_SRC" "$SYSROOT/etc/skel/.xinitrc"
+    cp "$XINITRC_SRC" "$SYSROOT/root/.xinitrc"
+    cp "$XINITRC_SRC" "$SYSROOT/home/kratos-live/.xinitrc"
     chmod +x "$SYSROOT/etc/skel/.xinitrc" "$SYSROOT/root/.xinitrc" "$SYSROOT/home/kratos-live/.xinitrc"
 fi
 

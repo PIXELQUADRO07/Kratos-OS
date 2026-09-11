@@ -389,7 +389,12 @@ echo "[✓] Sysroot copied."
 echo
 echo "[Step 6b] Normalizing ownership to root:root..."
 chown -R root:root "$MNT_ROOT"
-echo "[✓] Ownership normalized."
+for suid_bin in "$MNT_ROOT/usr/bin/sudo" "$MNT_ROOT/usr/bin/passwd" "$MNT_ROOT/bin/su" "$MNT_ROOT/usr/bin/pkexec" "$MNT_ROOT/usr/bin/Xorg" "$MNT_ROOT/usr/lib/polkit-1/polkit-agent-helper-1"; do
+    if [ -f "$suid_bin" ]; then
+        chmod 4755 "$suid_bin" 2>/dev/null || true
+    fi
+done
+echo "[✓] Ownership normalized and SUID permissions set."
 
 # ------------------------------------------------------------
 # Step 7: Create required directories in the root partition

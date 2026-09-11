@@ -78,8 +78,6 @@ if [ -d "$IMAGE_DIR" ] && [ ! -w "$IMAGE_DIR" ]; then
     echo "[~] Fixing permissions on $IMAGE_DIR..."
     if [ "$(id -u)" -eq 0 ]; then
         chown -R "${SUDO_USER:-$(id -un)}:${SUDO_USER:-$(id -gn)}" "$IMAGE_DIR" 2>/dev/null || true
-    else
-        sudo chown -R "$(id -u):$(id -g)" "$IMAGE_DIR" 2>/dev/null || true
     fi
 fi
 
@@ -141,12 +139,11 @@ fi
 
 # Ensure correct permissions for critical suid binaries and runtime dirs
 echo "  Sanitizing sysroot permissions and runtime directories..."
-if [ -f "$SYSROOT/usr/lib/polkit-1/polkit-agent-helper-1" ]; then
-    chmod 4755 "$SYSROOT/usr/lib/polkit-1/polkit-agent-helper-1" 2>/dev/null || true
-fi
-if [ -f "$SYSROOT/usr/bin/Xorg" ]; then
-    chmod 4755 "$SYSROOT/usr/bin/Xorg" 2>/dev/null || true
-fi
+for suid_bin in "$SYSROOT/usr/bin/sudo" "$SYSROOT/usr/bin/passwd" "$SYSROOT/bin/su" "$SYSROOT/usr/bin/pkexec" "$SYSROOT/usr/bin/Xorg" "$SYSROOT/usr/lib/polkit-1/polkit-agent-helper-1"; do
+    if [ -f "$suid_bin" ]; then
+        chmod 4755 "$suid_bin" 2>/dev/null || true
+    fi
+done
 if [ -f "$SYSROOT/etc/live/start-live.sh" ]; then
     chmod +x "$SYSROOT/etc/live/start-live.sh" 2>/dev/null || true
 fi
@@ -276,10 +273,45 @@ if [ -d "$SYSROOT/lib/modules" ]; then
     KERNEL_VER=$(ls "$SYSROOT/lib/modules" | head -n 1)
     if [ -n "$KERNEL_VER" ]; then
         mkdir -p "$BOOTSTRAP_DIR/lib/modules/$KERNEL_VER"
+
+        # ── Storage / ISO / overlay (boot-critical, always first) ────────────
         for _kmod in loop isofs squashfs overlay cdrom sr_mod sd_mod usb-storage \
             virtio virtio_pci virtio_blk virtio_scsi virtio_ring ahci libahci ata_piix; do
             copy_kmod "$KERNEL_VER" "$_kmod"
         done
+
+        # ── DRM subsystem core (required by every DRM driver below) ──────────
+        # drm and drm_kms_helper must be loaded before any GPU driver.
+        for _kmod in drm drm_kms_helper drm_display_helper drm_buddy drm_exec \
+            video button backlight; do
+            copy_kmod "$KERNEL_VER" "$_kmod"
+        done
+
+        # ── Real-hardware GPU drivers ────────────────────────────────────────
+        # These are compiled as modules (--module in build-kernel.sh) so they
+        # land in the squashfs only — which the kernel cannot access before
+        # Xorg initialises the display.  Copy them into the initramfs so they
+        # are available at first-boot, on any real machine.
+        #   i915 / intel_gtt / intel_agp  → Intel iGPU Gen4–Xe
+        #   amdgpu / amdttm / amdkcl      → AMD GCN/RDNA
+        #   radeon                         → AMD pre-GCN / legacy
+        #   nouveau / nvkm                 → Nvidia (open firmware path)
+        #   ttm                            → TTM memory manager (amdgpu/nouveau dep)
+        #   ast / mgag200                  → server BMC / Matrox
+        #   vmwgfx                         → VMware SVGA
+        echo "  Copying real-hardware DRM drivers into initramfs..."
+        for _kmod in \
+            i915 intel_gtt intel_agp \
+            amdgpu amd_iommu_v2 amdttm amdkcl \
+            radeon \
+            nouveau nvkm \
+            ttm \
+            drm_ast ast \
+            drm_mgag200 mgag200 \
+            drm_vmwgfx vmwgfx; do
+            copy_kmod "$KERNEL_VER" "$_kmod"
+        done
+
         for _meta in modules.order modules.builtin modules.builtin.modinfo; do
             if [ -e "$SYSROOT/lib/modules/$KERNEL_VER/$_meta" ]; then
                 cp -a "$SYSROOT/lib/modules/$KERNEL_VER/$_meta" \
@@ -289,6 +321,24 @@ if [ -d "$SYSROOT/lib/modules" ]; then
         depmod -a -b "$BOOTSTRAP_DIR" "$KERNEL_VER" || echo "[!] Warning: depmod failed."
     fi
 fi
+
+# ── GPU firmware blobs ───────────────────────────────────────────────────────
+# Firmware is already downloaded/extracted by build-firmware.sh into
+# $SYSROOT/lib/firmware.  Copy the GPU subdirs into the bootstrap initramfs
+# so the kernel can upload microcode during driver probe (before squashfs mount).
+echo "  Copying GPU firmware blobs into initramfs..."
+BOOT_FW_DIR="$BOOTSTRAP_DIR/lib/firmware"
+SYSROOT_FW="$SYSROOT/lib/firmware"
+mkdir -p "$BOOT_FW_DIR"
+for _fw_dir in i915 amdgpu radeon nouveau; do
+    if [ -d "$SYSROOT_FW/$_fw_dir" ]; then
+        echo "    - $_fw_dir firmware..."
+        mkdir -p "$BOOT_FW_DIR/$_fw_dir"
+        cp -r "$SYSROOT_FW/$_fw_dir/." "$BOOT_FW_DIR/$_fw_dir/"
+    else
+        echo "    [~] $_fw_dir firmware not found in sysroot — skipping"
+    fi
+done
 
 (
     cd "$BOOTSTRAP_DIR"

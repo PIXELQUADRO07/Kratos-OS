@@ -9,6 +9,7 @@ build/tools/
 build/sysroot/
 build/.stamps/
 build/tests/bin/
+build/images.old/
 
 # Partial downloads
 build/downloads/*.part
