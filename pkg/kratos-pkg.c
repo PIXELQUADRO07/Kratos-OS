@@ -647,7 +647,7 @@ static int install_kpkg(const char *kpkg_path, const char *target_root, int forc
     char db_manifest_path[PATH_MAX];
     snprintf(db_manifest_path, sizeof(db_manifest_path), "%s%s/%s", target_root, DB_FILES, meta.name);
 
-    char old_manifest_backup[PATH_MAX] = {0};
+    char old_manifest_backup[PATH_MAX + 64] = {0};
     if (already_installed) {
         snprintf(old_manifest_backup, sizeof(old_manifest_backup), "%s.upgrading-%d", db_manifest_path, getpid());
         kratos_copy_file(db_manifest_path, old_manifest_backup, 0644);

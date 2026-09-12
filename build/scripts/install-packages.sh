@@ -115,7 +115,8 @@ fi
 # 4. Define package groups to install
 # Since 'kpm' now handles recursive dependencies, we only need to install
 # the high-level groups.
-GROUPS=(
+# NOTE: We avoid the name 'GROUPS' as it is a special internal Bash variable.
+KRATOS_GROUPS=(
     "core"           # Base system (bash, coreutils, etc)
     "utils"          # Basic utilities (vim, hello)
     "networking"     # Network tools (dhcpcd, wpa_supplicant, wget)
@@ -124,7 +125,7 @@ GROUPS=(
 )
 
 echo "[+] Installing KratosOS package groups..."
-for group in "${GROUPS[@]}"; do
+for group in "${KRATOS_GROUPS[@]}"; do
     echo "    -> Installing group: $group..."
     if ! "$HOST_KPM" install --force "$group"; then
         echo "[!] Error: essential group '$group' failed to install."
