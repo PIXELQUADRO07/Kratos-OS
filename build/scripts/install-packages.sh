@@ -112,128 +112,23 @@ else
     "$HOST_KPM" update || true
 fi
 
-# 4. Define packages to install
-PACKAGES=(
-    "networking"
-    "utils"
-    "xz"
-    "libX11"
-    "xorgproto"
-    "libxcb"
-    "freetype"
-    "expat"
-    "libxml2"
-    "fontconfig"
-    "glib"
-    "pixman"
-    "cairo"
-    "pango"
-    "atk"
-    "gdk-pixbuf"
-    "gtk+3"
-    "fribidi"
-    "harfbuzz"
-    "libpng"
-    "libjpeg-turbo"
-    "librsvg"
-    "sqlite"
-    "gcc-libs"
-    "libXinerama"
-    "libXxf86vm"
-    "libXft"
-    "libXpm"
-    "libXaw"
-    "libyaml"
-    "eudev"
-    "libmd"
-    "libxcvt"
-    "libxshmfence"
-    "libcap"
-    "libtool"
-    "vim"
-    "wget"
-    "sudo"
-    "xterm"
+# 4. Define package groups to install
+# Since 'kpm' now handles recursive dependencies, we only need to install
+# the high-level groups.
+GROUPS=(
+    "core"           # Base system (bash, coreutils, etc)
+    "utils"          # Basic utilities (vim, hello)
+    "networking"     # Network tools (dhcpcd, wpa_supplicant, wget)
+    "cybersecurity"  # Security tools (nmap, tcpdump)
+    "live"           # Live environment (XFCE, Calamares, Drivers)
 )
 
-OPTIONAL_PACKAGES=(
-    "dbus"
-    "libdrm"
-    "mesa"
-    "xorg-server"
-    "xinit"
-    "xauth"
-    "xkbcomp"
-    "xrdb"
-    "libinput"
-    "xf86-input-libinput"
-    "xf86-video-vesa"
-    "xf86-video-fbdev"
-    "xkeyboard-config"
-    "adwaita-icon-theme"
-    "gnome-themes-extra"
-    "dejavu-fonts"
-    "arc-theme"
-    "papirus-icon-theme"
-    "alsa-lib"
-    "alsa-utils"
-    "shared-mime-info"
-    "desktop-file-utils"
-    "hicolor-icon-theme"
-    "at-spi2-core"
-    "polkit"
-    "polkit-gnome"
-    "libcanberra"
-    "libepoxy"
-    "libcroco"
-    "libxpresent"
-    "pulseaudio"
-    "libgudev"
-    "upower"
-    "libnotify"
-    "startup-notification"
-    "libxfce4util"
-    "xfconf"
-    "libxfce4ui"
-    "libxfce4windowing"
-    "libdisplay-info"
-    "libwnck3"
-    "garcon"
-    "exo"
-    "xfce4-settings"
-    "xfce4-session"
-    "xfce4-power-manager"
-    "xfce4-notifyd"
-    "xfce4-appfinder"
-    "xfwm4"
-    "xfdesktop"
-    "xfce4-panel"
-    "xfce4-whiskermenu-plugin"
-    "thunar"
-    "vte3"
-    "xfce4-terminal"
-)
-
-echo "[+] Installing core repository packages..."
-REQUIRED_PKGS="networking utils"
-for pkg in "${PACKAGES[@]}"; do
-    echo "    -> Installing $pkg..."
-    # --force to overwrite existing files (e.g. from etc skeleton)
-    if ! "$HOST_KPM" install --force "$pkg"; then
-        if echo " $REQUIRED_PKGS " | grep -q " $pkg "; then
-            echo "[!] Error: required package '$pkg' failed to install."
-            exit 1
-        fi
-        echo "    [!] Warning: Failed to install $pkg (might be missing in repo)"
-    fi
-done
-
-echo "[+] Checking optional desktop packages..."
-for pkg in "${OPTIONAL_PACKAGES[@]}"; do
-    if "$HOST_KPM" install --force "$pkg"; then
-        echo "    -> Installed optional package: $pkg"
-    else
-        echo "    [!] Warning: Failed to install optional package $pkg (missing or broken recipe)"
+echo "[+] Installing KratosOS package groups..."
+for group in "${GROUPS[@]}"; do
+    echo "    -> Installing group: $group..."
+    if ! "$HOST_KPM" install --force "$group"; then
+        echo "[!] Error: essential group '$group' failed to install."
+        exit 1
     fi
 done
 
