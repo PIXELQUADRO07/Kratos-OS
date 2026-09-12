@@ -129,12 +129,22 @@ int main(int argc, char *argv[])
     if (fchown(fout_fd, 0, 0) < 0)
         perror("[passwd] fchown shadow");
 
-    char line[512];
+    char line[4096];
     int updated = 0;
     long days = time(NULL) / 86400;
 
     while (fgets(line, sizeof(line), fin)) {
-        char copy[512];
+        size_t len = strlen(line);
+        /* Check if the line was truncated by the buffer size */
+        if (len > 0 && line[len-1] != '\n' && !feof(fin)) {
+            fprintf(stderr, "[passwd] Error: line in %s is too long (limit 4096 chars).\n", shadow_file);
+            fclose(fin);
+            fclose(fout);
+            unlink(shadow_tmp);
+            return 1;
+        }
+
+        char copy[4096];
         snprintf(copy, sizeof(copy), "%s", line);
 
         char *token = strtok(copy, ":");
