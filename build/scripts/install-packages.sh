@@ -48,7 +48,7 @@ if [ ! -f "$HOST_KPM" ]; then
     mkdir -p "$(dirname "$HOST_KPM")"
 
     # We use the host compiler and our built host mbedtls
-    gcc -O2 -Wall -std=gnu11 -DHOST_BUILD \
+    gcc -O2 -Wall -std=gnu11 \
         -I"$KPM_SRC_DIR" \
         -I"$MBEDTLS_HOST_INSTALL/include" \
         -o "$HOST_KPM" \
@@ -63,7 +63,7 @@ if [ ! -f "$HOST_KPM" ]; then
         -lmbedtls -lmbedx509 -lmbedcrypto
 
     # Build host-native kratos-fetch
-    gcc -O2 -Wall -std=gnu11 -DHOST_BUILD \
+    gcc -O2 -Wall -std=gnu11 \
         -I"$MBEDTLS_HOST_INSTALL/include" \
         -o "$(dirname "$HOST_KPM")/kratos-fetch" \
         "$KPM_SRC_DIR/kratos-fetch.c" \
