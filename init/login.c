@@ -275,12 +275,15 @@ int main(int argc, char *argv[])
     /* Drop privileges & setup user environment */
     if (initgroups(pw->pw_name, pw->pw_gid) < 0) {
         perror("[login] initgroups failed");
+        return 1;
     }
     if (setgid(pw->pw_gid) < 0) {
         perror("[login] setgid failed");
+        return 1;
     }
     if (setuid(pw->pw_uid) < 0) {
         perror("[login] setuid failed");
+        return 1;
     }
 
     if (chdir(pw->pw_dir) < 0) {
