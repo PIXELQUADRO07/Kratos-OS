@@ -18,11 +18,21 @@ insmod all_video
 insmod gfxterm
 insmod gettext
 
-# Visual Theme (Parrot OS style splash support)
-if loadfont /boot/grub/fonts/unicode.pf2 ; then
+# Visual Theme (KratosOS Custom Theme)
+insmod png
+
+if [ -f /boot/grub/themes/kratosos/theme.txt ]; then
+    set theme=/boot/grub/themes/kratosos/theme.txt
+    export theme
+    set gfxmode=1920x1080,auto
+    terminal_output gfxterm
+elif loadfont /boot/grub/fonts/unicode.pf2 ; then
     set gfxmode=auto
     terminal_output gfxterm
 fi
+
+set color_normal=light-gray/black
+set color_highlight=black/red
 
 # Serial and console terminal configuration
 # Parrot OS style: primary console is VGA (tty0), serial is secondary.

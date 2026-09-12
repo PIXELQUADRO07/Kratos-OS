@@ -84,6 +84,11 @@ fi
 mkdir -p "$IMAGE_DIR"
 rm -f "$ISO_OUT"
 mkdir -p "$ISO_ROOT/boot/grub/branding"
+mkdir -p "$ISO_ROOT/boot/grub/themes"
+
+if [ -d "$KRATOS_ROOT/config/grub/themes/kratosos" ]; then
+    cp -r "$KRATOS_ROOT/config/grub/themes/kratosos" "$ISO_ROOT/boot/grub/themes/"
+fi
 
 if [ -f "$KRATOS_ROOT/Branding/KratosOS.png" ]; then
     cp "$KRATOS_ROOT/Branding/KratosOS.png" "$ISO_ROOT/boot/grub/branding/KratosOS.png"
@@ -366,17 +371,26 @@ set default=0
 serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1
 terminal_input console serial
 
-# Custom Splash / gfxterm if available
+# Custom Splash / gfxterm / Theme if available
 # We load video modules BEFORE setting terminal_output to avoid GRUB hangs.
 insmod all_video
 insmod gfxterm
+insmod png
 
-if loadfont /boot/grub/fonts/unicode.pf2 ; then
+if [ -f /boot/grub/themes/kratosos/theme.txt ]; then
+    set theme=/boot/grub/themes/kratosos/theme.txt
+    export theme
+    set gfxmode=1920x1080,auto
+    terminal_output gfxterm serial
+elif loadfont /boot/grub/fonts/unicode.pf2 ; then
     set gfxmode=auto
     terminal_output gfxterm serial
 else
     terminal_output console serial
 fi
+
+set color_normal=light-gray/black
+set color_highlight=black/red
 
 menuentry "KratosOS Live Session (XFCE)" {
     insmod part_gpt

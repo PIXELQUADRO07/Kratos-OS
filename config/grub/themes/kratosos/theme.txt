@@ -1,0 +1,88 @@
+# =========================================================
+#  KratosOS GRUB2 Theme
+#  Palette: Black / Silver (#888888, #b0b0b0) / Red (#ff3333)
+# =========================================================
+
+title-text: ""
+desktop-image: "background.png"
+desktop-color: "#000000"
+terminal-font: "Liberation Mono Regular 16"
+
+# ---------------------------------------------------------
+# Logo KratosOS (centrato in alto)
+# ---------------------------------------------------------
++ image {
+    id = "logo"
+    file = "logo.png"
+    top = 6%
+    left = 50%-100
+    width = 200
+    height = 200
+}
+
+# ---------------------------------------------------------
+# Riquadro contenitore del menu (bordo argento, sfondo scuro)
+# ---------------------------------------------------------
++ image {
+    id = "menu_box"
+    file = "box.png"
+    top = 28%
+    left = 50%-260
+    width = 520
+    height = 360
+}
+
+# ---------------------------------------------------------
+# Titolo Menu
+# ---------------------------------------------------------
++ label {
+    id = "title"
+    text = "KratosOS Boot Menu"
+    top = 31%
+    left = 0
+    width = 100%
+    align = "center"
+    color = "#ff3333"
+    font = "Liberation Sans Bold 20"
+}
+
+# ---------------------------------------------------------
+# Voci di Boot
+# ---------------------------------------------------------
++ boot_menu {
+    left = 50%-210
+    top = 38%
+    width = 420
+    height = 240
+
+    item_font = "Liberation Sans Regular 15"
+    item_color = "#e0e0e0"
+    item_height = 34
+    item_padding = 8
+    item_spacing = 6
+    item_icon_space = 0
+    icon_width = 0
+    icon_height = 0
+
+    selected_item_color = "#ffffff"
+    selected_item_font = "Liberation Sans Regular 15"
+
+    item_pixmap_style = "item_*.png"
+    selected_item_pixmap_style = "select_*.png"
+
+    scrollbar = false
+}
+
+# ---------------------------------------------------------
+# Footer istruzioni
+# ---------------------------------------------------------
++ label {
+    id = "footer"
+    text = "Usa ↑ ↓ per selezionare, Invio per avviare"
+    top = 90%
+    left = 0
+    width = 100%
+    align = "center"
+    color = "#bbbbbb"
+    font = "Liberation Sans Regular 12"
+}
