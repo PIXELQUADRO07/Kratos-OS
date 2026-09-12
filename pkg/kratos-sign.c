@@ -1,4 +1,4 @@
-#ifdef HOST_BUILD
+#ifdef KRATOS_SIGN_STUB
 
 /* Stub implementation for host testing when mbedTLS is not present */
 #include "kratos-sign.h"
