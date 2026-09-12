@@ -173,6 +173,8 @@ OPTIONAL_PACKAGES=(
     "adwaita-icon-theme"
     "gnome-themes-extra"
     "dejavu-fonts"
+    "arc-theme"
+    "papirus-icon-theme"
     "alsa-lib"
     "alsa-utils"
     "shared-mime-info"

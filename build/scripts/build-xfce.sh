@@ -40,9 +40,16 @@ if [ -f "$KRATOS_ROOT/config/live/kratosos-live.desktop" ]; then
 fi
 
 # 3. Create default wallpaper directory and copy Branding assets
+# NOTE: this used to check for "Branding/KratosOS.png" (typo — the real file
+# is "KratosOS-logo.png"), so the wallpaper was NEVER actually copied into the
+# sysroot. This was a likely contributor to the black desktop background.
 mkdir -p "$SYSROOT/usr/share/backgrounds/xfce"
-if [ -f "$KRATOS_ROOT/Branding/KratosOS.png" ]; then
-    cp -f "$KRATOS_ROOT/Branding/KratosOS.png" "$SYSROOT/usr/share/backgrounds/xfce/kratosos-logo.png"
+WALLPAPER_DEST="$SYSROOT/usr/share/backgrounds/xfce/kratosos-wallpaper.png"
+if [ -f "$KRATOS_ROOT/Branding/KratosOS-wallpaper.png" ]; then
+    cp -f "$KRATOS_ROOT/Branding/KratosOS-wallpaper.png" "$WALLPAPER_DEST"
+elif [ -f "$KRATOS_ROOT/Branding/KratosOS-logo.png" ]; then
+    echo "[!] Warning: KratosOS-wallpaper.png not found, falling back to logo."
+    cp -f "$KRATOS_ROOT/Branding/KratosOS-logo.png" "$WALLPAPER_DEST"
 fi
 
 # If whiskermenu was installed to /usr/lib64, ensure a copy/symlink exists in /usr/lib
@@ -58,8 +65,18 @@ if [ -f "$SYSROOT/usr/share/xfce4/panel/plugins/whiskermenu.desktop" ] && \
     MENU_PLUGIN="whiskermenu"
 fi
 
+# Battery indicator only if xfce4-power-manager's panel plugin made it into the sysroot
+BATTERY_PLUGIN_AVAILABLE=0
+if [ -f "$SYSROOT/usr/lib/xfce4/panel/plugins/libpower-manager-plugin.so" ] || \
+   [ -f "$SYSROOT/usr/lib64/xfce4/panel/plugins/libpower-manager-plugin.so" ]; then
+    BATTERY_PLUGIN_AVAILABLE=1
+fi
+
+# Panel layout: menu | tasklist | (expanding spacer) | tray | [battery] | clock
 PANEL_CONFIG="$SYSROOT/etc/xdg/xfce4/panel/default.xml"
 rm -f "$PANEL_CONFIG"
+
+if [ "$BATTERY_PLUGIN_AVAILABLE" -eq 1 ]; then
 cat > "$PANEL_CONFIG" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <channel name="xfce4-panel" version="1.0">
@@ -70,23 +87,85 @@ cat > "$PANEL_CONFIG" <<EOF
       <property name="position" type="string" value="p=8;x=0;y=0"/>
       <property name="length" type="uint" value="100"/>
       <property name="position-locked" type="bool" value="true"/>
-      <property name="size" type="uint" value="30"/>
+      <property name="size" type="uint" value="34"/>
+      <property name="background-style" type="uint" value="1"/>
+      <property name="background-rgba" type="array">
+        <value type="double" value="0.098"/>
+        <value type="double" value="0.098"/>
+        <value type="double" value="0.106"/>
+        <value type="double" value="0.92"/>
+      </property>
       <property name="plugin-ids" type="array">
         <value type="int" value="1"/>
         <value type="int" value="2"/>
         <value type="int" value="3"/>
         <value type="int" value="4"/>
+        <value type="int" value="5"/>
+        <value type="int" value="6"/>
       </property>
     </property>
   </property>
   <property name="plugins" type="empty">
     <property name="plugin-1" type="string" value="${MENU_PLUGIN}"/>
     <property name="plugin-2" type="string" value="tasklist"/>
-    <property name="plugin-3" type="string" value="systray"/>
-    <property name="plugin-4" type="string" value="clock"/>
+    <property name="plugin-3" type="string" value="separator">
+      <property name="expand" type="bool" value="true"/>
+      <property name="style" type="uint" value="0"/>
+    </property>
+    <property name="plugin-4" type="string" value="systray"/>
+    <property name="plugin-5" type="string" value="power-manager-plugin"/>
+    <property name="plugin-6" type="string" value="clock">
+      <property name="digital-layout" type="uint" value="2"/>
+      <property name="digital-format" type="string" value="%H:%M  %a %d %b"/>
+    </property>
   </property>
 </channel>
 EOF
+else
+cat > "$PANEL_CONFIG" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfce4-panel" version="1.0">
+  <property name="configver" type="int" value="2"/>
+  <property name="panels" type="array">
+    <value type="int" value="1"/>
+    <property name="panel-1" type="empty">
+      <property name="position" type="string" value="p=8;x=0;y=0"/>
+      <property name="length" type="uint" value="100"/>
+      <property name="position-locked" type="bool" value="true"/>
+      <property name="size" type="uint" value="34"/>
+      <property name="background-style" type="uint" value="1"/>
+      <property name="background-rgba" type="array">
+        <value type="double" value="0.098"/>
+        <value type="double" value="0.098"/>
+        <value type="double" value="0.106"/>
+        <value type="double" value="0.92"/>
+      </property>
+      <property name="plugin-ids" type="array">
+        <value type="int" value="1"/>
+        <value type="int" value="2"/>
+        <value type="int" value="3"/>
+        <value type="int" value="4"/>
+        <value type="int" value="5"/>
+      </property>
+    </property>
+  </property>
+  <property name="plugins" type="empty">
+    <property name="plugin-1" type="string" value="${MENU_PLUGIN}"/>
+    <property name="plugin-2" type="string" value="tasklist"/>
+    <property name="plugin-3" type="string" value="separator">
+      <property name="expand" type="bool" value="true"/>
+      <property name="style" type="uint" value="0"/>
+    </property>
+    <property name="plugin-4" type="string" value="systray"/>
+    <property name="plugin-5" type="string" value="clock">
+      <property name="digital-layout" type="uint" value="2"/>
+      <property name="digital-format" type="string" value="%H:%M  %a %d %b"/>
+    </property>
+  </property>
+</channel>
+EOF
+    echo "[!] Warning: power-manager-plugin not found in sysroot, panel built without battery indicator."
+fi
 
 # Create minimal Xfconf channel files required for a functional session
 XFCONF_DIR="$SYSROOT/etc/xdg/xfce4/xfconf/xfce-perchannel-xml"
@@ -96,18 +175,58 @@ mkdir -p "$XFCONF_DIR"
 rm -f "$XFCONF_DIR/xfce4-panel.xml"
 cp -f "$PANEL_CONFIG" "$XFCONF_DIR/xfce4-panel.xml"
 
+# --- Theme detection -------------------------------------------------------
+# Dark GTK+xfwm4 window theme: needs the "arc-theme" package (recipe not yet
+# guaranteed to exist in KratosOS-Packages). Falls back to the stock GTK dark
+# variant + default xfwm4 borders if it isn't in the sysroot, so the build
+# never breaks over a missing theme package.
+WM_THEME="Default"
+if [ -d "$SYSROOT/usr/share/themes/Arc-Dark/xfwm4" ]; then
+    WM_THEME="Arc-Dark"
+fi
+
+# Dark icon set: needs the "papirus-icon-theme" package (same caveat as above).
+ICON_THEME="Adwaita"
+if [ -d "$SYSROOT/usr/share/icons/Papirus-Dark" ]; then
+    ICON_THEME="Papirus-Dark"
+fi
+
+echo "[+] Window theme: $WM_THEME | Icon theme: $ICON_THEME"
+
 rm -f "$XFCONF_DIR/xfwm4.xml"
-cat > "$XFCONF_DIR/xfwm4.xml" <<'EOF'
+cat > "$XFCONF_DIR/xfwm4.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <channel name="xfwm4" version="1.0">
   <property name="general" type="empty">
+    <property name="theme" type="string" value="${WM_THEME}"/>
+    <property name="title_font" type="string" value="DejaVu Sans Bold 9"/>
+    <property name="title_alignment" type="string" value="left"/>
+    <property name="button_layout" type="string" value="O|SHMC"/>
     <property name="use_compositing" type="bool" value="true"/>
     <property name="vblank_mode" type="string" value="off"/>
-    <property name="show_frame_shadow" type="bool" value="false"/>
+    <property name="show_frame_shadow" type="bool" value="true"/>
     <property name="show_popup_shadow" type="bool" value="false"/>
     <property name="show_dock_shadow" type="bool" value="false"/>
     <property name="box_move" type="bool" value="false"/>
     <property name="box_resize" type="bool" value="false"/>
+    <property name="frame_opacity" type="uint" value="95"/>
+  </property>
+</channel>
+EOF
+
+# --- GTK / icons / font (xsettings channel) --------------------------------
+rm -f "$XFCONF_DIR/xsettings.xml"
+cat > "$XFCONF_DIR/xsettings.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xsettings" version="1.0">
+  <property name="Net" type="empty">
+    <property name="ThemeName" type="string" value="Adwaita"/>
+    <property name="IconThemeName" type="string" value="${ICON_THEME}"/>
+  </property>
+  <property name="Gtk" type="empty">
+    <property name="FontName" type="string" value="DejaVu Sans 10"/>
+    <property name="MonospaceFontName" type="string" value="DejaVu Sans Mono 10"/>
+    <property name="ApplicationPreferDarkTheme" type="bool" value="true"/>
   </property>
 </channel>
 EOF
@@ -123,29 +242,29 @@ cat > "$DESKTOP_CONFIG" <<'EOF'
   <property name="backdrop" type="empty">
     <property name="screen0" type="empty">
       <property name="monitor0" type="empty">
-        <property name="image-path" type="string" value="/usr/share/backgrounds/xfce/kratosos-logo.png"/>
+        <property name="image-path" type="string" value="/usr/share/backgrounds/xfce/kratosos-wallpaper.png"/>
         <property name="image-style" type="int" value="5"/>
-        <property name="last-image" type="string" value="/usr/share/backgrounds/xfce/kratosos-logo.png"/>
+        <property name="last-image" type="string" value="/usr/share/backgrounds/xfce/kratosos-wallpaper.png"/>
       </property>
       <property name="monitorVirtual-1" type="empty">
-        <property name="image-path" type="string" value="/usr/share/backgrounds/xfce/kratosos-logo.png"/>
+        <property name="image-path" type="string" value="/usr/share/backgrounds/xfce/kratosos-wallpaper.png"/>
         <property name="image-style" type="int" value="5"/>
-        <property name="last-image" type="string" value="/usr/share/backgrounds/xfce/kratosos-logo.png"/>
+        <property name="last-image" type="string" value="/usr/share/backgrounds/xfce/kratosos-wallpaper.png"/>
       </property>
       <property name="monitorVirtual1" type="empty">
-        <property name="image-path" type="string" value="/usr/share/backgrounds/xfce/kratosos-logo.png"/>
+        <property name="image-path" type="string" value="/usr/share/backgrounds/xfce/kratosos-wallpaper.png"/>
         <property name="image-style" type="int" value="5"/>
-        <property name="last-image" type="string" value="/usr/share/backgrounds/xfce/kratosos-logo.png"/>
+        <property name="last-image" type="string" value="/usr/share/backgrounds/xfce/kratosos-wallpaper.png"/>
       </property>
       <property name="monitorVGA-1" type="empty">
-        <property name="image-path" type="string" value="/usr/share/backgrounds/xfce/kratosos-logo.png"/>
+        <property name="image-path" type="string" value="/usr/share/backgrounds/xfce/kratosos-wallpaper.png"/>
         <property name="image-style" type="int" value="5"/>
-        <property name="last-image" type="string" value="/usr/share/backgrounds/xfce/kratosos-logo.png"/>
+        <property name="last-image" type="string" value="/usr/share/backgrounds/xfce/kratosos-wallpaper.png"/>
       </property>
       <property name="monitorDefault" type="empty">
-        <property name="image-path" type="string" value="/usr/share/backgrounds/xfce/kratosos-logo.png"/>
+        <property name="image-path" type="string" value="/usr/share/backgrounds/xfce/kratosos-wallpaper.png"/>
         <property name="image-style" type="int" value="5"/>
-        <property name="last-image" type="string" value="/usr/share/backgrounds/xfce/kratosos-logo.png"/>
+        <property name="last-image" type="string" value="/usr/share/backgrounds/xfce/kratosos-wallpaper.png"/>
       </property>
     </property>
   </property>
