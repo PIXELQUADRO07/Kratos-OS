@@ -118,11 +118,11 @@ test:
 	@./build/tests/bin/test-deps
 	@echo ""
 	@echo "[+] Compiling and running test-repo..."
-	@gcc -Wall -Wextra -std=gnu11 -DHOST_BUILD -Ipkg pkg/kratos-repo.c pkg/kratos-json.c pkg/kratos-sha256.c pkg/kratos-deps.c pkg/kratos-tar.c pkg/kratos-sign.c build/tests/test-repo.c -o build/tests/bin/test-repo
+	@gcc -Wall -Wextra -std=gnu11 -DKRATOS_SIGN_STUB -Ipkg pkg/kratos-repo.c pkg/kratos-json.c pkg/kratos-sha256.c pkg/kratos-deps.c pkg/kratos-tar.c pkg/kratos-sign.c build/tests/test-repo.c -o build/tests/bin/test-repo
 	@./build/tests/bin/test-repo
 	@echo ""
 	@echo "[+] Compiling and running test-sign..."
-	@gcc -Wall -Wextra -std=gnu11 -DHOST_BUILD -Ipkg pkg/kratos-sign.c build/tests/test-sign.c -o build/tests/bin/test-sign
+	@gcc -Wall -Wextra -std=gnu11 -DKRATOS_SIGN_STUB -Ipkg pkg/kratos-sign.c build/tests/test-sign.c -o build/tests/bin/test-sign
 	@./build/tests/bin/test-sign
 	@echo ""
 	@echo "[+] Compiling and running test-pkg-security..."
