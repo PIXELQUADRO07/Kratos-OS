@@ -19,6 +19,7 @@
 #include "kratos-sha256.h"
 #include "kratos-deps.h"
 #include "kratos-repo.h"
+#include "kratos-sign.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -392,7 +393,7 @@ static void remove_orphaned_files(const char *old_manifest, const char *new_mani
 /* Recursive Dependency Resolution & Installation                      */
 /* ------------------------------------------------------------------ */
 
-static int install_kpkg(const char *kpkg_path, const char *target_root, int force);
+static int install_kpkg(const char *kpkg_path, const char *target_root, int force, const char *expected_sha256);
 
 static int install_repo_pkg_recursive(const char *name, const char *target_root, int force, int depth)
 {
@@ -442,16 +443,48 @@ static int install_repo_pkg_recursive(const char *name, const char *target_root,
     if (!kpkg_path) return -1;
 
     /* Install */
-    return install_kpkg(kpkg_path, target_root, force);
+    return install_kpkg(kpkg_path, target_root, force, pkg.sha256);
 }
 
 /* ------------------------------------------------------------------ */
 /* Package Installation                                                */
 /* ------------------------------------------------------------------ */
 
-static int install_kpkg(const char *kpkg_path, const char *target_root, int force)
+static int install_kpkg(const char *kpkg_path, const char *target_root, int force, const char *expected_sha256)
 {
     printf("[kratos-pkg] Installing package: %s\n", kpkg_path);
+
+    /* Pre-extraction integrity check */
+    if (expected_sha256 && expected_sha256[0]) {
+        char computed[KRATOS_SHA256_HEX_SIZE];
+        if (kratos_sha256_file(kpkg_path, computed) != 0 || strcasecmp(computed, expected_sha256) != 0) {
+            fprintf(stderr, "[kratos-pkg] Integrity Error: .kpkg file hash mismatch!\n"
+                            "  Expected: %s\n  Computed: %s\n", expected_sha256, computed);
+            return -1;
+        }
+        printf("  [✓] Integrity: .kpkg SHA-256 verified against repository index.\n");
+    } else {
+        /* Try signature verification for local/untrusted installs */
+        char sig_path[PATH_MAX];
+        snprintf(sig_path, sizeof(sig_path), "%s.sig", kpkg_path);
+        if (access(sig_path, F_OK) == 0) {
+            char pubkey[PATH_MAX];
+            snprintf(pubkey, sizeof(pubkey), "%s/etc/kratos/keys/official.pub", target_root);
+            if (access(pubkey, F_OK) != 0) {
+                /* Fallback if target_root is empty or key not in sysroot */
+                snprintf(pubkey, sizeof(pubkey), "/etc/kratos/keys/official.pub");
+            }
+
+            if (kratos_verify_file(kpkg_path, sig_path, pubkey) == 0) {
+                printf("  [✓] Signature: Ed25519 signature verified successfully.\n");
+            } else {
+                fprintf(stderr, "[kratos-pkg] Security Error: Signature verification FAILED for '%s'\n", kpkg_path);
+                if (!force) return -1;
+            }
+        } else {
+            printf("  [!] Warning: No signature found for local package. Integrity cannot be fully guaranteed.\n");
+        }
+    }
 
     ensure_dirs(target_root);
 
@@ -881,7 +914,7 @@ int main(int argc, char *argv[])
          * this preserves `kratos install ./local-build.kpkg`.
          * Otherwise treat it as a bare package name and resolve recursively. */
         if (stat(arg, &st) == 0 && S_ISREG(st.st_mode)) {
-            return install_kpkg(arg, target_root, force);
+            return install_kpkg(arg, target_root, force, NULL);
         }
 
         return install_repo_pkg_recursive(arg, target_root, force, 0);
