@@ -29,7 +29,7 @@ terminal-font: "Liberation Mono Regular 16"
     top = 28%
     left = 50%-260
     width = 520
-    height = 360
+    height = 320
 }
 
 # ---------------------------------------------------------

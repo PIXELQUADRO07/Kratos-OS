@@ -32,6 +32,7 @@ export XCURSOR_THEME=Adwaita
 # 3c. DRI/AIGLX workaround (Issue #4: DRI/AIGLX broken with absolute sysroot paths)
 export LIBGL_DRIVERS_PATH=/usr/lib/dri
 export ATSPI_CLOSE_ON_EXIT=1
+export GSETTINGS_BACKEND=memory
 
 # 3d. Clear previous session state for a clean Live boot
 rm -rf "$USER_HOME/.cache/sessions"/* 2>/dev/null || true

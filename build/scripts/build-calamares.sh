@@ -27,9 +27,11 @@ if [ -d "$KRATOS_ROOT/config/calamares" ]; then
 fi
 
 # 3. Copy branding logo to Calamares branding directory
-if [ -f "$KRATOS_ROOT/Branding/KratosOS.png" ]; then
-    cp "$KRATOS_ROOT/Branding/KratosOS.png" "$SYSROOT/etc/calamares/branding/kratosos/logo.png"
-    cp "$KRATOS_ROOT/Branding/KratosOS.png" "$SYSROOT/etc/calamares/branding/kratosos/welcome.png"
+if [ -f "$KRATOS_ROOT/Branding/Grub-logo.png" ]; then
+    cp "$KRATOS_ROOT/Branding/Grub-logo.png" "$SYSROOT/etc/calamares/branding/kratosos/logo.png"
+fi
+if [ -f "$KRATOS_ROOT/Branding/KratosOS-logo.png" ]; then
+    cp "$KRATOS_ROOT/Branding/KratosOS-logo.png" "$SYSROOT/etc/calamares/branding/kratosos/welcome.png"
 fi
 
 # 4. Ensure polkit permission for running calamares

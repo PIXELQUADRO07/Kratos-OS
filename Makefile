@@ -253,7 +253,7 @@ file-cmd:
 # ─────────────────────────────────────────────
 # Phase 3 — Kernel, bootloader, init, disk image
 # ─────────────────────────────────────────────
-phase3: kernel grub mbedtls ca-certs etc init pkg fetch xorg xfce calamares disk
+phase3: kernel grub mbedtls ca-certs firmware etc init pkg inject-pkgs fetch xorg xfce calamares disk
 
 kernel:
 	@bash $(SCRIPTS)/build-kernel.sh

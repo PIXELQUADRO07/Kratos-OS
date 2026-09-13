@@ -545,8 +545,15 @@ echo "[+] Build ID for this image: $BUILD_ID"
 
 # 1. Install KratosOS Logo from /Branding into GRUB boot directory
 mkdir -p "$MNT_ROOT/boot/grub/branding"
-if [ -f "$KRATOS_ROOT/Branding/KratosOS.png" ]; then
-    cp "$KRATOS_ROOT/Branding/KratosOS.png" "$MNT_ROOT/boot/grub/branding/KratosOS.png"
+mkdir -p "$MNT_ROOT/boot/grub/themes"
+
+if [ -d "$KRATOS_ROOT/config/grub/themes/kratosos" ]; then
+    cp -r "$KRATOS_ROOT/config/grub/themes/kratosos" "$MNT_ROOT/boot/grub/themes/"
+    echo "[✓] GRUB theme installed: /boot/grub/themes/kratosos"
+fi
+
+if [ -f "$KRATOS_ROOT/Branding/Grub-logo.png" ]; then
+    cp "$KRATOS_ROOT/Branding/Grub-logo.png" "$MNT_ROOT/boot/grub/branding/KratosOS.png"
     echo "[✓] Branding logo installed: /boot/grub/branding/KratosOS.png"
 fi
 
@@ -591,8 +598,12 @@ echo "[✓] grub.cfg written."
 
 # Mirror branding and grub.cfg to /boot/grub2/
 mkdir -p "$MNT_ROOT/boot/grub2/branding"
-if [ -f "$KRATOS_ROOT/Branding/KratosOS.png" ]; then
-    cp "$KRATOS_ROOT/Branding/KratosOS.png" "$MNT_ROOT/boot/grub2/branding/KratosOS.png"
+mkdir -p "$MNT_ROOT/boot/grub2/themes"
+if [ -d "$KRATOS_ROOT/config/grub/themes/kratosos" ]; then
+    cp -r "$KRATOS_ROOT/config/grub/themes/kratosos" "$MNT_ROOT/boot/grub2/themes/"
+fi
+if [ -f "$KRATOS_ROOT/Branding/Grub-logo.png" ]; then
+    cp "$KRATOS_ROOT/Branding/Grub-logo.png" "$MNT_ROOT/boot/grub2/branding/KratosOS.png"
 fi
 cp -f "$MNT_ROOT/boot/grub/grub.cfg" "$MNT_ROOT/boot/grub2/grub.cfg"
 

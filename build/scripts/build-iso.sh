@@ -90,8 +90,8 @@ if [ -d "$KRATOS_ROOT/config/grub/themes/kratosos" ]; then
     cp -r "$KRATOS_ROOT/config/grub/themes/kratosos" "$ISO_ROOT/boot/grub/themes/"
 fi
 
-if [ -f "$KRATOS_ROOT/Branding/KratosOS.png" ]; then
-    cp "$KRATOS_ROOT/Branding/KratosOS.png" "$ISO_ROOT/boot/grub/branding/KratosOS.png"
+if [ -f "$KRATOS_ROOT/Branding/Grub-logo.png" ]; then
+    cp "$KRATOS_ROOT/Branding/Grub-logo.png" "$ISO_ROOT/boot/grub/branding/KratosOS.png"
 fi
 
 # ------------------------------------------------------------

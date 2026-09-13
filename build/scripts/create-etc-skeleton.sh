@@ -430,8 +430,8 @@ if [ -x /sbin/ldconfig ]; then
     # Ensure /dev/pts exists and mount it (ignore errors if already mounted)
     mkdir -p /dev/pts && mount -t devpts devpts /dev/pts -o gid=5,mode=620 2>/dev/null || true
     
-    # Clean up temporary files but preserve the live switch marker
-    rm -rf /run/* /tmp/* && rm -f /run/kratos-live-switched && touch /run/kratos-live-switched
+    # Clean up temporary files
+    rm -rf /run/* /tmp/*
 
     ldconfig
 fi
