@@ -542,9 +542,11 @@ fi
 # 2. Process custom GRUB configuration template
 GRUB_TEMPLATE="$KRATOS_ROOT/config/grub/grub.cfg.template"
 if [ -f "$GRUB_TEMPLATE" ]; then
+    KRATOS_VERSION="${KRATOS_VERSION:-$(tr -d '[:space:]' < "$KRATOS_ROOT/VERSION" 2>/dev/null || echo 0.0.0)}"
     sed -e "s/@ROOT_UUID@/${ROOT_UUID}/g" \
         -e "s/@ROOT_PARTUUID@/${ROOT_PARTUUID}/g" \
         -e "s/@BUILD_ID@/${BUILD_ID}/g" \
+        -e "s/@KRATOS_VERSION@/${KRATOS_VERSION}/g" \
         "$GRUB_TEMPLATE" > "$MNT_ROOT/boot/grub/grub.cfg"
     echo "[✓] Custom grub.cfg generated from config/grub/grub.cfg.template"
 else

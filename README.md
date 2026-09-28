@@ -11,7 +11,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/architecture-x86__64-blue">
-  <img src="https://img.shields.io/badge/version-v0.9.1-orange">
+  <img src="https://img.shields.io/badge/version-v1.5.1-orange">
   <img src="https://img.shields.io/badge/boot-UEFI%20%2F%20GPT-green">
   <img src="https://img.shields.io/badge/kernel-Linux%207.1.5-lightgrey">
   <img src="https://img.shields.io/badge/license-GPL--3.0-blue">
@@ -53,6 +53,8 @@ Every foundational component is compiled from sources:
 | **HTTPS Client** | `kratos-fetch` | Native HTTP/HTTPS network client using mbedTLS and CA certificate verification |
 | **JSON Engine** | `kratos-json` | Zero-dependency recursive descent JSON parser for repository indexes |
 | **Test Suite** | Testing & CI | Automated test suite (`make test`) covering cryptographic hashing, JSON parsing, dependency resolution, and security exploit defenses |
+| **X11 / XFCE** | Desktop (Phase 4–5) | Modesetting Xorg, live `startx` session, XFCE with compositor disabled for QEMU/KMS |
+| **Calamares** | Installer (Phase 6) | Graphical installer configuration (KPMCore); native `kratos-install` is still in development |
 
 ### 🛠️ In Active Development
 
@@ -66,6 +68,9 @@ Every foundational component is compiled from sources:
 - [x] Remote package repository synchronization (`kratos update`, `kratos search`, `kratos upgrade`)
 - [x] Repository index format (`index.json`) with HTTPS fetch and local cache
 - [x] Multi-repository support (`/etc/kratos/repos.d/`)
+- [x] Distro version centralized in the top-level `VERSION` file (README, os-release, GRUB, Calamares)
+- [x] Live ISO graphical session (`make iso`) and optional graphical disk (`make desktop-disk`)
+- [x] Calamares graphical installer config as the current install path until `kratos-install` ships
 
 ### Installation Bundles (Prefixes)
 
@@ -253,12 +258,20 @@ Full script output is always saved to `build/build.log`.
 ```bash
 make phase1         # Bootstrap toolchain (binutils, gcc, glibc)
 make phase2         # Base userspace (bash, coreutils, sed, grep, tar, etc.)
-make phase3         # Kernel, GRUB, init system, packages, disk image
+make phase3         # Kernel, GRUB, init, KPM, fetch, console disk image
+make phase4         # X11 stack configuration (does not compile Xorg)
+make phase5         # XFCE desktop configuration
+make phase6         # Calamares installer configuration
+make inject-pkgs    # Install Xorg/XFCE binary packages into the sysroot
+make desktop-disk   # inject-pkgs (desktop required) + phases 4–6 + disk
+make iso            # Live ISO (injects desktop packages; GRUB kratos.live)
 
 make init           # Build init, devd, net, login, passwd, su, useradd + all system utilities
 make pkg            # Build kratos, kratos-pkg, kratos-pack
 make disk           # Generate bootable GPT disk image (build/images/kratosos.img)
 ```
+
+The distro version is the single line in [`VERSION`](VERSION). Keep the README badge, GRUB menus, `/etc/os-release`, and Calamares branding in sync with that file (build scripts substitute it).
 
 ---
 
@@ -267,7 +280,9 @@ make disk           # Generate bootable GPT disk image (build/images/kratosos.im
 Test the generated disk image in QEMU with UEFI firmware:
 
 ```bash
-./run-qemu.sh
+./run-qemu.sh                      # serial console, disk image
+./run-qemu.sh --graphic            # VGA window (virtio-vga)
+./run-qemu.sh --iso --graphic      # Live ISO + XFCE
 ```
 
 ---
@@ -287,6 +302,8 @@ Tests included:
 - **`test-repo`**: Repository client loading, package search, multi-repo index parsing
 - **`test-sign`**: Ed25519 signature generation and verification (host stub)
 - **`test-pkg-security`**: Path traversal exploits (`../`), device node injection, symlink escapes, SHA-256 verification
+
+CI on GitHub runs `make test` on push and pull requests to `main`, in addition to the Flawfinder static scan.
 
 ---
 

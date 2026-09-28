@@ -24,6 +24,15 @@ mkdir -p "$SYSROOT/usr/share/calamares"
 if [ -d "$KRATOS_ROOT/config/calamares" ]; then
     echo "[+] Installing Calamares configuration files..."
     cp -r "$KRATOS_ROOT/config/calamares/"* "$SYSROOT/etc/calamares/"
+    KRATOS_VERSION="${KRATOS_VERSION:-$(tr -d '[:space:]' < "$KRATOS_ROOT/VERSION" 2>/dev/null || echo 0.0.0)}"
+    KRATOS_VERSION_SHORT="${KRATOS_VERSION%.*}"
+    BRANDING_DESC="$SYSROOT/etc/calamares/branding/kratosos/branding.desc"
+    if [ -f "$BRANDING_DESC" ]; then
+        sed -i \
+            -e "s/@KRATOS_VERSION_SHORT@/${KRATOS_VERSION_SHORT}/g" \
+            -e "s/@KRATOS_VERSION@/${KRATOS_VERSION}/g" \
+            "$BRANDING_DESC"
+    fi
 fi
 
 # 3. Copy branding logo to Calamares branding directory

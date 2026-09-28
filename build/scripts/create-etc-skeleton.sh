@@ -7,6 +7,7 @@ set -e
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SYSROOT="$PROJECT_ROOT/build/sysroot"
 ETC="$SYSROOT/etc"
+KRATOS_VERSION="$(tr -d '[:space:]' < "$PROJECT_ROOT/VERSION" 2>/dev/null || echo 0.0.0)"
 
 echo "================================"
 echo "   KRATOSOS /etc SKELETON"
@@ -190,12 +191,12 @@ tmpfs           /tmp            tmpfs       mode=1777,nosuid,nodev      0       
 EOF
 
 echo "[+] Creating /etc/os-release..."
-cat > "$ETC/os-release" <<'EOF'
+cat > "$ETC/os-release" <<EOF
 NAME="KratosOS"
 ID=kratos
-VERSION="0.7.8.2"
-VERSION_ID="0.7.8.2"
-PRETTY_NAME="KratosOS 0.7.8.2"
+VERSION="$KRATOS_VERSION"
+VERSION_ID="$KRATOS_VERSION"
+PRETTY_NAME="KratosOS $KRATOS_VERSION"
 HOME_URL="https://kratosos.org"
 EOF
 
@@ -213,10 +214,11 @@ cat > "$ETC/issue" <<'EOF'
 |                                                                            |
 .--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..
 
-  KratosOS 0.7.8.2 (GNU/Linux \r)
+  KratosOS @KRATOS_VERSION@ (GNU/Linux \r)
   Kernel \v on \m (\l)
 
 EOF
+sed -i "s/@KRATOS_VERSION@/${KRATOS_VERSION}/g" "$ETC/issue"
 
 echo "[+] Creating /etc/profile (LFS 13.0 style)..."
 cat > "$ETC/profile" <<'EOF'
@@ -469,7 +471,7 @@ EOF
 
 cat > "$SYSROOT/var/lib/kratos/db/packages/kpm" <<EOF
 name=kpm
-version=0.7.8
+version=${KRATOS_VERSION}
 release=1
 arch=x86_64
 description=Kratos Package Manager (Base System)
