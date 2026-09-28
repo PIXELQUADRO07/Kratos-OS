@@ -27,6 +27,11 @@ export LD_LIBRARY_PATH="/usr/lib:/usr/local/lib:${LD_LIBRARY_PATH:-}"
 export GTK_THEME=Adwaita
 export XCURSOR_THEME=Adwaita
 
+# Software rendering: Mesa/GL on QEMU std VGA / simpledrm often yields a black desktop
+export LIBGL_ALWAYS_SOFTWARE=1
+export GALLIUM_DRIVER=llvmpipe
+export XFCE_COMPOSITOR=0
+
 # 3c. Clear previous session state for a clean Live boot
 rm -rf "$USER_HOME/.cache/sessions"/* 2>/dev/null || true
 
@@ -34,47 +39,51 @@ if [ -z "$GDK_PIXBUF_MODULE_FILE" ]; then
     for d in /usr/lib/gdk-pixbuf-2.0/* /usr/lib64/gdk-pixbuf-2.0/*; do
         if [ -f "$d/loaders.cache" ]; then
             export GDK_PIXBUF_MODULE_FILE="$d/loaders.cache"
-            export GDK_PIXBUF_MODULEDIR="$(dirname "$d")/loaders"
+            export GDK_PIXBUF_MODULEDIR="$d/loaders"
             break
         fi
     done
 fi
 
+start_xfce_manual() {
+    xfsettingsd --daemon 2>/dev/null || true
+    xfwm4 --compositor=off --daemon 2>/dev/null || true
+    xfdesktop --daemon 2>/dev/null || true
+    exec xfce4-panel
+}
+
 # 4. Start the session
 # We use dbus-run-session to ensure a clean, private bus for XFCE.
-# We launch xfce4-session directly for better control.
+# xfwm4 compositing is disabled via system xfconf (use_compositing=false)
+# because GL compositing on virtio/simpledrm is a common black-screen cause.
 
 if command -v dbus-run-session >/dev/null 2>&1; then
-    exec dbus-run-session -- bash -c "
-        # 4a. Start PulseAudio daemon in background
+    exec dbus-run-session -- sh -c '
         if command -v pulseaudio >/dev/null 2>&1; then
             pulseaudio --start --exit-idle-time=-1 2>/dev/null
         fi
 
-        # 4b. Start Polkit Authentication Agent
         if [ -x /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 ]; then
             /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 &
         fi
 
-        # 4c. Launch the full session manager
+        if command -v xfconf-query >/dev/null 2>&1; then
+            xfconf-query -c xfwm4 -p /general/use_compositing -n -t bool -s false 2>/dev/null || true
+        fi
+
         if command -v xfce4-session >/dev/null 2>&1; then
             exec xfce4-session
         elif command -v startxfce4 >/dev/null 2>&1; then
             exec startxfce4
         else
-            # Manual fallback
-            xfsettingsd --daemon
-            xfwm4 --compositor=off --daemon
-            xfdesktop --daemon
+            xfsettingsd --daemon 2>/dev/null || true
+            xfwm4 --compositor=off --daemon 2>/dev/null || true
+            xfdesktop --daemon 2>/dev/null || true
             exec xfce4-panel
         fi
-    "
+    '
 else
-    # Fallback without dbus-run-session
-    xfsettingsd --daemon
-    xfwm4 --compositor=off --daemon
-    xfdesktop --daemon
-    exec xfce4-panel
+    start_xfce_manual
 fi
 
 # Emergency fallback to xterm

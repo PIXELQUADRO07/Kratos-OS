@@ -45,6 +45,17 @@ if [ -f "$KRATOS_ROOT/Branding/KratosOS.png" ]; then
     cp -f "$KRATOS_ROOT/Branding/KratosOS.png" "$SYSROOT/usr/share/backgrounds/xfce/kratosos-logo.png"
 fi
 
+# Disable xfwm4 compositing system-wide (GL compositor → black screen on QEMU/KMS).
+XFWM4_XML="$SYSROOT/etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml"
+cat > "$XFWM4_XML" << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfwm4" version="1.0">
+  <property name="general" type="empty">
+    <property name="use_compositing" type="bool" value="false"/>
+  </property>
+</channel>
+EOF
+
 # Keep the default panel limited to plugins shipped in the base image.
 PANEL_CONFIG="$SYSROOT/etc/xdg/xfce4/panel/default.xml"
 if [ -f "$PANEL_CONFIG" ]; then
