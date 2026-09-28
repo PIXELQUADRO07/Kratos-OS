@@ -11,6 +11,11 @@
 #   make phase1         # Phase 1: toolchain bootstrap
 #   make phase2         # Phase 2: userspace base
 #   make phase3         # Phase 3: kernel + GRUB + init + disk image
+#   make phase4         # Phase 4: X11 stack config
+#   make phase5         # Phase 5: XFCE desktop config
+#   make phase6         # Phase 6: Calamares installer config
+#   make inject-pkgs    # Install binary packages (Xorg/XFCE) into sysroot
+
 #
 # Individual targets:
 #   make kernel         # build Linux kernel
@@ -32,13 +37,14 @@ MAKEFLAGS     += --no-print-directory
 export KRATOS_JOBS ?= $(shell nproc)
 
 .PHONY: help all test \
-        phase1 phase2 phase3 \
+        phase1 phase2 phase3 phase4 phase5 phase6 \
         toolchain verify verify-phase2 download \
         linux-headers binutils gcc-pass1 glibc-bootstrap libgcc glibc gcc-pass2 \
         ncurses readline bash coreutils grep sed gawk findutils \
         diffutils tar gzip xz bzip2 file-cmd \
         kernel grub etc init pkg disk image iso live-iso \
-        mbedtls ca-certs fetch xorg xfce calamares \
+        mbedtls ca-certs fetch xorg xfce calamares inject-pkgs \
+        desktop-disk \
         check-host host-deps \
         clean distclean stamps-clean
 
@@ -61,6 +67,11 @@ help:
 	@echo "  make phase1          Phase 1: toolchain bootstrap"
 	@echo "  make phase2          Phase 2: userspace base"
 	@echo "  make phase3          Phase 3: kernel + GRUB + init + disk"
+	@echo "  make phase4          Phase 4: X11 stack configuration"
+	@echo "  make phase5          Phase 5: XFCE desktop configuration"
+	@echo "  make phase6          Phase 6: Calamares installer configuration"
+	@echo "  make inject-pkgs     Install Xorg/XFCE binary packages into sysroot"
+	@echo "  make desktop-disk    inject-pkgs + xorg + xfce + calamares + disk"
 	@echo ""
 	@echo "  Phase 1 individual stages:"
 	@echo "  make linux-headers  make binutils     make gcc-pass1"
@@ -76,6 +87,9 @@ help:
 	@echo "  Phase 3 individual targets:"
 	@echo "  make kernel    make grub    make etc   make init"
 	@echo "  make pkg       make disk    make iso"
+	@echo ""
+	@echo "  Desktop (run inject-pkgs before disk for a graphical image):"
+	@echo "  make inject-pkgs  make xorg  make xfce  make calamares"
 	@echo ""
 	@echo "  Utilities:"
 	@echo "  make test            Run automated test suite (security, pkg, json, crypt)"
@@ -253,7 +267,7 @@ file-cmd:
 # ─────────────────────────────────────────────
 # Phase 3 — Kernel, bootloader, init, disk image
 # ─────────────────────────────────────────────
-phase3: kernel grub mbedtls ca-certs etc init pkg fetch xorg xfce calamares disk
+phase3: kernel grub mbedtls ca-certs etc init pkg fetch disk
 
 kernel:
 	@bash $(SCRIPTS)/build-kernel.sh
@@ -282,14 +296,35 @@ ca-certs:
 fetch:
 	@bash $(SCRIPTS)/build-fetch.sh
 
+# ─────────────────────────────────────────────
+# Phase 4 — X11 graphics stack
+# ─────────────────────────────────────────────
+phase4: xorg
+
 xorg:
 	@bash $(SCRIPTS)/build-xorg.sh
+
+# ─────────────────────────────────────────────
+# Phase 5 — XFCE desktop
+# ─────────────────────────────────────────────
+phase5: xfce
 
 xfce:
 	@bash $(SCRIPTS)/build-xfce.sh
 
+# ─────────────────────────────────────────────
+# Phase 6 — Calamares installer
+# ─────────────────────────────────────────────
+phase6: calamares
+
 calamares:
 	@bash $(SCRIPTS)/build-calamares.sh
+
+# Graphical disk image: packages must be in the sysroot before the image is packed.
+desktop-disk:
+	@echo "[+] Graphical disk: injecting desktop packages (required)..."
+	@KRATOS_REQUIRE_DESKTOP=1 bash $(SCRIPTS)/install-packages.sh
+	@$(MAKE) xorg xfce calamares disk
 
 # disk requires root — invoke via sudo automatically
 disk image:

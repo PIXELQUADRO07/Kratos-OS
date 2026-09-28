@@ -56,7 +56,7 @@ fi
 echo "[Step 1] Syncing latest Live, Desktop and Calamares configurations..."
 if [ -x "$SCRIPT_DIR/install-packages.sh" ]; then
     echo "  -> Injecting binary packages..."
-    bash "$SCRIPT_DIR/install-packages.sh"
+    KRATOS_REQUIRE_DESKTOP=1 bash "$SCRIPT_DIR/install-packages.sh"
 fi
 if [ -x "$SCRIPT_DIR/build-xorg.sh" ]; then
     bash "$SCRIPT_DIR/build-xorg.sh"
@@ -404,6 +404,5 @@ echo "  ISO:   $ISO_OUT"
 echo "  Size:  $(du -sh "$ISO_OUT" | cut -f1)"
 echo
 echo "To test in QEMU:"
-echo "  qemu-system-x86_64 -m 1G -cdrom $ISO_OUT -boot d"
-echo "  (For UEFI boot, add OVMF parameters like in run-qemu.sh)"
+echo "  ./run-qemu.sh --iso --graphic"
 echo

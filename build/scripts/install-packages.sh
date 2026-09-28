@@ -4,6 +4,14 @@
 # This script builds a host-native version of 'kpm' (kratos) and uses it
 # to populate the sysroot with pre-built binary packages (Xorg, Xfce, etc.)
 # from the KratosOS-Packages repository.
+#
+# Usage:
+#   make inject-pkgs              # optional desktop packages (warnings on miss)
+#   make desktop-disk             # require desktop pkgs, then pack a disk image
+#   KRATOS_REQUIRE_DESKTOP=1 ...  # fail if xorg-server/xinit/xfce4-session/xfwm4/dbus miss
+#
+# make iso always sets KRATOS_REQUIRE_DESKTOP=1. make phase3 / make disk do not
+# inject packages; a console-only image is intentional unless desktop-disk is used.
 
 set -euo pipefail
 
@@ -206,13 +214,24 @@ for pkg in "${PACKAGES[@]}"; do
 done
 
 echo "[+] Checking optional desktop packages..."
+DESKTOP_REQUIRED="dbus xorg-server xinit xfce4-session xfwm4"
+DESKTOP_FAILED=""
 for pkg in "${OPTIONAL_PACKAGES[@]}"; do
     if "$HOST_KPM" install --force "$pkg"; then
         echo "    -> Installed optional package: $pkg"
     else
         echo "    [!] Warning: Failed to install optional package $pkg (missing or broken recipe)"
+        if echo " $DESKTOP_REQUIRED " | grep -q " $pkg "; then
+            DESKTOP_FAILED="$DESKTOP_FAILED $pkg"
+        fi
     fi
 done
+
+if [ "${KRATOS_REQUIRE_DESKTOP:-0}" = "1" ] && [ -n "$DESKTOP_FAILED" ]; then
+    echo "[!] Error: required desktop packages failed to install:$DESKTOP_FAILED"
+    echo "    ISO/graphical images need xorg-server, xinit, xfce4-session, xfwm4, and dbus."
+    exit 1
+fi
 
 echo
 echo "[✓] Package injection complete."
