@@ -52,8 +52,6 @@ void shutdown_system(int cmd)
     for (;;) pause();
 }
 
-static const char *kratos_build_marker = "KRATOS_DEBUG_BUILD_20260817_01";
-
 int main(void)
 {
     /* Set basic environment for init and all its children (rc.sysinit, services, shells) */
@@ -63,7 +61,11 @@ int main(void)
     /* Handle Live Session (SquashFS + OverlayFS) if requested */
     setup_live_session();
 
-    fprintf(stderr, "\n[init] KratosOS starting... (%s)\n", kratos_build_marker);
+#ifdef KRATOS_DEBUG
+    fprintf(stderr, "\n[init] KratosOS starting... (debug build)\n");
+#else
+    fprintf(stderr, "\n[init] KratosOS starting...\n");
+#endif
 
     if (getpid() != 1) {
         fprintf(stderr, "[init] WARNING: Not running as PID 1 (PID=%d)\n", getpid());
