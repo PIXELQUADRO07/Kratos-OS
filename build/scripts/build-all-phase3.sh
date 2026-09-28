@@ -6,10 +6,13 @@
 #
 #   1. Linux kernel  (bzImage + modules)
 #   2. GRUB 2 EFI    (modules + EFI binary skeleton in sysroot)
-#   3. /etc skeleton (fstab, passwd, shadow, group, rc.d, ...)
-#   4. init system   (init, shutdown, devd, kratos-net, login, passwd)
-#   5. kpm           (Kratos Package Manager)
-#   6. disk image    (GPT + ESP + root ext4, GRUB installed, grub.cfg)
+#   3. mbedTLS + CA certificates + kratos-fetch
+#   4. /etc skeleton (fstab, passwd, shadow, group, rc.d, ...)
+#   5. init system   (init, shutdown, devd, kratos-net, login, passwd)
+#   6. kpm           (Kratos Package Manager)
+#   7. disk image    (GPT + ESP + root ext4, GRUB installed, grub.cfg)
+#
+# X11 / XFCE / Calamares are Phase 4–6 (make phase4/5/6 or make desktop-disk).
 #
 # Usage:
 #   ./build-all-phase3.sh        # run all steps
@@ -34,31 +37,29 @@ export MAKEFLAGS="-j${KRATOS_JOBS:-$(nproc)}"
 declare -a STAGES=(
     "build-kernel.sh"
     "build-grub.sh"
+    "build-mbedtls.sh"
+    "build-ca-certificates.sh"
     "create-etc-skeleton.sh"
     "build-init.sh"
     "build-pkg.sh"
-    "install-packages.sh"
-    "build-xorg.sh"
-    "build-xfce.sh"
-    "build-calamares.sh"
+    "build-fetch.sh"
     "build-disk.sh"
 )
 
 STAGE_NAMES=(
     "Linux kernel (bzImage + modules)"
     "GRUB 2 EFI bootloader"
+    "mbedTLS"
+    "CA certificate bundle"
     "/etc skeleton (fstab, passwd, rc.d, ...)"
     "init system (init, shutdown, devd, login, passwd)"
     "kpm package manager"
-    "Inject binary packages"
-    "X11 graphics stack"
-    "XFCE desktop environment"
-    "Calamares system installer"
+    "kratos-fetch HTTPS client"
     "Disk image (GPT + ESP + root ext4)"
 )
 
 # The disk step requires root.
-STAGE_SUDO=(no no no no no no no no no yes)
+STAGE_SUDO=(no no no no no no no no yes)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -169,9 +170,9 @@ echo "    └── /bin/bash"
 echo
 echo "  ${BOLD}Test with QEMU + OVMF:${RESET}"
 echo
-echo "    qemu-system-x86_64 \\"
-echo "      -m 512M \\"
-echo "      -drive file=\"$KRATOS_ROOT/build/images/kratosos.img\",format=raw,if=virtio \\"
-echo "      -bios /usr/share/ovmf/OVMF.fd \\"
-echo "      -nographic"
+echo "    ./run-qemu.sh"
+echo
+echo "  Graphical disk (Xorg/XFCE/Calamares) is not part of Phase 3:"
+echo "    make desktop-disk     # inject-pkgs (required) + phase4/5/6 + disk"
+echo "    make iso              # Live ISO with kratos.live"
 echo
