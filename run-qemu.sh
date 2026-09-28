@@ -209,10 +209,10 @@ if $SNAPSHOT; then
 fi
 
 if $GRAPHIC; then
-    CMD+=(-vga std)
-    echo "${YELLOW}  VGA window mode. Close the window or press Ctrl-C to quit.${RESET}"
+    CMD+=(-vga virtio)
+    echo "${YELLOW}  VGA window mode (virtio-vga). Close the window or press Ctrl-C to quit.${RESET}"
 elif $VNC; then
-    CMD+=(-vga std -vnc :1)
+    CMD+=(-vga virtio -vnc :1)
     echo "${YELLOW}  VNC mode enabled on display :1 (port 5901).${RESET}"
     echo "  Connect using: ${BOLD}vncviewer localhost:5901${RESET}"
 else

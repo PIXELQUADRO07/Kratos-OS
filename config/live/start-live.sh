@@ -134,10 +134,18 @@ fi
 
 chown -R "$SESSION_USER:$SESSION_USER" "$SESSION_HOME" 2>/dev/null || true
 
+log_console() {
+    echo "$1"
+    echo "$1" >> /var/log/Xorg.start.log 2>/dev/null || true
+    if [ -c /dev/tty0 ]; then
+        echo "$1" > /dev/tty0 2>/dev/null || true
+    fi
+}
+
 # 4. Launch X11 GUI
+mkdir -p /var/log
 if command -v startx >/dev/null 2>&1; then
-    echo "[Live] Starting graphical XFCE session as $SESSION_USER..."
-    mkdir -p /var/log
+    log_console "[Live] Starting graphical XFCE session as $SESSION_USER..."
     echo "[Live] Invoking startx..." >> /var/log/Xorg.start.log
 
     TARGET_VT=7
@@ -180,15 +188,20 @@ if command -v startx >/dev/null 2>&1; then
     fi
 
     if [ "$STARTX_RC" -ne 0 ]; then
-        echo "[Live] ERROR: startx exited $STARTX_RC. Checking logs..."
+        log_console "[Live] ERROR: startx exited $STARTX_RC. Checking logs..."
         for log in /var/log/Xorg.0.log /var/log/Xorg.start.log; do
             if [ -f "$log" ]; then
                 echo "[Live] --- $log ---"
-                cat "$log"
+                echo "[Live] --- $log ---" >> /var/log/Xorg.start.log
+                tail -n 80 "$log"
+                tail -n 80 "$log" >> /var/log/Xorg.start.log 2>/dev/null || true
             fi
         done
+        if [ -c /dev/tty0 ]; then
+            tail -n 40 /var/log/Xorg.0.log > /dev/tty0 2>/dev/null || true
+        fi
     fi
 else
-    echo "[Live] ERROR: 'startx' not found. Graphical session cannot start."
-    echo "[Live] Please ensure 'xorg-server' and 'xinit' packages are installed in the sysroot."
+    log_console "[Live] ERROR: 'startx' not found. Graphical session cannot start."
+    log_console "[Live] Please ensure 'xorg-server' and 'xinit' packages are installed in the sysroot."
 fi

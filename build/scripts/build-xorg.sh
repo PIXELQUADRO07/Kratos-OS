@@ -152,9 +152,9 @@ cat > "$SYSROOT/etc/rc.d/99-live" <<'EOF'
 #!/bin/bash
 # /etc/rc.d/99-live — Launch Live graphical session if in Live boot mode
 
-if grep -q "kratos.live" /proc/cmdline; then
+if grep -qE 'kratos\.live|kratos\.graphical' /proc/cmdline; then
     if [ -x /etc/live/start-live.sh ]; then
-        echo "[Live] KratosOS Live parameter detected, starting X11..."
+        echo "[Live] Graphical boot parameter detected, starting X11..."
         /etc/live/start-live.sh &
     fi
 fi
