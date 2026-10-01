@@ -567,10 +567,34 @@ EOF
 
 cat > "$SYSROOT/var/lib/kratos/db/packages/zstd" <<EOF
 name=zstd
-version=1.5.6
+version=1.5.7
 release=1
 arch=x86_64
 description=Zstandard Compression (Base System)
+EOF
+
+cat > "$SYSROOT/var/lib/kratos/db/packages/xz" <<EOF
+name=xz
+version=${XZ_VERSION:-5.6.4}
+release=1
+arch=x86_64
+description=XZ Utils (liblzma) Compression (Base System)
+EOF
+
+cat > "$SYSROOT/var/lib/kratos/db/packages/bzip2" <<EOF
+name=bzip2
+version=${BZIP2_VERSION:-1.0.8}
+release=1
+arch=x86_64
+description=bzip2 Compression Library (Base System)
+EOF
+
+cat > "$SYSROOT/var/lib/kratos/db/packages/kmod" <<EOF
+name=kmod
+version=${KMOD_VERSION:-33}
+release=1
+arch=x86_64
+description=Kernel Module Utilities (Base System)
 EOF
 
 echo
