@@ -22,7 +22,7 @@ CA_BUNDLE="$CA_DIR/ca-certificates.crt"
 #
 # To (re)generate this pin after reviewing a fresh download:
 #   sha256sum "$KRATOS_BUILD/downloads/cacert.pem"
-CA_BUNDLE_SHA256="f66dff1bdf8f96060b8177976f8b7d9254bc89bc4db933d769f7384d28480bc9"
+CA_BUNDLE_SHA256="a41b5d356aea97a529fe27e0f7316d2f9d946d75927476cf9cf1b90637d00505"
 
 echo "========================================"
 echo "       KRATOSOS CA CERTIFICATES"
