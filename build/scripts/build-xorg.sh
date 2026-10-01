@@ -151,11 +151,15 @@ mkdir -p "$SYSROOT/etc/rc.d"
 cat > "$SYSROOT/etc/rc.d/99-live" <<'EOF'
 #!/bin/bash
 # /etc/rc.d/99-live — Launch Live graphical session if in Live boot mode
+#
+# init.c forks this script as its own child process (via run_services()),
+# so 'exec' replaces this shell with start-live.sh directly — no orphaned
+# grandchild and init's boot.log fd routing stays intact.
 
 if grep -qE 'kratos\.live|kratos\.graphical' /proc/cmdline; then
     if [ -x /etc/live/start-live.sh ]; then
         echo "[Live] Graphical boot parameter detected, starting X11..."
-        /etc/live/start-live.sh &
+        exec /etc/live/start-live.sh
     fi
 fi
 EOF

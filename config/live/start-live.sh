@@ -1,8 +1,27 @@
 #!/bin/bash
 # /etc/live/start-live.sh — Live Environment Initialization and Graphical Boot
 #
+# Coordination with init's TTY supervisor:
+#   - Writes /run/kratos-graphical.pid on startup so init's check_and_respawn_ttys()
+#     suppresses the tty1 getty while the graphical session is active (prevents
+#     the VT7/TTY1 race where login/bash races against Xorg on VT1).
+#   - On exit (normal or crash), the cleanup trap removes the PID file and switches
+#     the active VT back to 1 so the user can see the init-spawned tty1 login prompt
+#     without guessing Ctrl+Alt+F1.
 
 echo "[Live] Initializing KratosOS Live Environment..."
+
+# Register PID so init knows the graphical session is active (see init/tty.c)
+printf '%d\n' "$$" > /run/kratos-graphical.pid
+
+_graphical_cleanup() {
+    rm -f /run/kratos-graphical.pid
+    # Switch back to VT1 so the login prompt spawned by init is visible
+    if [ -x /sbin/kratos-vtswitch ]; then
+        /sbin/kratos-vtswitch 1 2>/dev/null || true
+    fi
+}
+trap '_graphical_cleanup' EXIT
 
 LIVE_USER="kratos-live"
 LIVE_HOME="/home/kratos-live"
