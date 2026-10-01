@@ -197,6 +197,7 @@ OPTIONAL_PACKAGES=(
     "xfce4-panel"
     "thunar"
     "xfce4-terminal"
+    "xfce4-whiskermenu-plugin"
 )
 
 echo "[+] Installing core repository packages..."
@@ -214,7 +215,15 @@ for pkg in "${PACKAGES[@]}"; do
 done
 
 echo "[+] Checking optional desktop packages..."
-DESKTOP_REQUIRED="dbus xorg-server xinit xfce4-session xfwm4"
+# Full set of packages required for a functioning graphical XFCE ISO:
+#   mesa              — software GL (llvmpipe) needed by xinitrc GALLIUM_DRIVER=llvmpipe
+#   libinput + xf86-input-libinput — X starts without these but keyboard/mouse are dead
+#   xkeyboard-config  — XKB data; X may fail to start or produce a broken layout
+#   xfdesktop         — desktop background/icons (xfce4-session "succeeds" but leaves blank screen)
+#   xfce4-panel       — taskbar/menu (session works but nothing is visible/interactable)
+#   xf86-video-vesa   — required fallback driver for "Safe Graphics / Nomodeset" GRUB entry
+#   xf86-video-fbdev  — second framebuffer fallback for nomodeset path
+DESKTOP_REQUIRED="dbus xorg-server xinit xfce4-session xfwm4 mesa libinput xf86-input-libinput xkeyboard-config xfdesktop xfce4-panel xf86-video-vesa xf86-video-fbdev"
 DESKTOP_FAILED=""
 for pkg in "${OPTIONAL_PACKAGES[@]}"; do
     if "$HOST_KPM" install --force "$pkg"; then
@@ -229,7 +238,9 @@ done
 
 if [ "${KRATOS_REQUIRE_DESKTOP:-0}" = "1" ] && [ -n "$DESKTOP_FAILED" ]; then
     echo "[!] Error: required desktop packages failed to install:$DESKTOP_FAILED"
-    echo "    ISO/graphical images need xorg-server, xinit, xfce4-session, xfwm4, and dbus."
+    echo "    ISO/graphical images require all of: xorg-server xinit xfce4-session xfwm4 dbus"
+    echo "    mesa libinput xf86-input-libinput xkeyboard-config xfdesktop xfce4-panel"
+    echo "    xf86-video-vesa xf86-video-fbdev"
     exit 1
 fi
 
